@@ -27,19 +27,27 @@ def run_execution_loop():
     b_target_in_view = True
     last_image_time = -1
     ros = ROS()  # create a ros interface object
+    state_est = np.zeros((13, 1))
 
     loop_count = 0
     while not rospy.is_shutdown():
-        if ros.latest_time <= last_image_time:
+        loop_time = ros.latest_time
+        if loop_time <= last_image_time:
             # this means we dont have new data yet
             continue
+        # store data locally (so it doesnt get overwritten in ROS object)
+
+        abb = ros.latest_bb  # angled bounding box
+        ego_pose = ros.latest_ego_pose  # stored as a ros PoseStamped
+        bb_aqq_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
 
         rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
 
         # update ukf
+        ros.publish_filter_state(np.concatenate((loop_time, loop_count, ros.state_est)))  # send vector with time, iteration, state_est
         # [optional] update plots
         rate.sleep()
-        loop_count += 1
+        loop_count += 1    
 
 
 if __name__ == '__main__':
