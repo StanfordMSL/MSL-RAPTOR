@@ -27,7 +27,7 @@ def run_execution_loop():
     b_target_in_view = True
     last_image_time = -1
     ros = ROS()  # create a ros interface object
-    state_est = np.zeros((13, 1))
+    state_est = np.zeros((13, ))
 
     loop_count = 0
     while not rospy.is_shutdown():
@@ -44,7 +44,10 @@ def run_execution_loop():
         rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
 
         # update ukf
-        ros.publish_filter_state(np.concatenate((loop_time, loop_count, ros.state_est)))  # send vector with time, iteration, state_est
+        print(loop_time)
+        print(loop_count)
+        print(state_est)
+        ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
         # [optional] update plots
         rate.sleep()
         loop_count += 1    

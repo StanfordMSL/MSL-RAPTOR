@@ -41,7 +41,7 @@ class ros_interface:
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.pose_ekf_cb, queue_size=10)
         # rospy.Subscriber(self.ns + '/mavros/vision_position/pose', PoseStamped, self.pose_gt_cb, queue_size=10)
-        self.state_pub = rospy.Publisher(self.namespace + '/msl_raptor_state', Float32MultiArray, queue_size=10)
+        self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', Float32MultiArray, queue_size=10)
         ####################################################################
         
 
@@ -105,7 +105,7 @@ class ros_interface:
         state_msg.layout.dim[1].label = "cols"
         state_msg.layout.data_offset = 0
         state_msg.data = list(state)
-        self.state_pub.publish(state)
+        self.state_pub.publish(state_msg)
 
 
     def get_ros_time(self):
