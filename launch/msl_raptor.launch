@@ -1,6 +1,10 @@
 <launch>
+  <arg name="id"          default="7" />
+  <arg name="robot_type"  default="quad" />
+  <arg name="ns"          value="/$(arg robot_type)$(arg id)" />
 
   <node name="MSL_RAPTOR" pkg="msl_raptor" type="msl_raptor.py" output="screen">
+    <param name="ns"  value="$(arg ns)"/> 
   </node>
-  
+
 </launch>
