@@ -1,0 +1,6 @@
+<launch>
+
+  <node name="MSL_RAPTOR" pkg="msl_raptor" type="msl_raptor.py" output="screen">
+  </node>
+  
+</launch>
