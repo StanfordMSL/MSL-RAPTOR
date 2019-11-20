@@ -41,9 +41,9 @@ class ros_interface:
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.pose_ekf_cb, queue_size=10)
         # rospy.Subscriber(self.ns + '/mavros/vision_position/pose', PoseStamped, self.pose_gt_cb, queue_size=10)
+        self.state_pub = rospy.Publisher(self.namespace + '/msl_raptor_state', Float32MultiArray, queue_size=10)
         ####################################################################
         
-
 
     def pose_ekf_cb(self, msg):
         """
@@ -86,6 +86,26 @@ class ros_interface:
             
         self.latest_bb = [120, 230, 40, 20, 10*np.pi/180]
         self.latest_time = time  # DO THIS LAST
+
+
+    def publish_filter_state(self, state):
+        """
+        Broadcast the estimated state of the filter. 
+        State assumed to be a Nx1 numpy array of floats
+        """
+        data_len = len(state)
+        state_msg = Float32MultiArray()
+        state_msg.layout.dim.append(MultiArrayDimension())
+        state_msg.layout.dim.append(MultiArrayDimension())
+        state_msg.layout.dim[0].size = data_len
+        state_msg.layout.dim[1].size = 1
+        state_msg.layout.dim[0].stride = data_len*1
+        state_msg.layout.dim[1].stride = data_len
+        state_msg.layout.dim[0].label = "rows"
+        state_msg.layout.dim[1].label = "cols"
+        state_msg.layout.data_offset = 0
+        state_msg.data = list(state)
+        self.state_pub.publish(state)
 
 
     def get_ros_time(self):
