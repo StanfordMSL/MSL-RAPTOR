@@ -50,12 +50,12 @@ def run_execution_loop():
         rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
 
         # update ukf
-        print(loop_time)
-        print(loop_count)
-        print(state_est)
-        print(abb)
-        print(ego_pose)
-        print(bb_aqq_method)
+        # print(loop_time)
+        # print(loop_count)
+        # print(state_est)
+        # print(abb)
+        # print(ego_pose)
+        # print(bb_aqq_method)
         ukf.step_ukf(abb, bb_3d, pose_to_tf(ego_pose))
         ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
         # [optional] update plots
@@ -69,7 +69,12 @@ def init_objects(ros, ukf):
     camera['K'] = ros.K  # camera intrinsic matrix is recieved via ros
     camera['tf_cam_ego'] = np.eye(4)
     # camera['tf_cam_ego'][0:3, 0:3] = 
-    rospy.logwarn('need camera orientation relative to optitrack frame. The cameras pose relative to the quad frame should be in the camera parameter yaml (ON THE QUAD).')
+    rospy.logwarn('need camera orientation relative to optitrack frame. Load from yaml??')
+    # https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml
+    camera['tf_cam_ego'][0:3, 3] = [0.05, 0.0, 0.07]
+    camera['tf_cam_ego'][0:3, 0:3] = np.array([[ 0.0,  0.0,  1.0], 
+                                               [-1.0,  0.0,  0.0], 
+                                               [ 0.0, -1.0,  0.0]])
 
     # init ukf state
     rospy.logwarn('using ground truth to initialize filter!')

@@ -65,12 +65,23 @@ class UKF:
         if self.b_enforce_0_yaw:
             sig_step[8, :] = 0
 
-        quat_nom = self.mu[6:10]
+        q_nom = self.mu[6:10]
         # loop over half (-1) the num sigma points and update two at once
         for sp_ind in range(self.dim_sig):
-            sps[0:6, 1 + 2 * sp_ind] = self.mu[0:6] + sig_step[0:6, sp_ind]
-            sps[9:, 1 + 2 * sp_ind] = self.mu[9:13] + sig_step[8:12, sp_ind]
+            # first step in positive direction
+            sp_col_1 = 1 + 2 * sp_ind  # starting in the second col, count by pairs
+            sps[0:6, sp_col_1] = self.mu[0:6] + sig_step[0:6, sp_ind]
+            sps[10:, sp_col_1] = self.mu[10:13] + sig_step[9:12, sp_ind]
             q_perturb = axang_to_quat(sig_step[6:9, sp_ind])
+            sps[6:10, sp_col_1] = quat_mul(q_perturb, q_nom)
+
+            # next step in positive direction
+            sp_col_2 = sp_col_1 + 1
+            sps[0:6, sp_col_2] = self.mu[0:6] - sig_step[0:6, sp_ind]
+            sps[10:, sp_col_2] = self.mu[10:13] - sig_step[9:12, sp_ind]
+            q_perturb = axang_to_quat(-sig_step[6:9, sp_ind])
+            sps[6:10, sp_col_2] = quat_mul(q_perturb, q_nom)
+            
         return sps
     
     
