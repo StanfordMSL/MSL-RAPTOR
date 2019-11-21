@@ -1,5 +1,7 @@
 
 # IMPORTS
+#tools
+from copy import copy
 # math
 import numpy as np
 import numpy.linalg as la
@@ -51,10 +53,13 @@ class UKF:
         ####################################################################
 
 
-    def step_ukf(self, measurement, bb_3d, tf_ego_w):
+    def step_ukf(self, measurement, bb_3d, tf_ego_w, dt):
         self.ukf_itr += 1
 
         sps = self.calc_sigma_points()
+        sps_prop = np.empty_like(sps)
+        for sp_ind in range(sps_prop.shape[1]):
+            sps_prop[:, sp_ind] = self.propagate_dynamics(sps[:, sp_ind], dt)
 
     
     def calc_sigma_points(self):
@@ -85,8 +90,30 @@ class UKF:
         return sps
     
     
-    def propogate_dynamics():
-        pass
+    def propagate_dynamics(self, state, dt):
+        """
+        Estimate the next state vector. Assumes no control input (velocities stay the same)
+        """
+        next_state = copy(state)
+
+        # update position
+        next_state[0:3] += dt * state[3:6]
+
+        # update orientation
+        quat = state[6:10]  # current orientation
+        omegas = state[10:13]  # angular velocity vector
+        om_norm = la.norm(omegas)  # rate of change of all angles
+        ang = om_norm * dt  # change in angle in this small timestep
+        ax = omegas / om_norm  # axis about angle change
+        quat_delta = axang_to_quat(ax * ang)
+        quat_new = quat_mul(quat_delta, quat)
+
+        [roll, pitch, yaw] = quat_to_ang(quat_new)
+        if self.b_enforce_0_yaw:
+            yaw = 0
+        next_state[6:10] = ang_to_quat([roll, pitch, yaw])
+
+        return next_state
 
     
     def extract_mean_and_cov_from_state_sigma_points():

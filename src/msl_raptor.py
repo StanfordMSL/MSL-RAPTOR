@@ -41,6 +41,7 @@ def run_execution_loop():
         if loop_time <= last_image_time:
             # this means we dont have new data yet
             continue
+        dt = loop_time - last_image_time
         # store data locally (so it doesnt get overwritten in ROS object)
 
         abb = ros.latest_bb  # angled bounding box
@@ -56,7 +57,7 @@ def run_execution_loop():
         # print(abb)
         # print(ego_pose)
         # print(bb_aqq_method)
-        ukf.step_ukf(abb, bb_3d, pose_to_tf(ego_pose))
+        ukf.step_ukf(abb, bb_3d, pose_to_tf(ego_pose), dt)
         ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
         # [optional] update plots
         rate.sleep()
