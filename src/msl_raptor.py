@@ -14,9 +14,12 @@ import numpy as np
 # from mpl_toolkits import mplot3d
 # ros
 import rospy
-# libs
+# custom modules
 from ros_interface import ros_interface as ROS
 from ukf import UKF
+# libs & utils
+from utils.ros_utils import *
+
 
 def run_execution_loop():
     rate = rospy.Rate(100) # max filter rate
@@ -53,7 +56,7 @@ def run_execution_loop():
         print(abb)
         print(ego_pose)
         print(bb_aqq_method)
-        ukf.step_ukf(abb, bb_3d, ros.pose_to_tf(ego_pose))
+        ukf.step_ukf(abb, bb_3d, pose_to_tf(ego_pose))
         ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
         # [optional] update plots
         rate.sleep()
@@ -66,11 +69,11 @@ def init_objects(ros, ukf):
     camera['K'] = ros.K  # camera intrinsic matrix is recieved via ros
     camera['tf_cam_ego'] = np.eye(4)
     # camera['tf_cam_ego'][0:3, 0:3] = 
-    rospy.logwarn('need camera orientation relative to optitrack frame')
+    rospy.logwarn('need camera orientation relative to optitrack frame. The cameras pose relative to the quad frame should be in the camera parameter yaml (ON THE QUAD).')
 
     # init ukf state
     rospy.logwarn('using ground truth to initialize filter!')
-    ukf.mu = ros.pose_to_state_vec(ros.quad_pose_gt)
+    ukf.mu = pose_to_state_vec(ros.quad_pose_gt)
     return camera
 
 

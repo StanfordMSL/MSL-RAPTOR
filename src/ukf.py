@@ -9,7 +9,9 @@ import numpy.linalg as la
 # from mpl_toolkits import mplot3d
 # ros
 import rospy
-# libs
+# libs & utils
+from utils.ukf_utils import *
+
 
 class UKF:
 
@@ -68,7 +70,7 @@ class UKF:
         for sp_ind in range(self.dim_sig):
             sps[0:6, 1 + 2 * sp_ind] = self.mu[0:6] + sig_step[0:6, sp_ind]
             sps[9:, 1 + 2 * sp_ind] = self.mu[9:13] + sig_step[8:12, sp_ind]
-            q_perturb = self.axang_to_quat(sig_step[6:9, sp_ind])
+            q_perturb = axang_to_quat(sig_step[6:9, sp_ind])
         return sps
     
     
@@ -91,20 +93,3 @@ class UKF:
     def predict_measurement():
         pass
 
-
-#####  UTULS  ##########
-
-    def axang_to_quat(self, axang):
-        """ 
-        takes in an orientation in axis-angle form s.t. |axang| = ang, and 
-        axang/ang = unit vector about which the angle is rotated. Returns a quaternion
-        """
-        quat = np.array([1, 0, 0, 0])
-        ang = la.norm(axang)
-
-        # deal with numeric issues
-        if abs(ang) > 0.001:
-            vec_perturb = axang / ang
-            quat = [np.cos(ang/2), np.sin(ang/2) * vec_perturb]
-        
-        return quat
