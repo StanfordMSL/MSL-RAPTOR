@@ -110,8 +110,8 @@ def average_quaternions(Q, w=None):
     weightSum = 0
 
     for i in range(0,M):
-        q = Q[i,:]
-        A = w[i] * np.outer(q,q) + A
+        q = Q[i, :]
+        A = w[i] * np.outer(q, q) + A
         weightSum += w[i]
 
     # scale
@@ -121,12 +121,13 @@ def average_quaternions(Q, w=None):
     eigenValues, eigenVectors = la.eig(A)
 
     # Sort by largest eigenvalue
-    eigenVectors = eigenVectors[:,eigenValues.argsort()[::-1]]
+    eigenVectors = eigenVectors[:, eigenValues.argsort()[::-1]]
 
     # return the real part of the largest eigenvector (has only real part)
-    q_mean = np.real(eigenVectors[:,0])
+    q_mean = np.real(eigenVectors[:, 0])
     if q_mean[0] < 0:
         q_mean *= -1
+        
     # calc set of differences from each quat to the mean (in ax-angle rep.)
     ei_vec_set = np.zeros((3, M)) 
     q_mean_inv = quat_inv(q_mean)
@@ -135,3 +136,11 @@ def average_quaternions(Q, w=None):
         ei_vec_set[:, i] = quat_to_axang(ei_quat)
 
     return q_mean, ei_vec_set
+
+
+    def enforce_pos_def_sym_mat(sigma):
+        sigma_out = (sigma + sigma.T) / 2
+        V, D = la.eig(sigma_out)
+        D[D < 0] = 0.000001
+        sigma_out = V @ D @ V.T
+        return sigma_out

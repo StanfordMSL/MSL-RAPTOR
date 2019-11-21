@@ -28,7 +28,7 @@ def run_execution_loop():
     ros = ROS()  # create a ros interface object
     wait_intil_ros_ready(ros)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
-    camera = init_objects(ros, ukf)
+    init_objects(ros, ukf)  # init camera, pose, etc
 
     rospy.logwarn('need actual 3d bounding box info')
     bb_3d = np.zeros((8, 3))
@@ -51,12 +51,6 @@ def run_execution_loop():
         rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
 
         # update ukf
-        # print(loop_time)
-        # print(loop_count)
-        # print(state_est)
-        # print(abb)
-        # print(ego_pose)
-        # print(bb_aqq_method)
         ukf.step_ukf(abb, bb_3d, pose_to_tf(ego_pose), dt)
         ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
         # [optional] update plots
@@ -65,23 +59,20 @@ def run_execution_loop():
 
 
 def init_objects(ros, ukf):
-    # create camera object
-    camera = {}
+    # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
     camera['K'] = ros.K  # camera intrinsic matrix is recieved via ros
     camera['tf_cam_ego'] = np.eye(4)
-    # camera['tf_cam_ego'][0:3, 0:3] = 
-    rospy.logwarn('need camera orientation relative to optitrack frame. Load from yaml??')
-    # https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml
-    camera['tf_cam_ego'][0:3, 3] = [0.05, 0.0, 0.07]
-    camera['tf_cam_ego'][0:3, 0:3] = np.array([[ 0.0,  0.0,  1.0], 
-                                               [-1.0,  0.0,  0.0], 
-                                               [ 0.0, -1.0,  0.0]])
+
+    tf_cam_ego = np.eye(4)
+    tf_cam_ego[0:3, 3] = [0.05, 0.0, 0.07]
+    tf_cam_ego[0:3, 0:3] = np.array([[ 0.0,  0.0,  1.0], 
+                                     [-1.0,  0.0,  0.0], 
+                                     [ 0.0, -1.0,  0.0]])
+    ukf.camera = camera(ros.K, tf_cam_ego)
 
     # init ukf state
     rospy.logwarn('using ground truth to initialize filter!')
     ukf.mu = pose_to_state_vec(ros.quad_pose_gt)
-    return camera
-
 
 
 def wait_intil_ros_ready(ros, timeout = 10):
@@ -91,6 +82,25 @@ def wait_intil_ros_ready(ros, timeout = 10):
     while not ros.latest_time and (time - start_time < timeout):
         time = rospy.Time.now().to_sec()
         rospy.loginfo("waiting for ROS to be ready...")
+
+
+class camera:
+    def __init__(self, K, tf_cam_ego):
+        self.K = K  # camera intrinsic matrix
+        self.tf_cam_ego = tf_cam_ego  # camera pose relative to the quad (fixed)
+
+    def pix_to_pnt3d(self):
+        rospy.logwarn("pix_to_pnt3d is not written yet!")
+        pass
+
+    def pnt3d_to_pix(self, pnt_q):
+        """
+        input: assumes pnt in quad frame
+        output: [row, col] i.e. the projection of xyz onto camera plane
+        """
+        pnt_c = self.tf_cam_ego @ np.concatinate((pnt_q, [1]))
+        rc = camera.K @ np.reshape(pnt_c[0:3], 3, 1);
+        rc = [rc(2), rc(1)] / rc(3);
 
 
 if __name__ == '__main__':

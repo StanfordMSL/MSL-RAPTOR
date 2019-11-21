@@ -39,7 +39,7 @@ class UKF:
         self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
         self.w_arr[0] = self.w0_m
 
-        self.camera = {}
+        self.camera = None
         ####################################################################
 
         # init vars #############################
@@ -57,37 +57,61 @@ class UKF:
 
 
     def step_ukf(self, measurement, bb_3d, tf_ego_w, dt):
+        """
+        UKF iteration following pseudo code from probablistic robotics
+        """
         self.ukf_itr += 1
-        sps = self.calc_sigma_points()
+
+        # line 2
+        sps = self.calc_sigma_points(self.mu, self.sigma)
+
+        # lines 2 & 3
         sps_prop = np.empty_like(sps)
         for sp_ind in range(sps_prop.shape[1]):
             sps_prop[:, sp_ind] = self.propagate_dynamics(sps[:, sp_ind], dt)
 
+        # lines 4 & 5
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
+        
+        # line 6
+        sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
+        
+        # lines 7 & 8
+        pred_meas = self.predict_measurement(sps_recalc, bb_3d, tf_ego_w)
         pdb.set_trace()
+
+
+    def predict_measurement(self, sps_recalc, bb_3d, tf_ego_w):
+        """
+        use camera model & relative states to predict the angled 2d 
+        bounding box seen by the ego drone 
+        """
+        
+        pass
+
     
-    def calc_sigma_points(self):
+    def calc_sigma_points(self, mu, sigma):
         sps = np.zeros((self.dim_state, 2 * self.dim_sig + 1))
-        sps[:, 0] = self.mu
-        sig_step = self.sig_pnt_multiplier * la.cholesky(self.sigma)
+        sps[:, 0] = mu
+        sig_step = self.sig_pnt_multiplier * la.cholesky(sigma)
 
         if self.b_enforce_0_yaw:
             sig_step[8, :] = 0
 
-        q_nom = self.mu[6:10]
+        q_nom = mu[6:10]
         # loop over half (-1) the num sigma points and update two at once
         for sp_ind in range(self.dim_sig):
             # first step in positive direction
             sp_col_1 = 1 + 2 * sp_ind  # starting in the second col, count by pairs
-            sps[0:6, sp_col_1] = self.mu[0:6] + sig_step[0:6, sp_ind]
-            sps[10:, sp_col_1] = self.mu[10:13] + sig_step[9:12, sp_ind]
+            sps[0:6, sp_col_1] = mu[0:6] + sig_step[0:6, sp_ind]
+            sps[10:, sp_col_1] = mu[10:13] + sig_step[9:12, sp_ind]
             q_perturb = axang_to_quat(sig_step[6:9, sp_ind])
             sps[6:10, sp_col_1] = quat_mul(q_perturb, q_nom)
 
             # next step in positive direction
             sp_col_2 = sp_col_1 + 1
-            sps[0:6, sp_col_2] = self.mu[0:6] - sig_step[0:6, sp_ind]
-            sps[10:, sp_col_2] = self.mu[10:13] - sig_step[9:12, sp_ind]
+            sps[0:6, sp_col_2] = mu[0:6] - sig_step[0:6, sp_ind]
+            sps[10:, sp_col_2] = mu[10:13] - sig_step[9:12, sp_ind]
             q_perturb = axang_to_quat(-sig_step[6:9, sp_ind])
             sps[6:10, sp_col_2] = quat_mul(q_perturb, q_nom)
             
@@ -125,8 +149,25 @@ class UKF:
     
     def extract_mean_and_cov_from_state_sigma_points(self, sps):
         mu_bar = self.w0_m * sps[:, 0] + self.wi*np.sum(sps[:, 1:], 1)
-        mu_bar[6:10] = average_quaternions(sps[6:10, :].T, self.w_arr)
+        mu_bar[6:10], ei_vec_set = average_quaternions(sps[6:10, :].T, self.w_arr)
         sig_bar = 0
+
+        Wprime = np.zeros((self.dim_sig, sps.shape[1]))
+        
+        W = self.w0_c
+        sig_bar = zeros((self.dim_sig, self.dim_sig))
+        for sp_ind in range(sps.shape[1])
+            Wprime[0:6, sp_ind] = sps[0:6, sp_ind] - mu_bar[0:6]  # still need to overwrite the quat parts of this
+            Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13]  # still need to overwrite the quat parts of this
+            Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind];
+            
+            if sp_ind == 1:
+                sig_bar = sig_bar + self.w0_c * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
+            else:
+                sig_bar = sig_bar + self.wi * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
+        
+        sig_bar = sig_bar + self.Q  # add noise
+        sig_bar = enforce_pos_def_sym_mat(sig_bar) # project sig_bar to pos. def. cone to avoid numeric issues
         return mu_bar, sig_bar
         
 
@@ -137,7 +178,4 @@ class UKF:
     def calculate_cross_correlation():
         pass
 
-
-    def predict_measurement():
-        pass
 
