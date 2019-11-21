@@ -37,7 +37,7 @@ class ros_interface:
         # Subscribers / Listeners & Publishers #############################        
         camera_info = rospy.wait_for_message(self.ns + '/camera/camera_info', CameraInfo, 5)
         self.start_time = camera_info.header.stamp.to_sec()
-        self.K = camera_info.K
+        self.K = np.reshape(camera_info.K, (3, 3))
 
 
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb)

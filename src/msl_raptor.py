@@ -3,6 +3,7 @@
 # IMPORTS
 # system
 import os, sys, argparse, time
+import pdb
 # from pathlib import Path
 # save/load
 # import pickle
@@ -49,7 +50,6 @@ def run_execution_loop():
         bb_aqq_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
 
         rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
-
         # update ukf
         ukf.step_ukf(abb, bb_3d, pose_to_tf(ego_pose), dt)
         ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
@@ -60,9 +60,7 @@ def run_execution_loop():
 
 def init_objects(ros, ukf):
     # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
-    camera['K'] = ros.K  # camera intrinsic matrix is recieved via ros
-    camera['tf_cam_ego'] = np.eye(4)
-
+    rospy.logwarn('camera calibration values should be in yaml, not hardcoded!')
     tf_cam_ego = np.eye(4)
     tf_cam_ego[0:3, 3] = [0.05, 0.0, 0.07]
     tf_cam_ego[0:3, 0:3] = np.array([[ 0.0,  0.0,  1.0], 
@@ -77,11 +75,8 @@ def init_objects(ros, ukf):
 
 def wait_intil_ros_ready(ros, timeout = 10):
     """ pause until ros is ready or timeout reached """
-    start_time = rospy.Time.now().to_sec()
-    time = rospy.Time.now().to_sec()
-    while not ros.latest_time and (time - start_time < timeout):
-        time = rospy.Time.now().to_sec()
-        rospy.loginfo("waiting for ROS to be ready...")
+    while ros.latest_time is None or ros.quad_pose_gt is None or ros.latest_ego_pose is None:
+        continue
 
 
 class camera:

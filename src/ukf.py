@@ -150,13 +150,12 @@ class UKF:
     def extract_mean_and_cov_from_state_sigma_points(self, sps):
         mu_bar = self.w0_m * sps[:, 0] + self.wi*np.sum(sps[:, 1:], 1)
         mu_bar[6:10], ei_vec_set = average_quaternions(sps[6:10, :].T, self.w_arr)
-        sig_bar = 0
 
         Wprime = np.zeros((self.dim_sig, sps.shape[1]))
         
         W = self.w0_c
-        sig_bar = zeros((self.dim_sig, self.dim_sig))
-        for sp_ind in range(sps.shape[1])
+        sig_bar = np.zeros((self.dim_sig, self.dim_sig))
+        for sp_ind in range(sps.shape[1]):
             Wprime[0:6, sp_ind] = sps[0:6, sp_ind] - mu_bar[0:6]  # still need to overwrite the quat parts of this
             Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13]  # still need to overwrite the quat parts of this
             Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind];
