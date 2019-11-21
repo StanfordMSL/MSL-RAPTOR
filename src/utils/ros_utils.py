@@ -28,7 +28,7 @@ def pose_to_state_vec(pose):
     """ Turn a ROS pose message into a 13 el state vector (w/ 0 vels) """
     state = np.zeros((13,))
     state[0:3] = [pose.position.x, pose.position.y, pose.position.z]
-    state[6:10] = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
+    state[6:10] = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
     if state[6] < 0:
         state[6:10] *= -1
     return state

@@ -2,6 +2,7 @@
 # IMPORTS
 #tools
 from copy import copy
+import pdb
 # math
 import numpy as np
 import numpy.linalg as la
@@ -33,8 +34,10 @@ class UKF:
         self.sig_pnt_multiplier = np.sqrt(self.dim_sig + ukf_lambda)
 
         self.w0_m = ukf_lambda / (ukf_lambda + self.dim_sig)
-        self.w0_c = self.w0_m + (1 - alpha**22 + beta)
-        self.wi = 1 / (2*  (ukf_lambda + self.dim_sig))
+        self.w0_c = self.w0_m + (1 - alpha**2 + beta)
+        self.wi = 1 / (2 * (ukf_lambda + self.dim_sig))
+        self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
+        self.w_arr[0] = self.w0_m
 
         self.camera = {}
         ####################################################################
@@ -55,12 +58,13 @@ class UKF:
 
     def step_ukf(self, measurement, bb_3d, tf_ego_w, dt):
         self.ukf_itr += 1
-
         sps = self.calc_sigma_points()
         sps_prop = np.empty_like(sps)
         for sp_ind in range(sps_prop.shape[1]):
             sps_prop[:, sp_ind] = self.propagate_dynamics(sps[:, sp_ind], dt)
 
+        mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
+        pdb.set_trace()
     
     def calc_sigma_points(self):
         sps = np.zeros((self.dim_state, 2 * self.dim_sig + 1))
@@ -103,10 +107,13 @@ class UKF:
         quat = state[6:10]  # current orientation
         omegas = state[10:13]  # angular velocity vector
         om_norm = la.norm(omegas)  # rate of change of all angles
-        ang = om_norm * dt  # change in angle in this small timestep
-        ax = omegas / om_norm  # axis about angle change
-        quat_delta = axang_to_quat(ax * ang)
-        quat_new = quat_mul(quat_delta, quat)
+        if om_norm > 0:
+            ang = om_norm * dt  # change in angle in this small timestep
+            ax = omegas / om_norm  # axis about angle change
+            quat_delta = axang_to_quat(ax * ang)
+            quat_new = quat_mul(quat_delta, quat)
+        else:
+            quat_new = quat
 
         [roll, pitch, yaw] = quat_to_ang(quat_new)
         if self.b_enforce_0_yaw:
@@ -116,8 +123,11 @@ class UKF:
         return next_state
 
     
-    def extract_mean_and_cov_from_state_sigma_points():
-        pass
+    def extract_mean_and_cov_from_state_sigma_points(self, sps):
+        mu_bar = self.w0_m * sps[:, 0] + self.wi*np.sum(sps[:, 1:], 1)
+        mu_bar[6:10] = average_quaternions(sps[6:10, :].T, self.w_arr)
+        sig_bar = 0
+        return mu_bar, sig_bar
         
 
     def extract_mean_and_cov_from_obs_sigma_points():
