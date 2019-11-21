@@ -93,13 +93,17 @@ class camera:
         input: assumes pnt in quad frame
         output: [row, col] i.e. the projection of xyz onto camera plane
         """
-        pnt_c = self.tf_cam_ego @ np.concatinate((pnt_q, [1]))
-        rc = camera.K @ np.reshape(pnt_c[0:3], 3, 1);
+        if sys.version_info[0] < 3: # using python 2
+            pnt_c = np.matmul(self.tf_cam_ego, np.concatinate((pnt_q, [1])))
+            rc = np.matmul(camera.K, np.reshape(pnt_c[0:3], 3, 1))
+        else:
+            pnt_c = self.tf_cam_ego @ np.concatinate((pnt_q, [1]))
+            rc = camera.K @ np.reshape(pnt_c[0:3], 3, 1);
         rc = [rc(2), rc(1)] / rc(3);
 
 
 if __name__ == '__main__':
-    print("Starting MSL-RAPTOR main")
+    print("Starting MSL-RAPTOR main [running python {}]".format(sys.version_info[0]))
     rospy.init_node('RAPTOR_MSL', anonymous=True)
     run_execution_loop()
     print("--------------- FINISHED ---------------")

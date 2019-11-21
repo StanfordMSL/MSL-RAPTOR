@@ -36,8 +36,10 @@ class UKF:
         self.w0_m = ukf_lambda / (ukf_lambda + self.dim_sig)
         self.w0_c = self.w0_m + (1 - alpha**2 + beta)
         self.wi = 1 / (2 * (ukf_lambda + self.dim_sig))
-        self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
-        self.w_arr[0] = self.w0_m
+        self.w_arr_mean = np.ones((1+ 2 * self.dim_sig,)) * self.wi
+        self.w_arr_mean[0] = self.w0_m
+        self.w_arr_cov = np.ones((1+ 2 * self.dim_sig,)) * self.wi
+        self.w_arr_cov[0] = self.w0_c
 
         self.camera = None
         ####################################################################
@@ -149,21 +151,19 @@ class UKF:
     
     def extract_mean_and_cov_from_state_sigma_points(self, sps):
         mu_bar = self.w0_m * sps[:, 0] + self.wi*np.sum(sps[:, 1:], 1)
-        mu_bar[6:10], ei_vec_set = average_quaternions(sps[6:10, :].T, self.w_arr)
+        mu_bar[6:10], ei_vec_set = average_quaternions(sps[6:10, :].T, self.w_arr_mean)
 
         Wprime = np.zeros((self.dim_sig, sps.shape[1]))
-        
-        W = self.w0_c
         sig_bar = np.zeros((self.dim_sig, self.dim_sig))
         for sp_ind in range(sps.shape[1]):
             Wprime[0:6, sp_ind] = sps[0:6, sp_ind] - mu_bar[0:6]  # still need to overwrite the quat parts of this
             Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13]  # still need to overwrite the quat parts of this
             Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind];
             
-            if sp_ind == 1:
-                sig_bar = sig_bar + self.w0_c * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
+            if sys.version_info[0] < 3: # using python 2
+                sig_bar = sig_bar + self.w_arr_cov[sp_ind] * np.matmul(Wprime[:, sp_ind], Wprime[:, sp_ind].T)
             else:
-                sig_bar = sig_bar + self.wi * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
+                sig_bar = sig_bar + self.w_arr_cov[sp_ind] * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
         
         sig_bar = sig_bar + self.Q  # add noise
         sig_bar = enforce_pos_def_sym_mat(sig_bar) # project sig_bar to pos. def. cone to avoid numeric issues

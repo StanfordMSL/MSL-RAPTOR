@@ -142,5 +142,8 @@ def average_quaternions(Q, w=None):
         sigma_out = (sigma + sigma.T) / 2
         V, D = la.eig(sigma_out)
         D[D < 0] = 0.000001
-        sigma_out = V @ D @ V.T
+        if sys.version_info[0] < 3: # using python 2
+            sigma_out = np.matmul(V, np.matmul(D, V.T))
+        else:
+            sigma_out = V @ D @ V.T
         return sigma_out
