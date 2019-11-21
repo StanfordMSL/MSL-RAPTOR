@@ -3,7 +3,6 @@
 import sys, time #, argparse
 # math
 import numpy as np
-from bisect import bisect_left
 # ros
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
@@ -33,7 +32,6 @@ class ros_interface:
         self.quad_pose_gt = None
         ####################################################################
 
-
         self.ns = rospy.get_param('~ns')  # robot namespace
         
         # Subscribers / Listeners & Publishers #############################        
@@ -55,7 +53,7 @@ class ros_interface:
         Stored in a way to interface with a quick method for finding closest match by time.
         """
 
-        time = self.get_ros_time()  # time in seconds
+        time = get_ros_time(self.start_time)  # time in seconds
 
         if len(self.pose_buffer[0]) < self.pose_queue_size:
             self.pose_buffer[0].append(msg.pose)
@@ -83,7 +81,7 @@ class ros_interface:
             return # this happens if we are just starting
 
         time = msg.header.stamp.to_sec() - self.start_time  # timestamp in seconds
-        self.latest_ego_pose = self.find_closest_by_time(time)[0]
+        self.latest_ego_pose = find_closest_by_time(time, self.pose_buffer[1], self.pose_buffer[0])[0]
 
         # call NN here!!!!
         image = msg.data
@@ -114,33 +112,5 @@ class ros_interface:
         state_msg.layout.data_offset = 0
         state_msg.data = list(state)
         self.state_pub.publish(state_msg)
-
-
-    def get_ros_time(self):
-        """
-        returns ros time in seconds (minus time at start of program)
-        """
-        ts = rospy.Time.now()
-        return ts.to_sec() - self.start_time
-
-
-    def find_closest_by_time(self, time_to_match):
-        """
-        Assumes my_list is sorted. Returns closest item in list by time. If two numbers are equally close, return the smallest number.
-        Adapted from https://stackoverflow.com/questions/12141150/from-list-of-integers-get-number-closest-to-a-given-value/12141511#12141511
-        """
-        pose_list = self.pose_buffer[0]
-        time_list = self.pose_buffer[1]
-        pos = bisect_left(time_list, time_to_match)
-        if pos == 0:
-            return pose_list[0], 0
-        if pos == len(myList):
-            return pose_list[-1], len(pose_list) - 1
-        before = time_list[pos - 1]
-        after = time_list[pos]
-        if after - time_to_match < time_to_match - before:
-           return pose_list[pos], pos
-        else:
-           return pose_list[pos - 1], pos - 1
 
 

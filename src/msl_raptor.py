@@ -26,7 +26,7 @@ def run_execution_loop():
     b_target_in_view = True
     last_image_time = -1
     ros = ROS()  # create a ros interface object
-    my_ros_based_pause(2)  # pause to allow ros to get initial messages
+    wait_intil_ros_ready(ros)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
     camera = init_objects(ros, ukf)
 
@@ -84,12 +84,13 @@ def init_objects(ros, ukf):
 
 
 
-def my_ros_based_pause(pause_time = 1):
-    """ pause for given time """
+def wait_intil_ros_ready(ros, timeout = 10):
+    """ pause until ros is ready or timeout reached """
     start_time = rospy.Time.now().to_sec()
     time = rospy.Time.now().to_sec()
-    while (time - start_time < pause_time):
+    while not ros.latest_time and (time - start_time < timeout):
         time = rospy.Time.now().to_sec()
+        rospy.loginfo("waiting for ROS to be ready...")
 
 
 if __name__ == '__main__':
