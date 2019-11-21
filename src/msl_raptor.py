@@ -1,10 +1,5 @@
 #!/usr/bin/env python
 
-"""
-The MIT License (MIT)
-Copyright (c) 2019 MSL
-"""
-
 # IMPORTS
 # system
 import os, sys, argparse, time
@@ -21,12 +16,20 @@ import numpy as np
 import rospy
 # libs
 from ros_interface import ros_interface as ROS
+from ukf import UKF
 
 def run_execution_loop():
     rate = rospy.Rate(100) # max filter rate
     b_target_in_view = True
     last_image_time = -1
     ros = ROS()  # create a ros interface object
+    my_ros_based_pause(2)  # pause to allow ros to get initial messages
+    ukf = UKF()  # create ukf object
+    camera = init_objects(ros, ukf)
+
+    rospy.logwarn('need actual 3d bounding box info')
+    bb_3d = np.zeros((8, 3))
+
     state_est = np.zeros((13, ))
 
     loop_count = 0
@@ -47,10 +50,37 @@ def run_execution_loop():
         print(loop_time)
         print(loop_count)
         print(state_est)
+        print(abb)
+        print(ego_pose)
+        print(bb_aqq_method)
+        ukf.step_ukf(abb, bb_3d, ros.pose_to_tf(ego_pose))
         ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
         # [optional] update plots
         rate.sleep()
-        loop_count += 1    
+        loop_count += 1
+
+
+def init_objects(ros, ukf):
+    # create camera object
+    camera = {}
+    camera['K'] = ros.K  # camera intrinsic matrix is recieved via ros
+    camera['tf_cam_ego'] = np.eye(4)
+    # camera['tf_cam_ego'][0:3, 0:3] = 
+    rospy.logwarn('need camera orientation relative to optitrack frame')
+
+    # init ukf state
+    rospy.logwarn('using ground truth to initialize filter!')
+    ukf.mu = ros.pose_to_state_vec(ros.quad_pose_gt)
+    return camera
+
+
+
+def my_ros_based_pause(pause_time = 1):
+    """ pause for given time """
+    start_time = rospy.Time.now().to_sec()
+    time = rospy.Time.now().to_sec()
+    while (time - start_time < pause_time):
+        time = rospy.Time.now().to_sec()
 
 
 if __name__ == '__main__':
@@ -59,5 +89,3 @@ if __name__ == '__main__':
     run_execution_loop()
     print("--------------- FINISHED ---------------")
 
-
-            
