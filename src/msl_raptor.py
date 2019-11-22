@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # IMPORTS
 # system
@@ -93,12 +93,11 @@ class camera:
         input: assumes pnt in quad frame
         output: [row, col] i.e. the projection of xyz onto camera plane
         """
-        if sys.version_info[0] < 3: # using python 2
-            pnt_c = np.matmul(self.tf_cam_ego, np.concatinate((pnt_q, [1])))
-            rc = np.matmul(camera.K, np.reshape(pnt_c[0:3], 3, 1))
-        else:
-            pnt_c = self.tf_cam_ego @ np.concatinate((pnt_q, [1]))
-            rc = camera.K @ np.reshape(pnt_c[0:3], 3, 1);
+        ### TEMP PYTHON 2 ###
+        pnt_c = np.matmul(self.tf_cam_ego, np.concatinate((pnt_q, [1])))
+        rc = np.matmul(camera.K, np.reshape(pnt_c[0:3], 3, 1))
+        # pnt_c = self.tf_cam_ego @ np.concatinate((pnt_q, [1]))
+        # rc = camera.K @ np.reshape(pnt_c[0:3], 3, 1);
         rc = [rc(2), rc(1)] / rc(3);
 
 

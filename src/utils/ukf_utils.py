@@ -138,12 +138,15 @@ def average_quaternions(Q, w=None):
     return q_mean, ei_vec_set
 
 
-    def enforce_pos_def_sym_mat(sigma):
-        sigma_out = (sigma + sigma.T) / 2
-        V, D = la.eig(sigma_out)
-        D[D < 0] = 0.000001
-        if sys.version_info[0] < 3: # using python 2
-            sigma_out = np.matmul(V, np.matmul(D, V.T))
-        else:
-            sigma_out = V @ D @ V.T
-        return sigma_out
+def enforce_pos_def_sym_mat(sigma):
+    pdb.set_trace()
+    sigma_out = (sigma + sigma.T) / 2
+    eig_vals, eig_vecs = la.eig(sigma_out)
+    eig_val_mat = np.diag(eig_vals)
+    eig_vals[eig_vals < 0] = 0.000001
+    ### TEMP PYTHON 2 ###
+    pdb.set_trace()
+    sigma_out = np.matmul(eig_vecs, np.matmul(eig_val_mat, eig_vecs.T))
+    # sigma_out = eig_vecs @ eig_val_mat @ eig_vecs.T
+    pdb.set_trace()
+    return sigma_out

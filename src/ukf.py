@@ -62,7 +62,7 @@ class UKF:
         """
         UKF iteration following pseudo code from probablistic robotics
         """
-        self.ukf_itr += 1
+        rospy.loginfo("Starting UKF Iteration {}".format(self.ukf_itr))
 
         # line 2
         sps = self.calc_sigma_points(self.mu, self.sigma)
@@ -81,6 +81,7 @@ class UKF:
         # lines 7 & 8
         pred_meas = self.predict_measurement(sps_recalc, bb_3d, tf_ego_w)
         pdb.set_trace()
+        self.ukf_itr += 1
 
 
     def predict_measurement(self, sps_recalc, bb_3d, tf_ego_w):
@@ -160,10 +161,9 @@ class UKF:
             Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13]  # still need to overwrite the quat parts of this
             Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind];
             
-            if sys.version_info[0] < 3: # using python 2
-                sig_bar = sig_bar + self.w_arr_cov[sp_ind] * np.matmul(Wprime[:, sp_ind], Wprime[:, sp_ind].T)
-            else:
-                sig_bar = sig_bar + self.w_arr_cov[sp_ind] * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
+            ### TEMP PYTHON 2 ###
+            sig_bar = sig_bar + self.w_arr_cov[sp_ind] * np.matmul(Wprime[:, sp_ind], Wprime[:, sp_ind].T)
+            # sig_bar = sig_bar + self.w_arr_cov[sp_ind] * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
         
         sig_bar = sig_bar + self.Q  # add noise
         sig_bar = enforce_pos_def_sym_mat(sig_bar) # project sig_bar to pos. def. cone to avoid numeric issues
