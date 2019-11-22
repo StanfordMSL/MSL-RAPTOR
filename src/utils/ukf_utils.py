@@ -37,7 +37,7 @@ def bb_corners_to_angle(points):
     sortind_x = np.argsort(points[:, 0], axis=0)  # sort points by x coordinate
 
     # of the points furthest to the left, which is lower and which is higher? (bottom left / top left)
-    if points[sortind_x[0], 1] > points[sortind_x[2], 1]
+    if points[sortind_x[0], 1] > points[sortind_x[2], 1]:
         bl_x = points[sortind_x[0], 0]
         bl_y = points[sortind_x[0], 1]
         tl_x = points[sortind_x[1], 0]
@@ -49,7 +49,7 @@ def bb_corners_to_angle(points):
         tl_x = points[sortind_x[0], 1]
 
     # of the points furthest to the right, which is lower and which is higher? (bottom right / top right)
-    if points[sortind_x[2], 1] > points[sortind_x[3], 1]
+    if points[sortind_x[2], 1] > points[sortind_x[3], 1]:
         br_x = points[sortind_x[2], 0]
         br_y = points[sortind_x[2], 1]
         tr_x = points[sortind_x[3], 0]

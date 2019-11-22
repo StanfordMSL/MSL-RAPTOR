@@ -3,6 +3,7 @@
 #tools
 from copy import copy
 import pdb
+import cv2
 # math
 import numpy as np
 import numpy.linalg as la
@@ -102,17 +103,20 @@ class UKF:
         # tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
         
         # tranform 3d bounding box from quad frame to camera frame
-        bb_3d_cam = np.matmul(tf_cam_quad, bb_3d_quad)[:, 0:3] ### TEMP PYTHON 2 ###
+        bb_3d_cam = np.matmul(tf_cam_quad, bb_3d_quad.T)[0:3, :].T ### TEMP PYTHON 2 ###
         # bb_3d_cam = (tf_cam_quad @ bb_3d_quad)[:, 0:3]
 
-        # transform each 3d point to a 2d pixel
+        # transform each 3d point to a 2d pixel (row, col)
         bb_rc_list = np.zeros((bb_3d_cam.shape[0], 2))
         for i, bb_vert in enumerate(bb_3d_cam):
-            bb_rc_list(i, :) = self.camera.pnt3d_to_pix(bb_vert)
+            bb_rc_list[i, :] = self.camera.pnt3d_to_pix(bb_vert)
 
+        # construct sensor output
+        (xx, yy), (width, height), angle = cv2.minAreaRect(np.fliplr(bb_rc_list))
+        r_center = yy + np.sind(angle) * height / 2  # row is the height (y) dim
+        c_center = xx + np.cosd(angle) * width / 2 # col is the width (x) dim
+        return np.array([r_center, c_center, width, height, angle*np.pi/180])
 
-
-        pass
 
     
     def calc_sigma_points(self, mu, sigma):
