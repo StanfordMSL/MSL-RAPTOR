@@ -140,4 +140,4 @@ def enforce_pos_def_sym_mat(sigma):
     ### TEMP PYTHON 2 ###
     sigma_out = np.matmul(eig_vec_mat, np.matmul(eig_val_mat, eig_vec_mat.T))
     # sigma_out = eig_vec_mat @ eig_val_mat @ eig_vec_mat.T
-    return sigma_out
+    return sigma_out + 1e-12 * np.eye(sigma_out.shape[0])  # the small addition is for numeric stability

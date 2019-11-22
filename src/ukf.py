@@ -76,12 +76,17 @@ class UKF:
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
         
         # line 6
-        sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
+        # pdb.set_trace()
+        try:
+            sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
+        except:
+            pdb.set_trace()
         
         # lines 7 & 8
         pred_meas = self.predict_measurement(sps_recalc, bb_3d, tf_ego_w)
-        pdb.set_trace()
         self.ukf_itr += 1
+
+        # sigma = enforce_pos_def_sym_mat(sigma)  # project sigma to pos. def. cone to avoid numeric issues
 
 
     def predict_measurement(self, sps_recalc, bb_3d, tf_ego_w):
@@ -170,8 +175,11 @@ class UKF:
         return mu_bar, sig_bar
         
 
-    def extract_mean_and_cov_from_obs_sigma_points():
-        pass
+    def extract_mean_and_cov_from_obs_sigma_points(self, sps_meas):
+        z_hat = sps_meas[:, 0]
+        S = copy(sps_meas)
+        S = enforce_pos_def_sym_mat(S) # project S to pos. def. cone to avoid numeric issues
+        return z_hat, S
 
 
     def calculate_cross_correlation():
