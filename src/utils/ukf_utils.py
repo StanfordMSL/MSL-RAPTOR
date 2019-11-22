@@ -83,13 +83,6 @@ def ang_to_quat(angs):
     """
     q = tf.transformations.quaternion_from_euler(angs[0], angs[1], angs[2], 'rxyz')
     return np.array([q[3], q[0], q[1], q[2]])
-
-
-def calc_mean_weighted_quat(quat_arr):
-    """
-    find mean of quat_arr which should be N x 4
-    """
-    q_mean = quat_arr[0, :]
     
 
 def average_quaternions(Q, w=None):
@@ -139,14 +132,12 @@ def average_quaternions(Q, w=None):
 
 
 def enforce_pos_def_sym_mat(sigma):
-    pdb.set_trace()
     sigma_out = (sigma + sigma.T) / 2
     eig_vals, eig_vecs = la.eig(sigma_out)
-    eig_val_mat = np.diag(eig_vals)
-    eig_vals[eig_vals < 0] = 0.000001
+    eig_val_mat = np.diag(np.real(eig_vals))
+    eig_vec_mat = np.real(eig_vecs)
+    eig_val_mat[eig_val_mat < 0] = 0.000001
     ### TEMP PYTHON 2 ###
-    pdb.set_trace()
-    sigma_out = np.matmul(eig_vecs, np.matmul(eig_val_mat, eig_vecs.T))
-    # sigma_out = eig_vecs @ eig_val_mat @ eig_vecs.T
-    pdb.set_trace()
+    sigma_out = np.matmul(eig_vec_mat, np.matmul(eig_val_mat, eig_vec_mat.T))
+    # sigma_out = eig_vec_mat @ eig_val_mat @ eig_vec_mat.T
     return sigma_out
