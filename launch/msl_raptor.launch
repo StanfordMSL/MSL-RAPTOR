@@ -5,6 +5,7 @@
 
   <node name="MSL_RAPTOR" pkg="msl_raptor" type="msl_raptor.py" output="screen">
     <param name="ns"  value="$(arg ns)"/> 
+    <rosparam command="load" file="$(find msl_raptor)/params/quad7.yaml" />
   </node>
 
 </launch>

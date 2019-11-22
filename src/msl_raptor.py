@@ -56,24 +56,16 @@ def run_execution_loop():
 
 def init_objects(ros, ukf):
     # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
-    rospy.logwarn('camera calibration values should be in yaml, not hardcoded!')
-    tf_cam_ego = np.eye(4)
-    tf_cam_ego[0:3, 3] = [0.05, 0.0, 0.07]
-    tf_cam_ego[0:3, 0:3] = np.array([[ 0.0,  0.0,  1.0], 
-                                     [-1.0,  0.0,  0.0], 
-                                     [ 0.0, -1.0,  0.0]])
-    ukf.camera = camera(ros.K, tf_cam_ego)
+    ukf.camera = camera(ros)
 
     # init ukf state
     rospy.logwarn('using ground truth to initialize filter!')
     ukf.mu = pose_to_state_vec(ros.quad_pose_gt)
 
     # init 3d bounding box in quad frame
-    rospy.logwarn('3d bounding box info should come from yaml')
-
-    half_length = 0.27 / 2
-    half_width = 0.27 / 2
-    half_height = 0.13 / 2
+    half_length = rospy.get_param('~target_bound_box_l') / 2
+    half_width = rospy.get_param('~target_bound_box_w') / 2
+    half_height = rospy.get_param('~target_bound_box_h') / 2
     bb_3d = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
                       [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
                       [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
@@ -82,7 +74,6 @@ def init_objects(ros, ukf):
                       [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
                       [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
                       [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
-    target_bound_box_mult = 1.0
     return bb_3d 
 
 
@@ -93,9 +84,9 @@ def wait_intil_ros_ready(ros, timeout = 10):
 
 
 class camera:
-    def __init__(self, K, tf_cam_ego):
-        self.K = K  # camera intrinsic matrix
-        self.tf_cam_ego = tf_cam_ego  # camera pose relative to the quad (fixed)
+    def __init__(self, ros):
+         # camera intrinsic matrix K and pose relative to the quad (fixed)
+        self.K , self.tf_cam_ego = get_ros_camera_info()
 
     def pix_to_pnt3d(self):
         rospy.logwarn("pix_to_pnt3d is not written yet!")
