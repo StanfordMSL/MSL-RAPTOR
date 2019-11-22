@@ -111,6 +111,7 @@ class camera:
         rc = np.matmul(self.K, np.reshape(pnt_c[0:3], 3, 1)) ### TEMP PYTHON 2 ###
         # rc = camera.K @ np.reshape(pnt_c[0:3], 3, 1);
         rc = np.array([rc[1], rc[0]]) / rc[2]
+        return rc
 
 
 if __name__ == '__main__':
