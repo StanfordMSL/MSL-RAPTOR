@@ -112,11 +112,16 @@ class UKF:
             bb_rc_list[i, :] = self.camera.pnt3d_to_pix(bb_vert)
 
         # construct sensor output
-        (xx, yy), (width, height), angle = cv2.minAreaRect(np.fliplr(bb_rc_list).astype('float32'))  # apparently float64s cause this function to fail
+        rect = cv2.minAreaRect(np.fliplr(bb_rc_list).astype('float32'))  # apparently float64s cause this function to fail
+        box = cv2.boxPoints(rect)
+        output_msl = bb_corners_to_angle(box)
+        (xx, yy), (width, height), angle = rect
         angle *= np.pi/180
         r_center = yy + np.sin(angle) * height / 2  # row is the height (y) dim
         c_center = xx + np.cos(angle) * width / 2 # col is the width (x) dim
-        return np.array([r_center, c_center, width, height, angle*np.pi/180])
+        output_cv2 = np.array([r_center, c_center, width, height, angle])
+        pdb.set_trace()
+        return output
 
 
     

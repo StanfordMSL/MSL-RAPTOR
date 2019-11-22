@@ -46,21 +46,21 @@ def bb_corners_to_angle(points):
         bl_x = points[sortind_x[1], 0]
         bl_y = points[sortind_x[1], 1]
         tl_x = points[sortind_x[0], 0]
-        tl_x = points[sortind_x[0], 1]
+        tl_y = points[sortind_x[0], 1]
 
     # of the points furthest to the right, which is lower and which is higher? (bottom right / top right)
     if points[sortind_x[2], 1] > points[sortind_x[3], 1]:
         br_x = points[sortind_x[2], 0]
         br_y = points[sortind_x[2], 1]
         tr_x = points[sortind_x[3], 0]
-        tr_x = points[sortind_x[3], 1]
+        tr_y = points[sortind_x[3], 1]
     else:
         br_x = points[sortind_x[3], 0]
         br_y = points[sortind_x[3], 1]
         tr_x = points[sortind_x[2], 0]
-        tr_x = points[sortind_x[2], 1]
+        tr_y = points[sortind_x[2], 1]
 
-    ang = -np.atan((bl_y - br_y) / (bl_x - br_x))
+    angle = -np.arctan((bl_y - br_y) / (bl_x - br_x))
     x_center = np.mean([br_x, bl_x, tl_x, tr_x])
     y_center = np.mean([br_y, bl_y, tl_y, tr_y])
     width = la.norm([br_x - bl_x, br_y - bl_y])
