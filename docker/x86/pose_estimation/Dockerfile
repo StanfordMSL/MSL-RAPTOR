@@ -25,6 +25,11 @@ RUN source /ros_python3_entrypoint.sh && \
 # ---------------------------- Reset argument ------------------------------ #
 ARG rebuild=0
 # -------------------------------------------------------------------------- #
+
+# Add aliases to bashrc in docker containers
+RUN echo 'alias subl_go="subl /root/msl_raptor_ws/src/msl_raptor/src/msl_raptor.py"' >> ~/.bashrc
+RUN echo 'alias rosbag_go="rosbag play -l /bag.bag"' >> ~/.bashrc
+
 RUN source /ros_python3_entrypoint.sh && \
     cd ~/msl_raptor_ws/src/msl_raptor && \
     git pull && \
