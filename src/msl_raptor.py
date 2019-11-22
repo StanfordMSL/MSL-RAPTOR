@@ -29,13 +29,9 @@ def run_execution_loop():
     ros = ROS()  # create a ros interface object
     wait_intil_ros_ready(ros)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
-    init_objects(ros, ukf)  # init camera, pose, etc
-
-    rospy.logwarn('need actual 3d bounding box info')
-    bb_3d = np.zeros((8, 3))
+    bb_3d = init_objects(ros, ukf)  # init camera, pose, etc
 
     state_est = np.zeros((13, ))
-
     loop_count = 0
     while not rospy.is_shutdown():
         loop_time = ros.latest_time
@@ -72,6 +68,23 @@ def init_objects(ros, ukf):
     rospy.logwarn('using ground truth to initialize filter!')
     ukf.mu = pose_to_state_vec(ros.quad_pose_gt)
 
+    # init 3d bounding box in quad frame
+    rospy.logwarn('3d bounding box info should come from yaml')
+
+    half_length = 0.27 / 2
+    half_width = 0.27 / 2
+    half_height = 0.13 / 2
+    bb_3d = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
+                      [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
+                      [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
+                      [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
+                      [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
+                      [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
+                      [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
+                      [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
+    target_bound_box_mult = 1.0
+    return bb_3d 
+
 
 def wait_intil_ros_ready(ros, timeout = 10):
     """ pause until ros is ready or timeout reached """
@@ -93,10 +106,9 @@ class camera:
         input: assumes pnt in quad frame
         output: [row, col] i.e. the projection of xyz onto camera plane
         """
-        ### TEMP PYTHON 2 ###
-        pnt_c = np.matmul(self.tf_cam_ego, np.concatinate((pnt_q, [1])))
-        rc = np.matmul(camera.K, np.reshape(pnt_c[0:3], 3, 1))
+        pnt_c = np.matmul(self.tf_cam_ego, np.concatinate((pnt_q, [1]))) ### TEMP PYTHON 2 ###
         # pnt_c = self.tf_cam_ego @ np.concatinate((pnt_q, [1]))
+        rc = np.matmul(camera.K, np.reshape(pnt_c[0:3], 3, 1)) ### TEMP PYTHON 2 ###
         # rc = camera.K @ np.reshape(pnt_c[0:3], 3, 1);
         rc = [rc(2), rc(1)] / rc(3);
 

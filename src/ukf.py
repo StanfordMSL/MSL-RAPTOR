@@ -89,15 +89,29 @@ class UKF:
         # sigma = enforce_pos_def_sym_mat(sigma)  # project sigma to pos. def. cone to avoid numeric issues
 
 
-    def predict_measurement(self, state, bb_3d, tf_ego_w):
+    def predict_measurement(self, state, bb_3d_quad, tf_ego_w):
         """
         use camera model & relative states to predict the angled 2d 
         bounding box seen by the ego drone 
         """
+
+        # get relative transform from camera to quad
         tf_w_quad = state_to_tf(state)
-        ### TEMP PYTHON 2 ###
-        tf_cam_quad = np.matmul(self.camera.tf_cam_ego, np.matmul(tf_ego_w, tf_w_quad))
+        
+        tf_cam_quad = np.matmul(self.camera.tf_cam_ego, np.matmul(tf_ego_w, tf_w_quad)) ### TEMP PYTHON 2 ###
         # tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
+        
+        # tranform 3d bounding box from quad frame to camera frame
+        bb_3d_cam = np.matmul(tf_cam_quad, bb_3d_quad)[:, 0:3] ### TEMP PYTHON 2 ###
+        # bb_3d_cam = (tf_cam_quad @ bb_3d_quad)[:, 0:3]
+
+        # transform each 3d point to a 2d pixel
+        bb_rc_list = np.zeros((bb_3d_cam.shape[0], 2))
+        for i, bb_vert in enumerate(bb_3d_cam):
+            bb_rc_list(i, :) = self.camera.pnt3d_to_pix(bb_vert)
+
+
+
         pass
 
     
@@ -168,9 +182,7 @@ class UKF:
             Wprime[0:6, sp_ind] = sps[0:6, sp_ind] - mu_bar[0:6]  # still need to overwrite the quat parts of this
             Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13]  # still need to overwrite the quat parts of this
             Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind];
-            
-            ### TEMP PYTHON 2 ###
-            sig_bar = sig_bar + self.w_arr_cov[sp_ind] * np.matmul(Wprime[:, sp_ind], Wprime[:, sp_ind].T)
+            sig_bar = sig_bar + self.w_arr_cov[sp_ind] * np.matmul(Wprime[:, sp_ind], Wprime[:, sp_ind].T) ### TEMP PYTHON 2 ###
             # sig_bar = sig_bar + self.w_arr_cov[sp_ind] * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
         
         sig_bar = sig_bar + self.Q  # add noise
