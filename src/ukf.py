@@ -14,6 +14,7 @@ import numpy.linalg as la
 import rospy
 # libs & utils
 from utils.ukf_utils import *
+from utils.math_utils import *
 
 
 class UKF:
@@ -26,6 +27,7 @@ class UKF:
         self.b_enforce_0_yaw = True;
         self.dim_state = 13
         self.dim_sig = 12  # covariance is 1 less dimension due to quaternion
+        self.dim_meas = 5  # angled bounding box: row, col, width, height, angle
 
         alpha = .1  # scaling param - how far sig. points are from mean
         kappa = 2  # scaling param - how far sig. points are from mean
@@ -69,32 +71,33 @@ class UKF:
 
         # lines 2 & 3
         sps_prop = np.empty_like(sps)
-        for sp_ind in range(sps_prop.shape[1]):
+        for sp_ind in range(sps.shape[1]):
             sps_prop[:, sp_ind] = self.propagate_dynamics(sps[:, sp_ind], dt)
 
         # lines 4 & 5
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
         
         # line 6
-        # pdb.set_trace()
-        try:
-            sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
-        except:
-            pdb.set_trace()
+        sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
         
         # lines 7 & 8
-        pred_meas = self.predict_measurement(sps_recalc, bb_3d, tf_ego_w)
+        pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
+        for sp_ind in range(sps.shape[1]):
+            pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], bb_3d, tf_ego_w)
         self.ukf_itr += 1
 
         # sigma = enforce_pos_def_sym_mat(sigma)  # project sigma to pos. def. cone to avoid numeric issues
 
 
-    def predict_measurement(self, sps_recalc, bb_3d, tf_ego_w):
+    def predict_measurement(self, state, bb_3d, tf_ego_w):
         """
         use camera model & relative states to predict the angled 2d 
         bounding box seen by the ego drone 
         """
-        
+        tf_w_quad = state_to_tf(state)
+        ### TEMP PYTHON 2 ###
+        tf_cam_quad = np.matmul(self.camera.tf_cam_ego, np.matmul(tf_ego_w, tf_w_quad))
+        # tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
         pass
 
     
