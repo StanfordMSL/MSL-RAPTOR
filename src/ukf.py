@@ -107,19 +107,17 @@ class UKF:
         # bb_3d_cam = (tf_cam_quad @ bb_3d_quad)[:, 0:3]
 
         # transform each 3d point to a 2d pixel (row, col)
-        bb_rc_list = np.zeros((bb_3d_cam.shape[0], 2))
+        bb_cr_list = np.zeros((bb_3d_cam.shape[0], 2))
         for i, bb_vert in enumerate(bb_3d_cam):
-            bb_rc_list[i, :] = self.camera.pnt3d_to_pix(bb_vert)
+            bb_cr_list[i, :] = self.camera.pnt3d_to_pix(bb_vert)
 
         # construct sensor output
-        rect = cv2.minAreaRect(np.fliplr(bb_rc_list).astype('float32'))  # apparently float64s cause this function to fail
+        # minAreaRect sometimes flips the w/h and angle from how we want the output to be
+        # to fixe this, we can use boxPoints to get the x,y of the bb rect, and use our function
+        # to get the output in the form we want 
+        rect = cv2.minAreaRect(bb_cr_list.astype('float32'))  # apparently float64s cause this function to fail
         box = cv2.boxPoints(rect)
-        output_msl = bb_corners_to_angle(box)
-        (xx, yy), (width, height), angle = rect
-        angle *= np.pi/180
-        r_center = yy + np.sin(angle) * height / 2  # row is the height (y) dim
-        c_center = xx + np.cos(angle) * width / 2 # col is the width (x) dim
-        output_cv2 = np.array([r_center, c_center, width, height, angle])
+        output = bb_corners_to_angled_bb(box, output_coord_type='rc')
         pdb.set_trace()
         return output
 

@@ -28,7 +28,7 @@ def enforce_pos_def_sym_mat(sigma):
     return sigma_out + 1e-12 * np.eye(sigma_out.shape[0])  # the small addition is for numeric stability
 
 
-def bb_corners_to_angle(points):
+def bb_corners_to_angled_bb(points, output_coord_type='xy'):
     """
     BB_CORNERS_TO_ANGLE Function that takes takes coordinates of a bounding
     box corners and returns it as center, size and angle.
@@ -41,7 +41,7 @@ def bb_corners_to_angle(points):
         bl_x = points[sortind_x[0], 0]
         bl_y = points[sortind_x[0], 1]
         tl_x = points[sortind_x[1], 0]
-        tl_x = points[sortind_x[1], 1]
+        tl_y = points[sortind_x[1], 1]
     else:
         bl_x = points[sortind_x[1], 0]
         bl_y = points[sortind_x[1], 1]
@@ -65,5 +65,9 @@ def bb_corners_to_angle(points):
     y_center = np.mean([br_y, bl_y, tl_y, tr_y])
     width = la.norm([br_x - bl_x, br_y - bl_y])
     height = la.norm([br_x - tr_x, br_y - tr_y])
+    output = np.array([x_center, y_center, width, height, angle])
+    if output_coord_type.lower() == 'rc':
+        # r is y, col is x
+        output = np.array([y_center, x_center, width, height, angle])
 
-    return np.array([x_center, y_center, width, height, angle])
+    return output
