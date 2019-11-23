@@ -29,7 +29,6 @@ RUN source /ros_entrypoint.sh && \
 
 # Reinstall python stuff
 RUN apt-get update && \
-    pip3 install tf && \
     apt-get install python3-opencv && \
     rm -rf /var/lib/apt/lists/* 
 
