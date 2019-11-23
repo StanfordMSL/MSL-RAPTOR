@@ -81,13 +81,24 @@ class UKF:
         # line 6
         sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
         
-        # lines 7 & 8
+        # lines 7 -9 8
         pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
         for sp_ind in range(sps.shape[1]):
             pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], bb_3d, tf_ego_w)
+        z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
+        # sigma = enforce_pos_def_sym_mat(sigma)  # project sigma to pos. def. cone to avoid numeric issues
         self.ukf_itr += 1
 
-        # sigma = enforce_pos_def_sym_mat(sigma)  # project sigma to pos. def. cone to avoid numeric issues
+
+    def extract_mean_and_cov_from_obs_sigma_points(self, sps_meas):
+
+        z_hat = self.w0_m * sps_meas[:, 0] + self.wi * np.sum(sps_meas[:, 1:], axis=1)
+        S = self.w0_c * (sps_meas[:, 0] - z_hat) @ (sps_meas[:, 0] - z_hat).T
+        
+        S += self.R  # add measurement noise
+        S = enforce_pos_def_sym_mat(S) # project S to pos. def. cone to avoid numeric issues
+        S = la.inv(S)
+        return z_hat, S, S_inv
 
 
     def predict_measurement(self, state, bb_3d_quad, tf_ego_w):
@@ -99,12 +110,10 @@ class UKF:
         # get relative transform from camera to quad
         tf_w_quad = state_to_tf(state)
         
-        tf_cam_quad = np.matmul(self.camera.tf_cam_ego, np.matmul(tf_ego_w, tf_w_quad)) ### TEMP PYTHON 2 ###
-        # tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
+        tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
         
         # tranform 3d bounding box from quad frame to camera frame
-        bb_3d_cam = np.matmul(tf_cam_quad, bb_3d_quad.T)[0:3, :].T ### TEMP PYTHON 2 ###
-        # bb_3d_cam = (tf_cam_quad @ bb_3d_quad)[:, 0:3]
+        bb_3d_cam = (tf_cam_quad @ bb_3d_quad)[:, 0:3]
 
         # transform each 3d point to a 2d pixel (row, col)
         bb_cr_list = np.zeros((bb_3d_cam.shape[0], 2))
@@ -113,7 +122,7 @@ class UKF:
 
         # construct sensor output
         # minAreaRect sometimes flips the w/h and angle from how we want the output to be
-        # to fixe this, we can use boxPoints to get the x,y of the bb rect, and use our function
+        # to fix this, we can use boxPoints to get the x,y of the bb rect, and use our function
         # to get the output in the form we want 
         rect = cv2.minAreaRect(bb_cr_list.astype('float32'))  # apparently float64s cause this function to fail
         box = cv2.boxPoints(rect)
@@ -190,20 +199,12 @@ class UKF:
             Wprime[0:6, sp_ind] = sps[0:6, sp_ind] - mu_bar[0:6]  # still need to overwrite the quat parts of this
             Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13]  # still need to overwrite the quat parts of this
             Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind];
-            sig_bar = sig_bar + self.w_arr_cov[sp_ind] * np.matmul(Wprime[:, sp_ind], Wprime[:, sp_ind].T) ### TEMP PYTHON 2 ###
-            # sig_bar = sig_bar + self.w_arr_cov[sp_ind] * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
+            sig_bar = sig_bar + self.w_arr_cov[sp_ind] * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
         
         sig_bar = sig_bar + self.Q  # add noise
         sig_bar = enforce_pos_def_sym_mat(sig_bar) # project sig_bar to pos. def. cone to avoid numeric issues
         return mu_bar, sig_bar
         
-
-    def extract_mean_and_cov_from_obs_sigma_points(self, sps_meas):
-        z_hat = sps_meas[:, 0]
-        S = copy(sps_meas)
-        S = enforce_pos_def_sym_mat(S) # project S to pos. def. cone to avoid numeric issues
-        return z_hat, S
-
 
     def calculate_cross_correlation():
         pass

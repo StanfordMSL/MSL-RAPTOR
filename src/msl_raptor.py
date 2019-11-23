@@ -79,8 +79,10 @@ def init_objects(ros, ukf):
 
 def wait_intil_ros_ready(ros, timeout = 10):
     """ pause until ros is ready or timeout reached """
+    rospy.loginfo("waiting for ros...")
     while ros.latest_time is None or ros.quad_pose_gt is None or ros.latest_ego_pose is None:
         continue
+    rospy.loginfo("done!")
 
 
 class camera:
@@ -97,10 +99,8 @@ class camera:
         input: assumes pnt in quad frame
         output: [row, col] i.e. the projection of xyz onto camera plane
         """
-        pnt_c = np.matmul(self.tf_cam_ego, np.concatenate((pnt_q, [1]))) ### TEMP PYTHON 2 ###
-        # pnt_c = self.tf_cam_ego @ np.concatinate((pnt_q, [1]))
-        rc = np.matmul(self.K, np.reshape(pnt_c[0:3], 3, 1)) ### TEMP PYTHON 2 ###
-        # rc = camera.K @ np.reshape(pnt_c[0:3], 3, 1);
+        pnt_c = self.tf_cam_ego @ np.concatinate((pnt_q, [1]))
+        rc = camera.K @ np.reshape(pnt_c[0:3], 3, 1);
         rc = np.array([rc[1], rc[0]]) / rc[2]
         return rc
 
