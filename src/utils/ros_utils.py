@@ -60,3 +60,13 @@ def find_closest_by_time(time_to_match, time_list, message_list=None):
        return message_list[pos], pos
     else:
        return message_list[pos - 1], pos - 1
+
+
+def get_ros_camera_info():
+    ns = rospy.get_param('~ns')
+    camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 5)
+    K = np.reshape(camera_info.K, (3, 3))
+    tf_cam_ego = np.eye(4)
+    tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
+    tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))
+    return K, tf_cam_ego
