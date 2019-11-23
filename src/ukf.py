@@ -118,7 +118,7 @@ class UKF:
         rect = cv2.minAreaRect(bb_cr_list.astype('float32'))  # apparently float64s cause this function to fail
         box = cv2.boxPoints(rect)
         output = bb_corners_to_angled_bb(box, output_coord_type='rc')
-        pdb.set_trace()
+        # pdb.set_trace()
         return output
 
 
