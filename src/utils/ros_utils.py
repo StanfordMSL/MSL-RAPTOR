@@ -52,7 +52,7 @@ def find_closest_by_time(time_to_match, time_list, message_list=None):
     pos = bisect_left(time_list, time_to_match)
     if pos == 0:
         return message_list[0], 0
-    if pos == len(myList):
+    if pos == len(time_list):
         return message_list[-1], len(message_list) - 1
     before = time_list[pos - 1]
     after = time_list[pos]

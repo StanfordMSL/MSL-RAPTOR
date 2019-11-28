@@ -9,6 +9,16 @@ RUN apt-get update &&\
     apt-get update && \
     apt install -y sublime-text
 
+# # Install Visual Studio Code
+# RUN apt-get update &&\
+#     apt install -y software-properties-common apt-transport-https wget && \
+#     wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | apt-key add - && \
+#     add-apt-repository "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" && \
+#     apt-get update && \
+#     apt install -y code && \
+#     apt install -y libasound2 && \
+#     mkdir /home/docker/code
+
 
 # Clone and build MSL-RAPTOR with python3
 RUN source /ros_python3_entrypoint.sh && \
