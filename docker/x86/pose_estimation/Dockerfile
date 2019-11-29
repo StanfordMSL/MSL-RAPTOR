@@ -1,37 +1,33 @@
-FROM bramtoula/ros:melodic-python3
-
-
-# Install sublime
-RUN apt-get update &&\
-    apt install -y apt-transport-https ca-certificates curl software-properties-common && \
-    curl -fsSL https://download.sublimetext.com/sublimehq-pub.gpg | apt-key add - && \
-    add-apt-repository "deb https://download.sublimetext.com/ apt/stable/" && \
-    apt-get update && \
-    apt install -y sublime-text
-
-# # Install Visual Studio Code
-# RUN apt-get update &&\
-#     apt install -y software-properties-common apt-transport-https wget && \
-#     wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | apt-key add - && \
-#     add-apt-repository "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" && \
-#     apt-get update && \
-#     apt install -y code && \
-#     apt install -y libasound2 && \
-#     mkdir /home/docker/code
-
+FROM bramtoula/ros:melodic-trt-py3
+WORKDIR /root
 
 # Clone and build MSL-RAPTOR with python3
 RUN source /ros_python3_entrypoint.sh && \
-    mkdir ~/msl_raptor_ws && cd ~/msl_raptor_ws && \
+    mkdir msl_raptor_ws && cd msl_raptor_ws && \
     #catkin config -DPYTHON_EXECUTABLE=/usr/bin/python3 -DPYTHON_INCLUDE_DIR=/usr/include/python3.6m -DPYTHON_LIBRARY=/usr/lib/x86_64-linux-gnu/libpython3.6m.so && \
     #catkin config --install && \
-    mkdir ~/msl_raptor_ws/src && \
-    cd  ~/msl_raptor_ws/src && \
-    git clone https://github.com/StanfordMSL/MSL-RAPTOR.git msl_raptor && \
-    cd ~/msl_raptor_ws && \
+    mkdir src && \
+    cd  src && \
+    git clone --recurse-submodules -b siammask https://github.com/StanfordMSL/MSL-RAPTOR.git msl_raptor && \
+    cd .. && \
     catkin build
 
+# Set up SiamMask
+RUN cd msl_raptor_ws/src/msl_raptor/src/front-end/SiamMask && \
+    pip3 install -r requirements.txt && \
+    /bin/bash make.sh && \
+    cd experiments/siammask_sharp && \
+    wget http://www.robots.ox.ac.uk/~qwang/SiamMask_VOT.pth  && \
+    wget http://www.robots.ox.ac.uk/~qwang/SiamMask_DAVIS.pth
 
+# Torch to TensorRT package
+RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && \
+    cd torch2trt && \
+    python3 setup.py install
+    
+RUN apt-get update && \
+    apt-get install -y libsm6 libxext6 libxrender-dev && \
+    rm -rf /var/lib/apt/lists/*
 # ---------------------------- Reset argument ------------------------------ #
 ARG rebuild=0
 # -------------------------------------------------------------------------- #
@@ -43,7 +39,7 @@ RUN echo 'alias subl_go="cd /root/msl_raptor_ws/src/msl_raptor && subl /root/msl
 
 
 RUN source /ros_python3_entrypoint.sh && \
-    cd ~/msl_raptor_ws/src/msl_raptor && \
+    cd msl_raptor_ws/src/msl_raptor && \
     git pull && \
     catkin build
 

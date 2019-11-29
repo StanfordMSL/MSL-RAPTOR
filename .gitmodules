@@ -1,0 +1,4 @@
+[submodule "src/front-end/SiamMask"]
+	path = src/front-end/SiamMask
+	url = https://github.com/bramtoula/SiamMask.git
+	branch = tensorrt
