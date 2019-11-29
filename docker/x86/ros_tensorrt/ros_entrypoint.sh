@@ -2,6 +2,5 @@
 set -e
 
 # setup ros environment
-source "/root/python3_ws/install/setup.bash"
-
+source "/opt/ros/melodic/setup.bash"
 exec "$@"
