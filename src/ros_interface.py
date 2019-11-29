@@ -33,7 +33,9 @@ class ros_interface:
         self.start_time = None
         ####################################################################
 
-        # Subscribers / Listeners & Publishers #############################        
+        # Subscribers / Listeners & Publishers #############################   
+        rospy.loginfo("about to get rosparams")
+        rospy.loginfo(rospy.get_param_names())     
         self.ns = rospy.get_param('~ns')  # robot namespace
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.pose_ekf_cb, queue_size=10)  # internal ekf pose
