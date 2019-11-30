@@ -97,7 +97,7 @@ class UKF:
         
         S += self.R  # add measurement noise
         S = enforce_pos_def_sym_mat(S) # project S to pos. def. cone to avoid numeric issues
-        S = la.inv(S)
+        S_inv = la.inv(S)
         return z_hat, S, S_inv
 
 
@@ -113,7 +113,7 @@ class UKF:
         tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
         
         # tranform 3d bounding box from quad frame to camera frame
-        bb_3d_cam = (tf_cam_quad @ bb_3d_quad)[:, 0:3]
+        bb_3d_cam = (tf_cam_quad @ bb_3d_quad.T)[:, 0:3]
 
         # transform each 3d point to a 2d pixel (row, col)
         bb_cr_list = np.zeros((bb_3d_cam.shape[0], 2))

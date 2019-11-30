@@ -99,8 +99,8 @@ class camera:
         input: assumes pnt in quad frame
         output: [row, col] i.e. the projection of xyz onto camera plane
         """
-        pnt_c = self.tf_cam_ego @ np.concatinate((pnt_q, [1]))
-        rc = camera.K @ np.reshape(pnt_c[0:3], 3, 1);
+        pnt_c = self.tf_cam_ego @ np.concatenate((pnt_q, [1]))
+        rc = self.K @ np.reshape(pnt_c[0:3], 3, 1)
         rc = np.array([rc[1], rc[0]]) / rc[2]
         return rc
 
