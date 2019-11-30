@@ -8,7 +8,7 @@ RUN source /ros_python3_entrypoint.sh && \
     #catkin config --install && \
     mkdir src && \
     cd  src && \
-    git clone --recurse-submodules -b siammask https://github.com/StanfordMSL/MSL-RAPTOR.git msl_raptor && \
+    git clone --recurse-submodules https://github.com/StanfordMSL/MSL-RAPTOR.git msl_raptor && \
     cd .. && \
     catkin build
 
