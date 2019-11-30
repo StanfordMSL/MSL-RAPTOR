@@ -39,7 +39,16 @@ def quat_to_axang(quat):
         else:
             raise RuntimeException("Invalid quaternion!")
 
-    ang = 2 * np.arccos(quat[0])
+    # handle numeric issues with arccos and quaternion ( [-1, 1] <==> [pi, 0] )
+    eps = 0.00001;
+    if 1 < quat[0] and quat[0] < 1 + eps:
+        ang = 0
+    elif -1 > quat[0] and quat[0] > -1 -eps:
+        ang = np.pi
+    elif -1 - eps < quat[0] and quat[0] < 1 + eps:
+        ang = 2 * np.arccos(quat[0])  # this should be the case most of the time
+    else:
+        raise RuntimeException("Should never be here! issue with arccos(quat[0]), quat[0] = {:.8f}".format(quat[0]))
 
     if abs(ang) < 0.0001:
         return  # no rotation, return zeros

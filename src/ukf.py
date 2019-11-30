@@ -86,14 +86,44 @@ class UKF:
         for sp_ind in range(sps.shape[1]):
             pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], bb_3d, tf_ego_w)
         z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
-        # sigma = enforce_pos_def_sym_mat(sigma)  # project sigma to pos. def. cone to avoid numeric issues
+
+        # line 10
+        S_xz = self.calc_cross_correlation(sps_recalc, mu_bar, z_hat, pred_meas)
         self.ukf_itr += 1
 
+    def calc_cross_correlation(self, sps, mu_bar, z_hat, pred_meas):
+        dim_covar = self.sigma.shape[0]
+        num_sps = sps.shape[1]
+        
+        quat_ave_inv = quat_inv(mu_bar[6:10])
+        
+        Wprime = np.zeros((dim_covar, num_sps))
+        for sp_ind in range(num_sps):
+            Wprime[0:6, sp_ind] = sps[:6, sp_ind] - mu_bar[0:6]
+            Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13] 
+            
+            q = sps[6:10, sp_ind]
+            q_diff = quat_mul(q, quat_ave_inv)
+            axang_diff = quat_to_axang(q_diff)
+            Wprime[6:9, sp_ind] = axang_diff
 
+        sigma_xz = self.w0_c * Wprime[:, 0].reshape((dim_covar, 1)) @ (pred_meas[:, 0] - z_hat).reshape((1, z_hat.shape[0]))
+        for i in range(1, num_sps):
+            sigma_xz = sigma_xz + self.wi * Wprime[:, i].reshape((dim_covar, 1)) * (pred_meas[:, i] - z_hat).reshape((1, z_hat.shape[0]))
+        
+        return sigma_xz
+        
+    
     def extract_mean_and_cov_from_obs_sigma_points(self, sps_meas):
-
+        # calculate mean
         z_hat = self.w0_m * sps_meas[:, 0] + self.wi * np.sum(sps_meas[:, 1:], axis=1)
+
+        # calculate covariance
         S = self.w0_c * (sps_meas[:, 0] - z_hat) @ (sps_meas[:, 0] - z_hat).T
+        dim_covar = sps_meas.shape[0]
+        for obs_ind in range(dim_covar):
+            S = S + self.wi * (sps_meas[:, obs_ind + 2] - z_hat) @ (sps_meas[:, obs_ind + 2] - z_hat).T
+            S = S + self.wi * (sps_meas[:, dim_covar + obs_ind + 2] - z_hat) @ (sps_meas[:, dim_covar + obs_ind + 2] - z_hat).T
         
         S += self.R  # add measurement noise
         S = enforce_pos_def_sym_mat(S) # project S to pos. def. cone to avoid numeric issues
