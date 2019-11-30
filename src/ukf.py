@@ -25,7 +25,7 @@ class UKF:
         self.VERBOSE = True
 
         # Paramters #############################
-        self.b_enforce_0_yaw = True;
+        self.b_enforce_0_yaw = True
         self.dim_state = 13
         self.dim_sig = 12  # covariance is 1 less dimension due to quaternion
         self.dim_meas = 5  # angled bounding box: row, col, width, height, angle
@@ -88,8 +88,40 @@ class UKF:
         z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
 
         # line 10
+        print(pred_meas - z_hat)
+        print(sps_recalc)
+
         S_xz = self.calc_cross_correlation(sps_recalc, mu_bar, z_hat, pred_meas)
         self.ukf_itr += 1
+
+        # lines 11-13
+        mu_out, sigma_out = self.update_state(measurement, mu_bar, sig_bar, S, S_inv, S_xz, z_hat)
+
+        self.mu = mu_out
+        self.sigma = sigma_out
+
+
+    def update_state(self, z, mu_bar, sig_bar, S, S_inv, S_xz, z_hat):
+        k = S_xz @ S_inv
+        innovation = k @ (z - z_hat)
+        mu_out = copy(mu_bar)
+        sigma_out = copy(sig_bar)
+        mu_out[0:6] += innovation[0:6]
+        mu_out[6:10] = quat_mul(axang_to_quat(innovation[6:9]), mu_bar[6:10])
+        mu_out[10:13] += innovation[9:12]
+
+        if self.b_enforce_0_yaw:
+            mu_out[6:10] = remove_yaw(mu_out)
+
+        # print(k)
+        # print(S)
+        # print(sigma_out)
+        sigma_out -=  k @ S @ k.T
+        # print(sigma_out)
+        sigma_out = enforce_pos_def_sym_mat(sigma_out) # project sigma_out to pos. def. cone to avoid numeric issues
+
+        return mu_out, sigma_out
+
 
     def calc_cross_correlation(self, sps, mu_bar, z_hat, pred_meas):
         dim_covar = self.sigma.shape[0]
@@ -109,7 +141,7 @@ class UKF:
 
         sigma_xz = self.w0_c * Wprime[:, 0].reshape((dim_covar, 1)) @ (pred_meas[:, 0] - z_hat).reshape((1, z_hat.shape[0]))
         for i in range(1, num_sps):
-            sigma_xz = sigma_xz + self.wi * Wprime[:, i].reshape((dim_covar, 1)) * (pred_meas[:, i] - z_hat).reshape((1, z_hat.shape[0]))
+            sigma_xz = sigma_xz + self.wi * Wprime[:, i].reshape((dim_covar, 1)) @ (pred_meas[:, i] - z_hat).reshape((1, z_hat.shape[0]))
         
         return sigma_xz
         
@@ -211,10 +243,9 @@ class UKF:
         else:
             quat_new = quat
 
-        [roll, pitch, yaw] = quat_to_ang(quat_new)
+        next_state[6:10] = quat_new
         if self.b_enforce_0_yaw:
-            yaw = 0
-        next_state[6:10] = ang_to_quat([roll, pitch, yaw])
+            next_state[6:10] = remove_yaw(quat_new)
 
         return next_state
 

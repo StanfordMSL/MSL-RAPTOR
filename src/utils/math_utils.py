@@ -40,7 +40,7 @@ def quat_to_axang(quat):
             raise RuntimeException("Invalid quaternion!")
 
     # handle numeric issues with arccos and quaternion ( [-1, 1] <==> [pi, 0] )
-    eps = 0.00001;
+    eps = 0.00001
     if 1 < quat[0] and quat[0] < 1 + eps:
         ang = 0
     elif -1 > quat[0] and quat[0] > -1 -eps:

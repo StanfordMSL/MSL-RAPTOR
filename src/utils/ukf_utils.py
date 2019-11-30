@@ -70,3 +70,8 @@ def bb_corners_to_angled_bb(points, output_coord_type='xy'):
         output = np.array([y_center, x_center, width, height, angle])
 
     return output
+
+
+def remove_yaw(quat):
+    [roll, pitch, yaw] = quat_to_ang(quat)
+    return ang_to_quat([roll, pitch, 0])
