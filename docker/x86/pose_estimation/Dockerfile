@@ -20,6 +20,11 @@ RUN cd msl_raptor_ws/src/msl_raptor/src/front-end/SiamMask && \
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_VOT.pth  && \
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_DAVIS.pth
 
+# Set up YOLO
+RUN apt-get update && \
+    apt-get install -y python3-tk && \
+    touch msl_raptor_ws/src/msl_raptor/src/front-end/yolov3/__init__.py && \
+    rm -rf /var/lib/apt/lists/*
 # Torch to TensorRT package
 RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && \
     cd torch2trt && \
