@@ -2,3 +2,6 @@
 	path = src/front-end/SiamMask
 	url = https://github.com/bramtoula/SiamMask.git
 	branch = tensorrt
+[submodule "src/front-end/yolov3"]
+	path = src/front-end/yolov3
+	url = https://github.com/ultralytics/yolov3.git
