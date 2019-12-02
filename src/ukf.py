@@ -81,24 +81,21 @@ class UKF:
         # line 6
         sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
         
-        # lines 7 -9 8
+        # lines 7-9
         pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
         for sp_ind in range(sps.shape[1]):
             pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], bb_3d, tf_ego_w)
         z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
 
         # line 10
-        print(pred_meas - z_hat)
-        print(sps_recalc)
-
-        S_xz = self.calc_cross_correlation(sps_recalc, mu_bar, z_hat, pred_meas)
-        self.ukf_itr += 1
+        S_xz = self.calc_cross_correlation(sps_recalc, mu_bar, z_hat, pred_meas)  # somewhere in calc_cross_corr there is prob an error --> output has nans
 
         # lines 11-13
         mu_out, sigma_out = self.update_state(measurement, mu_bar, sig_bar, S, S_inv, S_xz, z_hat)
 
         self.mu = mu_out
         self.sigma = sigma_out
+        self.ukf_itr += 1
 
 
     def update_state(self, z, mu_bar, sig_bar, S, S_inv, S_xz, z_hat):
@@ -113,11 +110,7 @@ class UKF:
         if self.b_enforce_0_yaw:
             mu_out[6:10] = remove_yaw(mu_out)
 
-        # print(k)
-        # print(S)
-        # print(sigma_out)
         sigma_out -=  k @ S @ k.T
-        # print(sigma_out)
         sigma_out = enforce_pos_def_sym_mat(sigma_out) # project sigma_out to pos. def. cone to avoid numeric issues
 
         return mu_out, sigma_out
@@ -128,7 +121,6 @@ class UKF:
         num_sps = sps.shape[1]
         
         quat_ave_inv = quat_inv(mu_bar[6:10])
-        
         Wprime = np.zeros((dim_covar, num_sps))
         for sp_ind in range(num_sps):
             Wprime[0:6, sp_ind] = sps[:6, sp_ind] - mu_bar[0:6]
@@ -139,10 +131,12 @@ class UKF:
             axang_diff = quat_to_axang(q_diff)
             Wprime[6:9, sp_ind] = axang_diff
 
-        sigma_xz = self.w0_c * Wprime[:, 0].reshape((dim_covar, 1)) @ (pred_meas[:, 0] - z_hat).reshape((1, z_hat.shape[0]))
+        z_hat_2d = np.expand_dims(z_hat, axis=1)
+        # note: [:, 0:1] results in shape (n,1) vs. []:, 0] --> shape of (n,)
+        sigma_xz = self.w0_c * Wprime[:, 0:1] @ (pred_meas[:, 0:1] - z_hat_2d).T
         for i in range(1, num_sps):
-            sigma_xz = sigma_xz + self.wi * Wprime[:, i].reshape((dim_covar, 1)) @ (pred_meas[:, i] - z_hat).reshape((1, z_hat.shape[0]))
-        
+            sigma_xz = sigma_xz + self.wi * Wprime[:, i:i+1] @ (pred_meas[:, i:i+1] - z_hat_2d).T
+
         return sigma_xz
         
     
