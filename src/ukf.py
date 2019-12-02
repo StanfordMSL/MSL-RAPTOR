@@ -79,7 +79,15 @@ class UKF:
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
         
         # line 6
-        sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
+        try:
+            sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
+        except Exception as e:
+            print(e)
+            print(sig_bar)
+            eig_vals, eig_vecs = la.eig(sig_bar)
+            print(eig_vals)
+            pdb.set_trace()
+
         
         # lines 7-9
         pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
@@ -88,7 +96,7 @@ class UKF:
         z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
 
         # line 10
-        S_xz = self.calc_cross_correlation(sps_recalc, mu_bar, z_hat, pred_meas)  # somewhere in calc_cross_corr there is prob an error --> output has nans
+        S_xz = self.calc_cross_correlation(sps_recalc, mu_bar, z_hat, pred_meas)
 
         # lines 11-13
         mu_out, sigma_out = self.update_state(measurement, mu_bar, sig_bar, S, S_inv, S_xz, z_hat)
@@ -187,7 +195,6 @@ class UKF:
         return output
 
 
-    
     def calc_sigma_points(self, mu, sigma):
         sps = np.zeros((self.dim_state, 2 * self.dim_sig + 1))
         sps[:, 0] = mu
@@ -256,12 +263,5 @@ class UKF:
             Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind];
             sig_bar = sig_bar + self.w_arr_cov[sp_ind] * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
         
-        sig_bar = sig_bar + self.Q  # add noise
-        sig_bar = enforce_pos_def_sym_mat(sig_bar) # project sig_bar to pos. def. cone to avoid numeric issues
+        sig_bar = enforce_pos_def_sym_mat(sig_bar + self.Q)  # add noise & project sig_bar to pos. def. cone to avoid numeric issues
         return mu_bar, sig_bar
-        
-
-    def calculate_cross_correlation():
-        pass
-
-
