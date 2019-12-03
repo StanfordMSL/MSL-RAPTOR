@@ -70,7 +70,7 @@ class UKF:
         # line 2
         sps = self.calc_sigma_points(self.mu, self.sigma)
 
-        # lines 2 & 3
+        # line 3
         sps_prop = np.empty_like(sps)
         for sp_ind in range(sps.shape[1]):
             sps_prop[:, sp_ind] = self.propagate_dynamics(sps[:, sp_ind], dt)
@@ -87,6 +87,7 @@ class UKF:
             eig_vals, eig_vecs = la.eig(sig_bar)
             print(eig_vals)
             pdb.set_trace()
+        pdb.set_trace()
         
         # lines 7-9
         pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
