@@ -11,6 +11,7 @@ RUN source /ros_python3_entrypoint.sh && \
     git clone --recurse-submodules https://github.com/StanfordMSL/MSL-RAPTOR.git msl_raptor && \
     cd .. && \
     catkin build
+    pip3 install pyquaternion && \
 
 # Set up SiamMask
 RUN cd msl_raptor_ws/src/msl_raptor/src/front-end/SiamMask && \
@@ -25,6 +26,7 @@ RUN apt-get update && \
     apt-get install -y python3-tk && \
     touch msl_raptor_ws/src/msl_raptor/src/front-end/yolov3/__init__.py && \
     rm -rf /var/lib/apt/lists/*
+
 # Torch to TensorRT package
 RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && \
     cd torch2trt && \

@@ -120,7 +120,7 @@ class camera:
 
 
 if __name__ == '__main__':
-    np.set_printoptions(linewidth=160)  # format numpy so printing matrices is more clear
+    np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
     print("Starting MSL-RAPTOR main [running python {}]".format(sys.version_info[0]))
     rospy.init_node('RAPTOR_MSL', anonymous=True)
     run_execution_loop()

@@ -5,6 +5,7 @@ import pdb
 # math
 import numpy as np
 import numpy.linalg as la
+from pyquaternion import Quaternion
 import tf
 
 
