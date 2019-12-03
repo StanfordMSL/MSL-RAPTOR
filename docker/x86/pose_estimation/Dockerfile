@@ -10,8 +10,8 @@ RUN source /ros_python3_entrypoint.sh && \
     cd  src && \
     git clone --recurse-submodules https://github.com/StanfordMSL/MSL-RAPTOR.git msl_raptor && \
     cd .. && \
-    catkin build
-    pip3 install pyquaternion && \
+    catkin build && \
+    pip3 install pyquaternion
 
 # Set up SiamMask
 RUN cd msl_raptor_ws/src/msl_raptor/src/front-end/SiamMask && \
