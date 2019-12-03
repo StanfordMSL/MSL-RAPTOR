@@ -69,8 +69,8 @@ def quat_mul(q0, q1):
     """
     multiply q0 by q1. first element in quat is scalar value
     """
-    w0, x0, y0, z0 = q0
-    w1, x1, y1, z1 = q1
+    w0, x0, y0, z0 = q1  # <<---- !!!!! NOTE THESE ARE NOW SWITCHED (to match matlab's function)
+    w1, x1, y1, z1 = q0  # <<---- !!!!! NOTE THESE ARE NOW SWITCHED (to match matlab's function)
     q_out = np.array([-x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
                        x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
                       -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
