@@ -1,4 +1,4 @@
-FROM ros_tensorrt:latest
+FROM bramtoula/ros:melodic-trt-tx2
 
 WORKDIR /root
 # Basic stuff for Python 3 with ROS

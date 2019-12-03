@@ -1,4 +1,4 @@
-FROM ros_python3:latest
+FROM bramtoula/melodic-trt-py3-tx2
 WORKDIR /root
 
 # Clone and build MSL-RAPTOR with python3
@@ -27,9 +27,11 @@ RUN wget https://nvidia.box.com/shared/static/phqe92v26cbhqjohwtvxorrwnmrnfx1o.w
 RUN cd msl_raptor_ws/src/msl_raptor/src/front-end/SiamMask && \
     apt-get update && \
     apt-get install -y python3-h5py python3-scipy python3-llvmlite python3-pandas python3-numba && \
+    pip3 install wheel && \
     pip3 install Cython==0.29.4 colorama==0.3.9 requests==2.21.0 fire==0.1.3 tqdm==4.29.1 tensorboardX==1.6 && \
     /bin/bash make.sh && \
     cd experiments/siammask_sharp && \
+    # Download weights
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_VOT.pth  && \
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_DAVIS.pth && \
     rm -rf /var/lib/apt/lists/* 
@@ -38,6 +40,10 @@ RUN cd msl_raptor_ws/src/msl_raptor/src/front-end/SiamMask && \
 RUN apt-get update && \
     apt-get install -y python3-tk && \
     touch msl_raptor_ws/src/msl_raptor/src/front-end/yolov3/__init__.py && \
+    # Download weights
+    cd msl_raptor_ws/src/msl_raptor/src/front-end/yolov3/weights && \
+    wget https://pjreddie.com/media/files/yolov3.weights && \
+    wget https://pjreddie.com/media/files/yolov3-tiny.weights && \
     rm -rf /var/lib/apt/lists/*
 # Torch to TensorRT package
 RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && \
