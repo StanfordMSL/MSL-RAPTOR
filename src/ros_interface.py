@@ -100,9 +100,10 @@ class ros_interface:
         Broadcast the estimated state of the filter. 
         State assumed to be a Nx1 numpy array of floats
         """
-        if np.any(state > 1e30):
+        MAX_VAL_ERR_THRESH = 1e10
+        if np.any(state > MAX_VAL_ERR_THRESH):
             rospy.logwarn("VALUES IN STATE ARE TOO BIG TO BE RIGHT!! Truncating to avoid error")
-            state[state > 1e30] = 1e30
+            state[state > MAX_VAL_ERR_THRESH] = MAX_VAL_ERR_THRESH
         data_len = state.shape[0]
         state_msg = Float32MultiArray()
         state_msg.layout.dim.append(MultiArrayDimension())
