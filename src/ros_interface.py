@@ -16,7 +16,7 @@ from utils.ros_utils import *
 
 class ros_interface:
 
-    def __init__(self):
+    def __init__(self, b_DEBUG=False):
         
         self.VERBOSE = True
 
@@ -41,7 +41,15 @@ class ros_interface:
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.pose_gt_cb, queue_size=10)  # optitrack pose
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', Float32MultiArray, queue_size=10)
         ####################################################################
+
+        # DEBUGGGGGGGGG
+        if b_DEBUG:
+            self.tracked_quad_pose_gt = None
+            rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.debug_tracked_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
+        ##########################
     
+    def debug_tracked_pose_gt_cb(self, msg):
+        self.tracked_quad_pose_gt = msg.pose
 
     def pose_ekf_cb(self, msg):
         """

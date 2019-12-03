@@ -66,6 +66,7 @@ class UKF:
         UKF iteration following pseudo code from probablistic robotics
         """
         rospy.loginfo("Starting UKF Iteration {}".format(self.ukf_itr))
+        print(self.mu)
 
         # line 2
         sps = self.calc_sigma_points(self.mu, self.sigma)
@@ -259,7 +260,7 @@ class UKF:
         for sp_ind in range(sps.shape[1]):
             Wprime[0:6, sp_ind] = sps[0:6, sp_ind] - mu_bar[0:6]  # still need to overwrite the quat parts of this
             Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13]  # still need to overwrite the quat parts of this
-            Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind];
+            Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind]
             sig_bar = sig_bar + self.w_arr_cov[sp_ind] * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
         
         sig_bar = enforce_pos_def_sym_mat(sig_bar + self.Q)  # add noise & project sig_bar to pos. def. cone to avoid numeric issues

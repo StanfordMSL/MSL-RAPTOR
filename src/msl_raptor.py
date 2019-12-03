@@ -23,9 +23,13 @@ from utils.ros_utils import *
 
 
 def run_execution_loop():
+    b_DEBUG = True
+    if b_DEBUG:
+        rospy.logwarn("\n\n\n------------- IN DEBUG MODE -------------\n\n\n")
+        time.sleep(0.5)
     rate = rospy.Rate(100) # max filter rate
     b_target_in_view = True
-    ros = ROS()  # create a ros interface object
+    ros = ROS(b_DEBUG)  # create a ros interface object
     wait_intil_ros_ready(ros)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
     bb_3d = init_objects(ros, ukf)  # init camera, pose, etc
@@ -46,6 +50,7 @@ def run_execution_loop():
         bb_aqq_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
 
         rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
+        # print(ukf.mu)
         ukf.step_ukf(abb, bb_3d, pose_to_tf(ego_pose), dt)  # update ukf
         state_est[0:ukf.dim_state] = ukf.mu
         state_est[ukf.dim_state:] = np.reshape(ukf.sigma, (ukf.dim_sig**2,))
@@ -69,7 +74,7 @@ def init_objects(ros, ukf):
 
     # init ukf state
     rospy.logwarn('using ground truth to initialize filter!')
-    ukf.mu = pose_to_state_vec(ros.quad_pose_gt)
+    ukf.mu = pose_to_state_vec(ros.tracked_quad_pose_gt)
 
     # init 3d bounding box in quad frame
     half_length = rospy.get_param('~target_bound_box_l') / 2
