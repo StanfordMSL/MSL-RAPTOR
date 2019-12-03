@@ -15,7 +15,7 @@
 
   <!-- IF using rosbag, launch our node then play the rosbag (using a delay to ensure msl_raptor starts first) -->
   <group if="$(arg b_rosbag)">
-    <node pkg="rosbag" type="play" name="player" output="screen" args="$(arg rb_path)/$(arg rb_name)" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
+    <node pkg="rosbag" type="play" name="player" args="$(arg rb_path)/$(arg rb_name)" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
   </group>
 
 

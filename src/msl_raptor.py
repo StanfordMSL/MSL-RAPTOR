@@ -30,7 +30,7 @@ def run_execution_loop():
     ukf = UKF()  # create ukf object
     bb_3d = init_objects(ros, ukf)  # init camera, pose, etc
 
-    state_est = np.zeros((13, ))
+    state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
     last_image_time = 0
     while not rospy.is_shutdown():
@@ -47,8 +47,15 @@ def run_execution_loop():
 
         rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
         ukf.step_ukf(abb, bb_3d, pose_to_tf(ego_pose), dt)  # update ukf
+        state_est[0:ukf.dim_state] = ukf.mu
+        state_est[ukf.dim_state:] = np.reshape(ukf.sigma, (ukf.dim_sig**2,))
         last_image_time = loop_time  # this ensures we dont reuse the image
-        ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
+        
+        try:
+            ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
+        except Exception as e:
+            print("failed pub (msl_raptor): {}".format(e))
+            pdb.set_trace()
         
         # [optional] update plots - to do
 

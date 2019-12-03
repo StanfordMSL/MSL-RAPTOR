@@ -1,6 +1,7 @@
 # IMPORTS
 # system
-import sys, time #, argparse
+import sys, time
+import pdb
 # math
 import numpy as np
 # ros
@@ -99,7 +100,10 @@ class ros_interface:
         Broadcast the estimated state of the filter. 
         State assumed to be a Nx1 numpy array of floats
         """
-        data_len = len(state)
+        if np.any(state > 1e30):
+            rospy.logwarn("VALUES IN STATE ARE TOO BIG TO BE RIGHT!! Truncating to avoid error")
+            state[state > 1e30] = 1e30
+        data_len = state.shape[0]
         state_msg = Float32MultiArray()
         state_msg.layout.dim.append(MultiArrayDimension())
         state_msg.layout.dim.append(MultiArrayDimension())
@@ -111,6 +115,10 @@ class ros_interface:
         state_msg.layout.dim[1].label = "cols"
         state_msg.layout.data_offset = 0
         state_msg.data = list(state)
-        self.state_pub.publish(state_msg)
+        try:
+            self.state_pub.publish(state_msg)
+        except Exception as e:
+            print("failed pub (ros_interface): {}".format(e))
+            pdb.set_trace()
 
 
