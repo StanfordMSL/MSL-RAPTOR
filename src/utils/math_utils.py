@@ -51,7 +51,7 @@ def quat_to_axang(quat):
         raise RuntimeException("Should never be here! issue with arccos(quat[0]), quat[0] = {:.8f}".format(quat[0]))
 
     if abs(ang) < 0.0001:
-        return  # no rotation, return zeros
+        return axang  # no rotation, return zeros
 
     ax = quat[1:4] / la.norm(quat[1:4])  # unit vector
     return ang * ax
