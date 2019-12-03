@@ -59,7 +59,10 @@ def quat_to_axang(quat):
 
 def quat_inv(q):
     """ technically this is the conjugate, for unit quats this is same as inverse """
-    return np.array([-q[0], q[1], q[2], q[3]])
+    if q[0] > 0:
+        return np.array([q[0], -q[1], -q[2], -q[3]])
+    else:
+        return np.array([-q[0], q[1], q[2], q[3]])  # this works if q[0] == 0 also
 
 
 def quat_mul(q0, q1):
