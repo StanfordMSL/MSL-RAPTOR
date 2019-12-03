@@ -24,7 +24,7 @@ class ros_interface:
         self.latest_bb = None
         self.latest_ego_pose = None
         self.latest_bb_method = 1  # 1 for detect network, -1 for tracking network
-        self.latest_time = 0
+        self.latest_time = -1
         self.image_dims = None
         self.pose_buffer = ([], [])
         self.pose_queue_size = 50

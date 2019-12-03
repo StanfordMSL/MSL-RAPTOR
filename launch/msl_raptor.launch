@@ -1,11 +1,22 @@
 <launch>
-  <arg name="id"          default="7" />
-  <arg name="robot_type"  default="quad" />
-  <arg name="ns"          value="/$(arg robot_type)$(arg id)" />
+  <arg name="id"              default="7" />
+  <arg name="robot_type"      default="quad" />
+  <arg name="ns"              value="/$(arg robot_type)$(arg id)" />
+  <arg name="b_rosbag"        default="false" />  <!-- boolean if we are reading data from a rosbag -->
+  <arg name="rb_path"         default="" />  <!-- path to the rosbag -->
+  <arg name="rb_name"         default="bag.bag" /> <!-- name of the rosbag -->
+  <arg name="rb_start_delay"  default="1.0" /> <!-- how long to delay the start of the rosbag -->
 
+  <!-- Launch our main node -->
   <node name="MSL_RAPTOR" pkg="msl_raptor" type="msl_raptor.py" output="screen">
     <param name="ns"  value="$(arg ns)"/> 
     <rosparam command="load" file="$(find msl_raptor)/params/quad7.yaml" />
   </node>
+
+  <!-- IF using rosbag, launch our node then play the rosbag (using a delay to ensure msl_raptor starts first) -->
+  <group if="$(arg b_rosbag)">
+    <node pkg="rosbag" type="play" name="player" output="screen" args="$(arg rb_path)/$(arg rb_name)" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
+  </group>
+
 
 </launch>
