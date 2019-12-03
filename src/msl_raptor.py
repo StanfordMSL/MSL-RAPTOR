@@ -29,7 +29,7 @@ def run_execution_loop():
     ros = ROS()  # create a ros interface object
     wait_intil_ros_ready(ros)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
-    bb_3d = init_objects(ros, ukf)  # init camera, pose, etc
+    bb_3d, last_image_time = init_objects(ros, ukf)  # init camera, pose, etc
 
     state_est = np.zeros((13, ))
     loop_count = 0
@@ -50,6 +50,7 @@ def run_execution_loop():
         ukf.step_ukf(abb, bb_3d, pose_to_tf(ego_pose), dt)
         ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
         # [optional] update plots
+        last_image_time = loop_time
         rate.sleep()
         loop_count += 1
 
@@ -61,6 +62,7 @@ def init_objects(ros, ukf):
     # init ukf state
     rospy.logwarn('using ground truth to initialize filter!')
     ukf.mu = pose_to_state_vec(ros.quad_pose_gt)
+    init_time = 0
 
     # init 3d bounding box in quad frame
     half_length = rospy.get_param('~target_bound_box_l') / 2
@@ -74,7 +76,7 @@ def init_objects(ros, ukf):
                       [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
                       [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
                       [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
-    return bb_3d 
+    return bb_3d, init_time
 
 
 def wait_intil_ros_ready(ros, timeout = 10):
@@ -106,6 +108,7 @@ class camera:
 
 
 if __name__ == '__main__':
+    np.set_printoptions(linewidth=160)  # format numpy so printing matrices is more clear
     print("Starting MSL-RAPTOR main [running python {}]".format(sys.version_info[0]))
     rospy.init_node('RAPTOR_MSL', anonymous=True)
     run_execution_loop()

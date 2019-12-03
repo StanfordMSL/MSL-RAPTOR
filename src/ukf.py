@@ -87,7 +87,6 @@ class UKF:
             eig_vals, eig_vecs = la.eig(sig_bar)
             print(eig_vals)
             pdb.set_trace()
-
         
         # lines 7-9
         pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
