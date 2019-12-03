@@ -7,6 +7,7 @@ import cv2
 # math
 import numpy as np
 import numpy.linalg as la
+from pyquaternion import Quaternion
 # plots
 # import matplotlib
 # from matplotlib import pyplot as plt
@@ -66,10 +67,11 @@ class UKF:
         UKF iteration following pseudo code from probablistic robotics
         """
         rospy.loginfo("Starting UKF Iteration {}".format(self.ukf_itr))
-        # print(self.mu)
+        print(self.mu)
 
         # line 2
         sps = self.calc_sigma_points(self.mu, self.sigma)
+        # pdb.set_trace()
 
         # line 3
         sps_prop = np.empty_like(sps)

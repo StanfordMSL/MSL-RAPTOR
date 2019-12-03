@@ -9,20 +9,28 @@ from pyquaternion import Quaternion
 import tf
 
 
+def enforce_quat_format(quat):
+    """
+    quat should have norm 1 and a positive first element (note orientation represented by q is same as -q)
+    """
+    unit_quat = quat / la.norm(quat)
+    s = np.sign(unit_quat[0])
+    if not s == 0:
+        unit_quat *= s
+    return unit_quat
+
+
 def axang_to_quat(axang):
     """ 
     takes in an orientation in axis-angle form s.t. |axang| = ang, and 
     axang/ang = unit vector about which the angle is rotated. Returns a quaternion
     """
-    quat = np.array([1., 0., 0., 0.])
     ang = la.norm(axang)
-
-    # deal with numeric issues
-    if abs(ang) > 0.001:
-        vec_perturb = axang / ang
-        quat[0] = np.cos(ang/2)
-        quat[1:4] = np.sin(ang/2) * vec_perturb
-    
+    # deal with numeric issues if angle is 0
+    if abs(ang) > 0.0001:
+        quat = enforce_quat_format(Quaternion(axis=axang, angle=ang).elements)
+    else:
+        quat = np.array([1., 0., 0., 0.])
     return quat
 
 
@@ -31,54 +39,21 @@ def quat_to_axang(quat):
     takes in an orientation in axis-angle form s.t. |axang| = ang, and 
     axang/ang = unit vector about which the angle is rotated. Returns a quaternion
     """
-    axang = np.zeros((3,))
-    # deal with some numerical issues...
-    if abs(quat[0]) > 1:
-        if abs(la.norm(quat) - 1) < 0.0001:
-            # this is a numeric issue (w/ no rotation)
-            axang = np.zeros((3,))
-        else:
-            raise RuntimeException("Invalid quaternion!")
-
-    # handle numeric issues with arccos and quaternion ( [-1, 1] <==> [pi, 0] )
-    eps = 0.00001
-    if 1 < quat[0] and quat[0] < 1 + eps:
-        ang = 0
-    elif -1 > quat[0] and quat[0] > -1 -eps:
-        ang = np.pi
-    elif -1 - eps < quat[0] and quat[0] < 1 + eps:
-        ang = 2 * np.arccos(quat[0])  # this should be the case most of the time
-    else:
-        raise RuntimeException("Should never be here! issue with arccos(quat[0]), quat[0] = {:.8f}".format(quat[0]))
-
-    if abs(ang) < 0.0001:
-        return axang  # no rotation, return zeros
-
-    ax = quat[1:4] / la.norm(quat[1:4])  # unit vector
-    return ang * ax
+    q_obj = Quaternion(array=quat)  # turn a numpy array into a pyquaternion object
+    return q_obj.radians * q_obj.axis  # will be [0, 0, 0] if no rotation
 
 
 def quat_inv(q):
     """ technically this is the conjugate, for unit quats this is same as inverse """
-    if q[0] > 0:
-        return np.array([q[0], -q[1], -q[2], -q[3]])
-    else:
-        return np.array([-q[0], q[1], q[2], q[3]])  # this works if q[0] == 0 also
+    return enforce_quat_format(Quaternion(array=q).inverse.elements)
 
 
 def quat_mul(q0, q1):
     """
     multiply q0 by q1. first element in quat is scalar value
     """
-    w0, x0, y0, z0 = q1  # <<---- !!!!! NOTE THESE ARE NOW SWITCHED (to match matlab's function)
-    w1, x1, y1, z1 = q0  # <<---- !!!!! NOTE THESE ARE NOW SWITCHED (to match matlab's function)
-    q_out = np.array([-x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
-                       x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
-                      -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
-                       x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0], dtype=np.float64)
-    if q_out[0] < 0:
-        q_out *= -1
-    return q_out
+    return enforce_quat_format((Quaternion(array=q0) * Quaternion(array=q1)).elements)
+
 
 def quat_to_ang(q):
     """
@@ -103,7 +78,15 @@ def quat_to_rotm(quat):
     calculate the rotation matrix of a given quaternion (frames assumed to be consistant 
     with the UKF state quaternion). First element of quat is the scalar.
     """
-    return tf.transformations.quaternion_matrix((quat[0], quat[1], quat[2], quat[3]))[0:3, 0:3]
+    return Quaternion(array=quat).rotation_matrix
+
+
+def quat_to_tf(quat):
+    """ 
+    calculate the rotation matrix of a given quaternion (frames assumed to be consistant 
+    with the UKF state quaternion). First element of quat is the scalar.
+    """
+    return Quaternion(array=quat).transformation_matrix
     
 
 def average_quaternions(Q, w=None):
