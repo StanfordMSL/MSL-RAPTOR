@@ -66,7 +66,7 @@ class UKF:
         UKF iteration following pseudo code from probablistic robotics
         """
         rospy.loginfo("Starting UKF Iteration {}".format(self.ukf_itr))
-        print(self.mu)
+        # print(self.mu)
 
         # line 2
         sps = self.calc_sigma_points(self.mu, self.sigma)
@@ -219,7 +219,6 @@ class UKF:
             sps[10:, sp_col_2] = mu[10:13] - sig_step[9:12, sp_ind]
             q_perturb = axang_to_quat(-sig_step[6:9, sp_ind])
             sps[6:10, sp_col_2] = quat_mul(q_perturb, q_nom)
-            
         return sps
     
     

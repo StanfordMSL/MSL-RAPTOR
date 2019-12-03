@@ -38,7 +38,7 @@ ARG rebuild=0
 # -------------------------------------------------------------------------- #
 
 # Add aliases to bashrc in docker containers
-RUN echo 'alias raptor_go="roslaunch msl_raptor msl_raptor.launch b_rosbag:=true"' >> ~/.bashrc
+RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch b_rosbag:=true"' >> ~/.bashrc
 
 RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \
