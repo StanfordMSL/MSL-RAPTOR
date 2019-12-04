@@ -46,29 +46,35 @@ class UKF:
         self.w_arr_cov[0] = self.w0_c
 
         self.camera = None
-        ####################################################################
 
-        # init vars #############################
-        self.ukf_itr = 0
         dp = 0.1  # [m]
         dv = 0.005  # [m/s]
         dq = 0.1  # [rad] in ax ang 
         dw = 0.005  # [rad/s]
-        self.mu = np.zeros((self.dim_state, 1))
         self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])
 
         self.Q = self.sigma/10  # Process Noise
         self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
         ####################################################################
 
+        # init vars #############################
+        self.mu = np.zeros((self.dim_state, 1))  # set by main function initialization
+        self.bb_3d = np.zeros((8, 3))  # set by main function initialization
+        self.itr = 0
+        self.itr_time = 0
+        ####################################################################
 
-    def step_ukf(self, measurement, bb_3d, tf_ego_w, dt):
+
+    def step_ukf(self, measurement, tf_ego_w, dt):
         """
         UKF iteration following pseudo code from probablistic robotics
         """
-        rospy.loginfo("Starting UKF Iteration {}".format(self.ukf_itr))
-        print("Starting UKF Iteration {}".format(self.ukf_itr))
+        if b_vs_debug():
+            print("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
+        else:
+            rospy.loginfo("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
         print(self.mu)
+        
 
         # line 2
         sps = self.calc_sigma_points(self.mu, self.sigma)
@@ -89,12 +95,13 @@ class UKF:
             print(sig_bar)
             eig_vals, eig_vecs = la.eig(sig_bar)
             print(eig_vals)
-            # pdb.set_trace()
+            if not b_vs_debug():
+                pdb.set_trace()
         
         # lines 7-9
         pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
         for sp_ind in range(sps.shape[1]):
-            pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], bb_3d, tf_ego_w)
+            pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], tf_ego_w)
         z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
 
         # line 10
@@ -105,7 +112,7 @@ class UKF:
 
         self.mu = mu_out
         self.sigma = sigma_out
-        self.ukf_itr += 1
+        self.itr += 1
 
 
     def update_state(self, z, mu_bar, sig_bar, S, S_inv, S_xz, z_hat):
@@ -172,7 +179,7 @@ class UKF:
         return z_hat, S, S_inv
 
 
-    def predict_measurement(self, state, bb_3d_quad, tf_ego_w):
+    def predict_measurement(self, state, tf_ego_w):
         """
         use camera model & relative states to predict the angled 2d 
         bounding box seen by the ego drone 
@@ -183,7 +190,7 @@ class UKF:
         tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
 
         # tranform 3d bounding box from quad frame to camera frame
-        bb_3d_cam = (tf_cam_quad @ bb_3d_quad.T).T[:, 0:3]
+        bb_3d_cam = (tf_cam_quad @ self.bb_3d.T).T[:, 0:3]
 
         # transform each 3d point to a 2d pixel (row, col)
         bb_rc_list = np.zeros((bb_3d_cam.shape[0], 2))

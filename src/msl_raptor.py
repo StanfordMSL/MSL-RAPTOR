@@ -33,7 +33,7 @@ def run_execution_loop():
     ros = ROS(b_DEBUG)  # create a ros interface object
     wait_intil_ros_ready(ros)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
-    bb_3d = init_objects(ros, ukf)  # init camera, pose, etc
+    init_objects(ros, ukf)  # init camera, pose, etc
 
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
@@ -56,9 +56,10 @@ def run_execution_loop():
         # tf_ego_w = inv_tf(pose_to_tf(ros.pose_ego_w))
         bb_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
 
-        rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
-        print(ukf.mu)
-        ukf.step_ukf(abb, bb_3d, tf_ego_w, dt)  # update ukf
+        # rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
+        # print(ukf.mu)
+        ukf.itr_time = loop_time
+        ukf.step_ukf(abb, tf_ego_w, dt)  # update ukf
         state_est[0:ukf.dim_state] = ukf.mu
         state_est[ukf.dim_state:] = np.reshape(ukf.sigma, (ukf.dim_sig**2,))
         last_image_time = loop_time  # this ensures we dont reuse the image
@@ -67,12 +68,14 @@ def run_execution_loop():
             ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
         except Exception as e:
             print("failed pub (msl_raptor): {}".format(e))
-            # pdb.set_trace()
+            if not b_vs_debug():
+                pdb.set_trace()
         
         # [optional] update plots - to do
 
         rate.sleep()
         loop_count += 1
+        print(" ")  # print blank line to separate iteration output
 
 
 def init_objects(ros, ukf):
@@ -87,15 +90,14 @@ def init_objects(ros, ukf):
     half_length = rospy.get_param('~target_bound_box_l') / 2
     half_width = rospy.get_param('~target_bound_box_w') / 2
     half_height = rospy.get_param('~target_bound_box_h') / 2
-    bb_3d = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
-                      [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
-                      [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
-                      [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
-                      [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
-                      [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
-                      [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
-                      [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
-    return bb_3d
+    ukf.bb_3d = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
+                          [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
+                          [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
+                          [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
+                          [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
+                          [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
+                          [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
+                          [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
 
 def wait_intil_ros_ready(ros, timeout = 10):

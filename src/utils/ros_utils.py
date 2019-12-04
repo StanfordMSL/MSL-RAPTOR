@@ -69,3 +69,11 @@ def get_ros_camera_info():
     tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
     tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))
     return K, tf_cam_ego
+
+
+def b_vs_debug():
+    try:
+        rospy.Time().now()
+    except:
+        return True
+    return False

@@ -48,9 +48,10 @@ class ros_interface:
             rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.debug_tracked_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
         ##########################
     
+    
     def debug_tracked_pose_gt_cb(self, msg):
         self.tracked_quad_pose_gt = msg.pose
-        print(pose_to_state_vec(self.tracked_quad_pose_gt))
+
 
     def pose_ekf_cb(self, msg):
         """
@@ -129,6 +130,7 @@ class ros_interface:
             self.state_pub.publish(state_msg)
         except Exception as e:
             print("failed pub (ros_interface): {}".format(e))
-            pdb.set_trace()
+            if not b_vs_debug():
+                pdb.set_trace()
 
 
