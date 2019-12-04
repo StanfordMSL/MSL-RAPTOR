@@ -39,7 +39,8 @@ def run_execution_loop():
     loop_count = 0
     last_image_time = 0
 
-    tf_ego_w = inv_tf(pose_to_tf(ros.pose_ego_w)) # DEBUGGING
+    tf_w_ego = pose_to_tf(ros.pose_ego_w)
+    tf_ego_w = inv_tf(tf_w_ego) # DEBUGGING
     rospy.logwarn("FIXING OUR POSE!!")
     while not rospy.is_shutdown():
         loop_time = ros.latest_time
@@ -52,7 +53,7 @@ def run_execution_loop():
         if 0:
             abb = ros.latest_bb  # angled bounding box
         else:
-            abb = ukf.predict_measurement(pose_to_state_vec(ros.tracked_quad_pose_gt), bb_3d, tf_ego_w)
+            abb = ukf.predict_measurement(pose_to_state_vec(ros.tracked_quad_pose_gt), tf_ego_w)
         # tf_ego_w = inv_tf(pose_to_tf(ros.pose_ego_w))
         bb_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
 

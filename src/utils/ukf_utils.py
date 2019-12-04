@@ -11,10 +11,11 @@ from utils.math_utils import *
 
 
 def state_to_tf(state):
-    tf = np.eye(4)
-    tf[0:3, 3] = state[0:3]
-    tf[0:3, 0:3] = quat_to_rotm(state[6:10])
-    return tf
+    """ returns tf_w_quad given the state vector """
+    tf_w_quad = np.eye(4)
+    tf_w_quad[0:3, 3] = state[0:3]
+    tf_w_quad[0:3, 0:3] = quat_to_rotm(state[6:10])
+    return tf_w_quad
 
 
 def enforce_pos_def_sym_mat(sigma):

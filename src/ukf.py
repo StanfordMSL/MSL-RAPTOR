@@ -32,19 +32,17 @@ class UKF:
         self.dim_sig = 12  # covariance is 1 less dimension due to quaternion
         self.dim_meas = 5  # angled bounding box: row, col, width, height, angle
 
-        alpha = .1  # scaling param - how far sig. points are from mean
-        kappa = 2  # scaling param - how far sig. points are from mean
-        beta = 2  # optimal choice according to probablistic robotics (textbook)
-        ukf_lambda = alpha**2 * (self.dim_sig + kappa) - self.dim_sig
-        self.sig_pnt_multiplier = np.sqrt(self.dim_sig + ukf_lambda)
+        # alpha = .1  # scaling param - how far sig. points are from mean
+        # kappa = 2  # scaling param - how far sig. points are from mean
+        # beta = 2  # optimal choice according to probablistic robotics (textbook)
+        # ukf_lambda = alpha**2 * (self.dim_sig + kappa) - self.dim_sig
+        kappa = 2
+        self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
 
-        self.w0_m = ukf_lambda / (ukf_lambda + self.dim_sig)
-        self.w0_c = self.w0_m + (1 - alpha**2 + beta)
-        self.wi = 1 / (2 * (ukf_lambda + self.dim_sig))
-        self.w_arr_mean = np.ones((1+ 2 * self.dim_sig,)) * self.wi
-        self.w_arr_mean[0] = self.w0_m
-        self.w_arr_cov = np.ones((1+ 2 * self.dim_sig,)) * self.wi
-        self.w_arr_cov[0] = self.w0_c
+        self.w0 = kappa / (kappa + self.dim_sig)
+        self.wi = 1 / (2 * (kappa + self.dim_sig))
+        self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
+        self.w_arr[0] = self.w0
 
         self.camera = None
 
@@ -52,7 +50,7 @@ class UKF:
         dv = 0.005  # [m/s]
         dq = 0.1  # [rad] in ax ang 
         dw = 0.005  # [rad/s]
-        self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])
+        self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])/100
 
         self.Q = self.sigma/10  # Process Noise
         self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
@@ -153,7 +151,7 @@ class UKF:
 
         z_hat_2d = np.expand_dims(z_hat, axis=1)
         # note: [:, 0:1] results in shape (n,1) vs. []:, 0] --> shape of (n,)
-        sigma_xz = self.w0_c * Wprime[:, 0:1] @ (pred_meas[:, 0:1] - z_hat_2d).T
+        sigma_xz = self.w0 * Wprime[:, 0:1] @ (pred_meas[:, 0:1] - z_hat_2d).T
         for i in range(1, num_sps):
             sigma_xz = sigma_xz + self.wi * Wprime[:, i:i+1] @ (pred_meas[:, i:i+1] - z_hat_2d).T
 
@@ -162,11 +160,11 @@ class UKF:
     
     def extract_mean_and_cov_from_obs_sigma_points(self, sps_meas):
         # calculate mean
-        z_hat = self.w0_m * sps_meas[:, 0] + self.wi * np.sum(sps_meas[:, 1:], axis=1)
+        z_hat = self.w0 * sps_meas[:, 0] + self.wi * np.sum(sps_meas[:, 1:], axis=1)
 
         # calculate covariance
         z_hat_2d = np.expand_dims(z_hat, axis=1)
-        S = self.w0_c * (sps_meas[:, 0:1] - z_hat_2d) @ (sps_meas[:, 0:1] - z_hat_2d).T
+        S = self.w0 * (sps_meas[:, 0:1] - z_hat_2d) @ (sps_meas[:, 0:1] - z_hat_2d).T
         dim_covar = self.dim_sig
         for obs_ind in range(dim_covar):
             col_ind_1 = obs_ind + 1
@@ -189,6 +187,10 @@ class UKF:
         # get relative transform from camera to quad
         tf_w_quad = state_to_tf(state)
         tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
+        # tf_cam_quad = np.array([[-0.0956 ,  -0.9951  ,  0.0258 ,  -0.1867],
+        #                          [   0.0593,   -0.0316,   -0.9977,    0.6696],
+        #                          [   0.9936 ,  -0.0939 ,   0.0620,    4.7865],
+        #                          [       0  ,       0 ,        0 ,   1.0000]])
 
         # tranform 3d bounding box from quad frame to camera frame
         bb_3d_cam = (tf_cam_quad @ self.bb_3d.T).T[:, 0:3]
@@ -264,8 +266,8 @@ class UKF:
 
     
     def extract_mean_and_cov_from_state_sigma_points(self, sps):
-        mu_bar = self.w0_m * sps[:, 0] + self.wi*np.sum(sps[:, 1:], 1)
-        mu_bar[6:10], ei_vec_set = average_quaternions(sps[6:10, :].T, self.w_arr_mean)
+        mu_bar = self.w0 * sps[:, 0] + self.wi*np.sum(sps[:, 1:], 1)
+        mu_bar[6:10], ei_vec_set = average_quaternions(sps[6:10, :].T, self.w_arr)
 
         Wprime = np.zeros((self.dim_sig, sps.shape[1]))
         sig_bar = np.zeros((self.dim_sig, self.dim_sig))
@@ -273,7 +275,7 @@ class UKF:
             Wprime[0:6, sp_ind] = sps[0:6, sp_ind] - mu_bar[0:6]  # still need to overwrite the quat parts of this
             Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13]  # still need to overwrite the quat parts of this
             Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind]
-            sig_bar = sig_bar + self.w_arr_cov[sp_ind] * Wprime[:, sp_ind] @ Wprime[:, sp_ind].T
+            sig_bar = sig_bar + self.w_arr[sp_ind] * Wprime[:, sp_ind:sp_ind+1] @ Wprime[:, sp_ind:sp_ind+1].T
         
         sig_bar = enforce_pos_def_sym_mat(sig_bar + self.Q)  # add noise & project sig_bar to pos. def. cone to avoid numeric issues
         return mu_bar, sig_bar
