@@ -67,6 +67,7 @@ class UKF:
         UKF iteration following pseudo code from probablistic robotics
         """
         rospy.loginfo("Starting UKF Iteration {}".format(self.ukf_itr))
+        
         print(self.mu)
 
         # line 2
@@ -77,9 +78,11 @@ class UKF:
         sps_prop = np.empty_like(sps)
         for sp_ind in range(sps.shape[1]):
             sps_prop[:, sp_ind] = self.propagate_dynamics(sps[:, sp_ind], dt)
+        # pdb.set_trace()
 
         # lines 4 & 5
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
+        # pdb.set_trace()
         
         # line 6
         try:
@@ -89,7 +92,8 @@ class UKF:
             print(sig_bar)
             eig_vals, eig_vecs = la.eig(sig_bar)
             print(eig_vals)
-            pdb.set_trace()
+            # pdb.set_trace()
+        # pdb.set_trace()
         
         # lines 7-9
         pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
@@ -133,7 +137,7 @@ class UKF:
         quat_ave_inv = quat_inv(mu_bar[6:10])
         Wprime = np.zeros((dim_covar, num_sps))
         for sp_ind in range(num_sps):
-            Wprime[0:6, sp_ind] = sps[:6, sp_ind] - mu_bar[0:6]
+            Wprime[0:6, sp_ind] = sps[0:6, sp_ind] - mu_bar[0:6]
             Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13] 
             
             q = sps[6:10, sp_ind]
@@ -155,11 +159,14 @@ class UKF:
         z_hat = self.w0_m * sps_meas[:, 0] + self.wi * np.sum(sps_meas[:, 1:], axis=1)
 
         # calculate covariance
-        S = self.w0_c * (sps_meas[:, 0] - z_hat) @ (sps_meas[:, 0] - z_hat).T
-        dim_covar = sps_meas.shape[0]
+        z_hat_2d = np.expand_dims(z_hat, axis=1)
+        S = self.w0_c * (sps_meas[:, 0:1] - z_hat_2d) @ (sps_meas[:, 0:1] - z_hat_2d).T
+        dim_covar = self.dim_sig
         for obs_ind in range(dim_covar):
-            S = S + self.wi * (sps_meas[:, obs_ind + 2] - z_hat) @ (sps_meas[:, obs_ind + 2] - z_hat).T
-            S = S + self.wi * (sps_meas[:, dim_covar + obs_ind + 2] - z_hat) @ (sps_meas[:, dim_covar + obs_ind + 2] - z_hat).T
+            col_ind_1 = obs_ind + 1
+            col_ind_2 = col_ind_1 + dim_covar
+            S = S + self.wi * (sps_meas[:, col_ind_1:(col_ind_1 + 1)] - z_hat_2d) @ (sps_meas[:, col_ind_1:(col_ind_1 + 1)] - z_hat_2d).T
+            S = S + self.wi * (sps_meas[:, col_ind_2:(col_ind_2 + 1)] - z_hat_2d) @ (sps_meas[:, col_ind_2:(col_ind_2 + 1)] - z_hat_2d).T
         
         S += self.R  # add measurement noise
         S = enforce_pos_def_sym_mat(S) # project S to pos. def. cone to avoid numeric issues
@@ -179,18 +186,18 @@ class UKF:
         tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
         
         # tranform 3d bounding box from quad frame to camera frame
-        bb_3d_cam = (tf_cam_quad @ bb_3d_quad.T)[:, 0:3]
+        bb_3d_cam = (tf_cam_quad @ bb_3d_quad.T).T[:, 0:3]
 
         # transform each 3d point to a 2d pixel (row, col)
-        bb_cr_list = np.zeros((bb_3d_cam.shape[0], 2))
+        bb_rc_list = np.zeros((bb_3d_cam.shape[0], 2))
         for i, bb_vert in enumerate(bb_3d_cam):
-            bb_cr_list[i, :] = self.camera.pnt3d_to_pix(bb_vert)
+            bb_rc_list[i, :] = self.camera.pnt3d_to_pix(bb_vert)
 
         # construct sensor output
         # minAreaRect sometimes flips the w/h and angle from how we want the output to be
         # to fix this, we can use boxPoints to get the x,y of the bb rect, and use our function
         # to get the output in the form we want 
-        rect = cv2.minAreaRect(bb_cr_list.astype('float32'))  # apparently float64s cause this function to fail
+        rect = cv2.minAreaRect(np.fliplr(bb_rc_list.astype('float32')))  # apparently float64s cause this function to fail
         box = cv2.boxPoints(rect)
         output = bb_corners_to_angled_bb(box, output_coord_type='rc')
         # pdb.set_trace()
@@ -200,7 +207,7 @@ class UKF:
     def calc_sigma_points(self, mu, sigma):
         sps = np.zeros((self.dim_state, 2 * self.dim_sig + 1))
         sps[:, 0] = mu
-        sig_step = self.sig_pnt_multiplier * la.cholesky(sigma)
+        sig_step = self.sig_pnt_multiplier * la.cholesky(sigma).T
 
         if self.b_enforce_0_yaw:
             sig_step[8, :] = 0

@@ -2,6 +2,7 @@
 # IMPORTS
 # tools
 import pdb
+from copy import copy
 # math
 import numpy as np
 import numpy.linalg as la
@@ -133,3 +134,11 @@ def average_quaternions(Q, w=None):
         ei_vec_set[:, i] = quat_to_axang(ei_quat)
 
     return q_mean, ei_vec_set
+
+
+def inv_tf(tf):
+    tf_inv = np.empty_like(tf)
+    tf_inv[3, 3] = 1
+    tf_inv[0:3, 0:3] = tf[0:3, 0:3].T
+    tf_inv[0:3, 3] = -tf_inv[0:3, 0:3] @ tf[0:3, 3]
+    return tf_inv

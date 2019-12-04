@@ -46,12 +46,12 @@ def run_execution_loop():
         # store data locally (so it doesnt get overwritten in ROS object)
 
         abb = ros.latest_bb  # angled bounding box
-        ego_pose = ros.latest_ego_pose  # stored as a ros PoseStamped
+        tf_ego_w = inv_tf(pose_to_tf(ros.latest_ego_pose))
         bb_aqq_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
 
         rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
         # print(ukf.mu)
-        ukf.step_ukf(abb, bb_3d, pose_to_tf(ego_pose), dt)  # update ukf
+        ukf.step_ukf(abb, bb_3d, tf_ego_w, dt)  # update ukf
         state_est[0:ukf.dim_state] = ukf.mu
         state_est[ukf.dim_state:] = np.reshape(ukf.sigma, (ukf.dim_sig**2,))
         last_image_time = loop_time  # this ensures we dont reuse the image
@@ -108,12 +108,11 @@ class camera:
         rospy.logwarn("pix_to_pnt3d is not written yet!")
         pass
 
-    def pnt3d_to_pix(self, pnt_q):
+    def pnt3d_to_pix(self, pnt_c):
         """
-        input: assumes pnt in quad frame
+        input: assumes pnt in camera frame
         output: [row, col] i.e. the projection of xyz onto camera plane
         """
-        pnt_c = self.tf_cam_ego @ np.concatenate((pnt_q, [1]))
         rc = self.K @ np.reshape(pnt_c[0:3], 3, 1)
         rc = np.array([rc[1], rc[0]]) / rc[2]
         return rc
