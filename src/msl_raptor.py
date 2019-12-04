@@ -61,12 +61,12 @@ def run_execution_loop():
         # print(ukf.mu)
         ukf.itr_time = loop_time
         ukf.step_ukf(abb, tf_ego_w, dt)  # update ukf
-        state_est[0:ukf.dim_state] = ukf.mu
-        state_est[ukf.dim_state:] = np.reshape(ukf.sigma, (ukf.dim_sig**2,))
+        # state_est[0:ukf.dim_state] = ukf.mu
+        # state_est[ukf.dim_state:] = np.reshape(ukf.sigma, (ukf.dim_sig**2,))
         last_image_time = loop_time  # this ensures we dont reuse the image
         
         try:
-            ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
+            ros.publish_filter_state(ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
         except Exception as e:
             print("failed pub (msl_raptor): {}".format(e))
             if not b_vs_debug():
@@ -77,6 +77,7 @@ def run_execution_loop():
         rate.sleep()
         loop_count += 1
         print(" ")  # print blank line to separate iteration output
+    print("ENDED")
 
 
 def init_objects(ros, ukf):

@@ -39,7 +39,7 @@ class ros_interface:
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.pose_ekf_cb, queue_size=10)  # internal ekf pose
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.pose_gt_cb, queue_size=10)  # optitrack pose
-        self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', Float32MultiArray, queue_size=10)
+        self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', PoseStamped, queue_size=5)
         ####################################################################
 
         # DEBUGGGGGGGGG
@@ -105,32 +105,20 @@ class ros_interface:
         self.latest_time = time  # DO THIS LAST
 
 
-    def publish_filter_state(self, state):
+    def publish_filter_state(self, state_est, time, itr):
         """
         Broadcast the estimated state of the filter. 
         State assumed to be a Nx1 numpy array of floats
         """
-        MAX_VAL_ERR_THRESH = 1e10
-        if np.any(state > MAX_VAL_ERR_THRESH):
-            rospy.logwarn("VALUES IN STATE ARE TOO BIG TO BE RIGHT!! Truncating to avoid error")
-            state[state > MAX_VAL_ERR_THRESH] = MAX_VAL_ERR_THRESH
-        data_len = state.shape[0]
-        state_msg = Float32MultiArray()
-        state_msg.layout.dim.append(MultiArrayDimension())
-        state_msg.layout.dim.append(MultiArrayDimension())
-        state_msg.layout.dim[0].size = data_len
-        state_msg.layout.dim[1].size = 1
-        state_msg.layout.dim[0].stride = data_len*1
-        state_msg.layout.dim[1].stride = data_len
-        state_msg.layout.dim[0].label = "rows"
-        state_msg.layout.dim[1].label = "cols"
-        state_msg.layout.data_offset = 0
-        state_msg.data = list(state)
-        try:
-            self.state_pub.publish(state_msg)
-        except Exception as e:
-            print("failed pub (ros_interface): {}".format(e))
-            if not b_vs_debug():
-                pdb.set_trace()
-
-
+        pose_msg = PoseStamped()
+        pose_msg.header.stamp = rospy.Time(time)
+        pose_msg.header.frame_id = 'world'
+        pose_msg.header.seq = np.uint32(itr)
+        pose_msg.pose.position.x = state_est[0]
+        pose_msg.pose.position.y = state_est[1]
+        pose_msg.pose.position.z = state_est[2]
+        pose_msg.pose.orientation.w = state_est[6]
+        pose_msg.pose.orientation.x = state_est[7]
+        pose_msg.pose.orientation.y = state_est[8]
+        pose_msg.pose.orientation.z = state_est[9]
+        self.state_pub.publish(pose_msg)

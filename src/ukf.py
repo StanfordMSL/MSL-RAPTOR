@@ -50,7 +50,7 @@ class UKF:
         dv = 0.005  # [m/s]
         dq = 0.1  # [rad] in ax ang 
         dw = 0.005  # [rad/s]
-        self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])/100
+        self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])
 
         self.Q = self.sigma/10  # Process Noise
         self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
