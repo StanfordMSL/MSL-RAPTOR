@@ -115,6 +115,8 @@ class UKF:
     def update_state(self, z, mu_bar, sig_bar, S, S_inv, S_xz, z_hat):
         k = S_xz @ S_inv
         innovation = k @ (z - z_hat)
+        if np.any(np.abs(innovation) > 1):
+            print("stop here")
         mu_out = copy(mu_bar)
         sigma_out = copy(sig_bar)
         mu_out[0:6] += innovation[0:6]
@@ -122,7 +124,7 @@ class UKF:
         mu_out[10:13] += innovation[9:12]
 
         if self.b_enforce_0_yaw:
-            mu_out[6:10] = remove_yaw(mu_out)
+            mu_out[6:10] = remove_yaw(mu_out[6:10])
 
         sigma_out -=  k @ S @ k.T
         sigma_out = enforce_pos_def_sym_mat(sigma_out) # project sigma_out to pos. def. cone to avoid numeric issues

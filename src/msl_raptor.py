@@ -20,6 +20,7 @@ from ros_interface import ros_interface as ROS
 from ukf import UKF
 # libs & utils
 from utils.ros_utils import *
+from utils.math_utils import *
 
 
 def run_execution_loop():
@@ -37,6 +38,9 @@ def run_execution_loop():
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
     last_image_time = 0
+
+    tf_ego_w = inv_tf(pose_to_tf(ros.latest_ego_pose)) # DEBUGGING
+    rospy.logwarn("FIXING OUR POSE!!")
     while not rospy.is_shutdown():
         loop_time = ros.latest_time
         if loop_time <= last_image_time:
@@ -46,11 +50,11 @@ def run_execution_loop():
         # store data locally (so it doesnt get overwritten in ROS object)
 
         abb = ros.latest_bb  # angled bounding box
-        tf_ego_w = inv_tf(pose_to_tf(ros.latest_ego_pose))
+        # tf_ego_w = inv_tf(pose_to_tf(ros.latest_ego_pose))
         bb_aqq_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
 
         rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
-        # print(ukf.mu)
+        print(ukf.mu)
         ukf.step_ukf(abb, bb_3d, tf_ego_w, dt)  # update ukf
         state_est[0:ukf.dim_state] = ukf.mu
         state_est[ukf.dim_state:] = np.reshape(ukf.sigma, (ukf.dim_sig**2,))
@@ -60,7 +64,7 @@ def run_execution_loop():
             ros.publish_filter_state(np.concatenate(([loop_time], [loop_count], state_est)))  # send vector with time, iteration, state_est
         except Exception as e:
             print("failed pub (msl_raptor): {}".format(e))
-            pdb.set_trace()
+            # pdb.set_trace()
         
         # [optional] update plots - to do
 
@@ -103,10 +107,6 @@ class camera:
     def __init__(self, ros):
          # camera intrinsic matrix K and pose relative to the quad (fixed)
         self.K , self.tf_cam_ego = get_ros_camera_info()
-
-    def pix_to_pnt3d(self):
-        rospy.logwarn("pix_to_pnt3d is not written yet!")
-        pass
 
     def pnt3d_to_pix(self, pnt_c):
         """

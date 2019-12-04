@@ -114,6 +114,12 @@ def bb_corners_to_angled_bb(points, output_coord_type='xy'):
         tr_x = points[sortind_x[2], 0]
         tr_y = points[sortind_x[2], 1]
 
+    # print(bl_x)
+    # print(bl_y)
+    # print(br_x)
+    # print(br_y)
+    if np.abs(br_x - bl_x) < 0.00001:
+        print("error")
     angle = -np.arctan((bl_y - br_y) / (bl_x - br_x))
     x_center = np.mean([br_x, bl_x, tl_x, tr_x])
     y_center = np.mean([br_y, bl_y, tl_y, tr_y])
