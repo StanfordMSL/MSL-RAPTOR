@@ -91,7 +91,7 @@ def bb_corners_to_angled_bb(points, output_coord_type='xy'):
     sortind_x = np.argsort(points[:, 0], axis=0)  # sort points by x coordinate
 
     # of the points furthest to the left, which is lower and which is higher? (bottom left / top left)
-    if points[sortind_x[0], 1] > points[sortind_x[2], 1]:
+    if points[sortind_x[0], 1] > points[sortind_x[1], 1]:
         bl_x = points[sortind_x[0], 0]
         bl_y = points[sortind_x[0], 1]
         tl_x = points[sortind_x[1], 0]
