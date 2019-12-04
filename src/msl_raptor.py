@@ -39,7 +39,7 @@ def run_execution_loop():
     loop_count = 0
     last_image_time = 0
 
-    tf_ego_w = inv_tf(pose_to_tf(ros.latest_ego_pose)) # DEBUGGING
+    tf_ego_w = inv_tf(pose_to_tf(ros.pose_ego_w)) # DEBUGGING
     rospy.logwarn("FIXING OUR POSE!!")
     while not rospy.is_shutdown():
         loop_time = ros.latest_time
@@ -49,9 +49,12 @@ def run_execution_loop():
         dt = loop_time - last_image_time
         # store data locally (so it doesnt get overwritten in ROS object)
 
-        abb = ros.latest_bb  # angled bounding box
-        # tf_ego_w = inv_tf(pose_to_tf(ros.latest_ego_pose))
-        bb_aqq_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
+        if 0:
+            abb = ros.latest_bb  # angled bounding box
+        else:
+            abb = ukf.predict_measurement(pose_to_state_vec(ros.tracked_quad_pose_gt), bb_3d, tf_ego_w)
+        # tf_ego_w = inv_tf(pose_to_tf(ros.pose_ego_w))
+        bb_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
 
         rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
         print(ukf.mu)
@@ -98,7 +101,7 @@ def init_objects(ros, ukf):
 def wait_intil_ros_ready(ros, timeout = 10):
     """ pause until ros is ready or timeout reached """
     rospy.loginfo("waiting for ros...")
-    while ros.latest_time is None or ros.quad_pose_gt is None or ros.latest_ego_pose is None:
+    while ros.latest_time is None or ros.quad_pose_gt is None or ros.pose_ego_w is None:
         continue
     rospy.loginfo("done!")
 

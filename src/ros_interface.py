@@ -23,7 +23,7 @@ class ros_interface:
         # Paramters #############################
         self.b_detect_new_bb = True  # set to false if last frame we had a bb (if false, use a tracking network like SiamMask)
         self.latest_bb = None
-        self.latest_ego_pose = None
+        self.pose_ego_w = None
         self.latest_bb_method = 1  # 1 for detect network, -1 for tracking network
         self.latest_time = -1
         self.image_dims = None
@@ -50,6 +50,7 @@ class ros_interface:
     
     def debug_tracked_pose_gt_cb(self, msg):
         self.tracked_quad_pose_gt = msg.pose
+        print(pose_to_state_vec(self.tracked_quad_pose_gt))
 
     def pose_ekf_cb(self, msg):
         """
@@ -90,7 +91,7 @@ class ros_interface:
         if len(self.pose_buffer[0]) == 0:
             return # this happens if we are just starting
 
-        self.latest_ego_pose = find_closest_by_time(time, self.pose_buffer[1], self.pose_buffer[0])[0]
+        self.pose_ego_w = find_closest_by_time(time, self.pose_buffer[1], self.pose_buffer[0])[0]
 
         # call NN here!!!!
         image = msg.data

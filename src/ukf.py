@@ -67,22 +67,19 @@ class UKF:
         UKF iteration following pseudo code from probablistic robotics
         """
         rospy.loginfo("Starting UKF Iteration {}".format(self.ukf_itr))
-        
+        print("Starting UKF Iteration {}".format(self.ukf_itr))
         print(self.mu)
 
         # line 2
         sps = self.calc_sigma_points(self.mu, self.sigma)
-        # pdb.set_trace()
 
         # line 3
         sps_prop = np.empty_like(sps)
         for sp_ind in range(sps.shape[1]):
             sps_prop[:, sp_ind] = self.propagate_dynamics(sps[:, sp_ind], dt)
-        # pdb.set_trace()
 
         # lines 4 & 5
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
-        # pdb.set_trace()
         
         # line 6
         try:
@@ -93,7 +90,6 @@ class UKF:
             eig_vals, eig_vecs = la.eig(sig_bar)
             print(eig_vals)
             # pdb.set_trace()
-        # pdb.set_trace()
         
         # lines 7-9
         pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
@@ -115,7 +111,7 @@ class UKF:
     def update_state(self, z, mu_bar, sig_bar, S, S_inv, S_xz, z_hat):
         k = S_xz @ S_inv
         innovation = k @ (z - z_hat)
-        if np.any(np.abs(innovation) > 1):
+        if np.any(np.abs(innovation) > 2):
             print("stop here")
         mu_out = copy(mu_bar)
         sigma_out = copy(sig_bar)
@@ -184,9 +180,8 @@ class UKF:
 
         # get relative transform from camera to quad
         tf_w_quad = state_to_tf(state)
-        
         tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
-        
+
         # tranform 3d bounding box from quad frame to camera frame
         bb_3d_cam = (tf_cam_quad @ bb_3d_quad.T).T[:, 0:3]
 
@@ -202,7 +197,6 @@ class UKF:
         rect = cv2.minAreaRect(np.fliplr(bb_rc_list.astype('float32')))  # apparently float64s cause this function to fail
         box = cv2.boxPoints(rect)
         output = bb_corners_to_angled_bb(box, output_coord_type='rc')
-        # pdb.set_trace()
         return output
 
 
