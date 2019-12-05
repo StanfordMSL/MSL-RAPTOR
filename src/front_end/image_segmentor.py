@@ -1,9 +1,12 @@
 from detector import YoloDetector
 from tracker import SiammaskTracker
+import sys, os, pdb
 
 class ImageSegmentor:
     def __init__(self,detector_name='yolov3',tracker_name='siammask'):
         if detector_name == 'yolov3':
+            pdb.set_trace()
+            cfg_path = os.path.dirname(cfg=os.path.dirname(os.path.abspath(__file__))) + '/front_end/yolov3/cfg/yolov3.cfg'
             self.detector = YoloDetector()
         else:
             raise RuntimeError("Detector chosen not implemented")

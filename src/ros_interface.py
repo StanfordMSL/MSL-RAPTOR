@@ -11,12 +11,12 @@ from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
 import tf
 # libs & utils
-from utils.ros_utils import *
+from utils_msl_raptor.ros_utils import *
 
 
 class ros_interface:
 
-    def __init__(self, b_DEBUG=False):
+    def __init__(self, b_use_gt_bb=False):
         
         self.VERBOSE = True
 
@@ -43,7 +43,7 @@ class ros_interface:
         ####################################################################
 
         # DEBUGGGGGGGGG
-        if b_DEBUG:
+        if b_use_gt_bb:
             self.tracked_quad_pose_gt = None
             rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.debug_tracked_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
         ##########################
@@ -82,7 +82,6 @@ class ros_interface:
         recieve an image, process w/ NN, then set variables that the main function will access 
         note: set the time variable at the end (this signals the program when new data has arrived)
         """
-        print("in")
         if self.start_time is None:
             self.start_time = msg.header.stamp.to_sec()
             time = 0

@@ -19,24 +19,24 @@ import rospy
 from ros_interface import ros_interface as ROS
 from ukf import UKF
 # libs & utils
-from utils.ros_utils import *
-from utils.math_utils import *
-sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/front_end/')
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils_msl_raptor.ros_utils import *
+from utils_msl_raptor.math_utils import *
+# sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/front_end/')
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/src/front_end')
 from image_segmentor import ImageSegmentor
 
 
-
 def run_execution_loop():
-    b_DEBUG = True
-    if b_DEBUG:
-        rospy.logwarn("\n\n\n------------- IN DEBUG MODE -------------\n\n\n")
+    b_use_gt_bb = True
+    if b_use_gt_bb:
+        rospy.logwarn("\n\n\n------------- IN DEBUG MODE (Using Ground Truth Bounding Boxes) -------------\n\n\n")
         time.sleep(0.5)
     rate = rospy.Rate(100) # max filter rate
     b_target_in_view = True
-    ros = ROS(b_DEBUG)  # create a ros interface object
-    wait_intil_ros_ready(ros)  # pause to allow ros to get initial messages
+    ros = ROS(b_use_gt_bb)  # create a ros interface object
+    wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
+    print('initializing image segmentor!!!!!!')
     img_set = ImageSegmentor()
     pdb.set_trace()
     init_objects(ros, ukf)  # init camera, pose, etc
@@ -53,7 +53,7 @@ def run_execution_loop():
             # this means we dont have new data yet
             continue
         tf_ego_w = inv_tf(pose_to_tf(ros.pose_w_ego))
-        if 0:
+        if not b_use_gt_bb:
             abb = ros.latest_bb  # angled bounding box
         else:
             abb = ukf.predict_measurement(pose_to_state_vec(ros.tracked_quad_pose_gt), tf_ego_w)
@@ -95,19 +95,13 @@ def init_objects(ros, ukf):
                           [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
 
-def wait_intil_ros_ready(ros, timeout = 10):
+def wait_intil_ros_ready(ros, rate):
     """ pause until ros is ready or timeout reached """
     rospy.loginfo("waiting for ros...")
-    while ros.latest_time is None or ros.quad_pose_gt is None or ros.pose_ego_w is None:
-        if ros.latest_time is None:
-            print("latest_time")
-        if ros.pose_ego_w is None:
-            print("pose_ego_w")
-        if ros.pose_ego_w is None:
-            print("pose_ego_w")
-            time.sleep(0.1)
+    while ros.latest_time is None:
+        rate.sleep()
         continue
-    rospy.loginfo("done!")
+    rospy.loginfo("ROS is initialized!")
 
 
 class camera:
