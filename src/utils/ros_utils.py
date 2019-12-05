@@ -68,6 +68,7 @@ def get_ros_camera_info():
     tf_cam_ego = np.eye(4)
     tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
     tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))
+    pdb.set_trace()
     return K, tf_cam_ego
 
 

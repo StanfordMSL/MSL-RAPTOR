@@ -21,6 +21,10 @@ from ukf import UKF
 # libs & utils
 from utils.ros_utils import *
 from utils.math_utils import *
+sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/front_end/')
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from image_segmentor import ImageSegmentor
+
 
 
 def run_execution_loop():
@@ -33,6 +37,8 @@ def run_execution_loop():
     ros = ROS(b_DEBUG)  # create a ros interface object
     wait_intil_ros_ready(ros)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
+    img_set = ImageSegmentor()
+    pdb.set_trace()
     init_objects(ros, ukf)  # init camera, pose, etc
 
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
