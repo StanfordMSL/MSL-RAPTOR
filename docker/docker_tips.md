@@ -29,9 +29,13 @@ For this method you need to create a file with the env variabls defined and use 
 >`--env-file [path to file]/.env`
 
 
+## 3. Using ROS with the container
+Including the run option `--network host` means "container’s network stack is not isolated from the Docker host (the container shares the host’s networking namespace), and the container does not get its own IP-address allocated". This wsa useful when we wanted to be able to communicate over ros to another computer.  
+
+The next step was to set the ROS_MASTER_URI and ROS_HOSTNAME environemental variables. This got complicated because in our lab we use avahi-daemon to resolve host names (so we do not have static ips). For example, normally the ROS_MASTER_URI is http://relay.local:11311, but in the container we were unable to resolve erlay.local into an ip address. If this is not a problem for you, just follow the steps in Section 2 how to set an environemntal variable.
+
 
 #### Avahi-daemon workaround - using .bashrc functions to generate an .env file with ros environmental variables
-In our lab we use avahi-daemon to resolve host names (so we do not have static ips). This is a problem because we were unable to resolve the hostnames in the container. If this is not a problem for you, skip this section.
 
 These lines are in my .bashrc. The function could be done in a single line, but for clarity I break it up into three. The first task is to get our own IP address. Run ifconfig on your computer, and look for the network adapter name you want (i.e. wlp2s0).
 >`get_ip_addr() { ip addr list wlp2s0 | awk -F'[ /]+' '$2=="inet"{print $3}'; }`
