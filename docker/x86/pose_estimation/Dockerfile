@@ -14,7 +14,7 @@ RUN source /ros_python3_entrypoint.sh && \
     pip3 install pyquaternion
 
 # Set up SiamMask
-RUN cd msl_raptor_ws/src/msl_raptor/src/front-end/SiamMask && \
+RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
     pip3 install -r requirements.txt && \
     /bin/bash make.sh && \
     cd experiments/siammask_sharp && \
@@ -24,7 +24,7 @@ RUN cd msl_raptor_ws/src/msl_raptor/src/front-end/SiamMask && \
 # Set up YOLO
 RUN apt-get update && \
     apt-get install -y python3-tk && \
-    touch msl_raptor_ws/src/msl_raptor/src/front-end/yolov3/__init__.py && \
+    touch msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/__init__.py && \
     rm -rf /var/lib/apt/lists/*
 
 # Torch to TensorRT package
