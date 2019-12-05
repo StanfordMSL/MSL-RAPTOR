@@ -7,7 +7,7 @@ from yolov3.utils.utils import *
 
 # Adapted from detect.py of https://github.com/ultralytics/yolov3
 class YoloDetector:
-    def __init__(self,cfg='yolov3/cfg/yolov3.cfg',data='yolov3/data/coco.data',weights='yolov3/weights/yolov3.weights',img_size=416,conf_thres=0.3,nms_thres=0.5,half=True):
+    def __init__(self, base_dir='', cfg='yolov3/cfg/yolov3.cfg',data='yolov3/data/coco.data',weights='yolov3/weights/yolov3.weights',img_size=416,conf_thres=0.3,nms_thres=0.5,half=True):
         self.img_size = img_size
         self.conf_thres = conf_thres
         self.nms_thres = nms_thres
@@ -17,14 +17,14 @@ class YoloDetector:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # Initialize model
-        self.model = Darknet(cfg, img_size)
+        self.model = Darknet(base_dir + cfg, img_size)
 
         # Load weights
-        attempt_download(weights)
+        attempt_download(base_dir + weights)
         if weights.endswith('.pt'):  # pytorch format
-            self.model.load_state_dict(torch.load(weights, map_location=device)['model'])
+            self.model.load_state_dict(torch.load(base_dir + weights, map_location=device)['model'])
         else:  # darknet format
-            _ = load_darknet_weights(self.model, weights)
+            _ = load_darknet_weights(self.model, base_dir + weights)
 
         # Fuse Conv2d + BatchNorm2d layers
         # model.fuse()

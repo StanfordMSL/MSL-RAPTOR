@@ -1,14 +1,14 @@
 from SiamMask.tools.test import *
 
 class SiammaskTracker:
-    def __init__(self,x=0 ,y=0,w=10,h=10,sample_im='SiamMask/data/tennis/00000.jpg',fp16_mode=True,features_trt=True,rpn_trt=False,mask_trt=False,refine_trt=False):
+    def __init__(self, base_dir='', x=0 ,y=0,w=10,h=10,sample_im='SiamMask/data/tennis/00000.jpg',fp16_mode=True,features_trt=True,rpn_trt=False,mask_trt=False,refine_trt=False):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         torch.backends.cudnn.benchmark = True
 
         # Setup Model
         args = argparse.Namespace()
-        args.config = 'SiamMask/experiments/siammask_sharp/config_davis.json'
-        args.resume = 'SiamMask/experiments/siammask_sharp/SiamMask_DAVIS.pth'
+        args.config = base_dir + 'SiamMask/experiments/siammask_sharp/config_davis.json'
+        args.resume = base_dir + 'SiamMask/experiments/siammask_sharp/SiamMask_DAVIS.pth'
         self.cfg = load_config(args)
         from custom import Custom
         siammask = Custom(anchors=self.cfg['anchors'])
