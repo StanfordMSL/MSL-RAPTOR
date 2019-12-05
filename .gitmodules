@@ -1,7 +1,7 @@
-[submodule "src/front-end/SiamMask"]
+[submodule "src/front_end/SiamMask"]
 	path = src/front_end/SiamMask
 	url = https://github.com/bramtoula/SiamMask.git
 	branch = tensorrt
-[submodule "src/front-end/yolov3"]
+[submodule "src/front_end/yolov3"]
 	path = src/front_end/yolov3
 	url = https://github.com/ultralytics/yolov3.git

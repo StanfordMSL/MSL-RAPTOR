@@ -25,7 +25,7 @@ RUN wget https://nvidia.box.com/shared/static/phqe92v26cbhqjohwtvxorrwnmrnfx1o.w
     python3 setup.py install
 
 # SiamMask
-RUN cd msl_raptor_ws/src/msl_raptor/src/front-end/SiamMask && \
+RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
     apt-get update && \
     apt-get install -y python3-h5py python3-scipy python3-llvmlite python3-pandas python3-numba && \
     pip3 install wheel && \
@@ -40,9 +40,9 @@ RUN cd msl_raptor_ws/src/msl_raptor/src/front-end/SiamMask && \
 # Set up YOLO
 RUN apt-get update && \
     apt-get install -y python3-tk && \
-    touch msl_raptor_ws/src/msl_raptor/src/front-end/yolov3/__init__.py && \
+    touch msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/__init__.py && \
     # Download weights
-    cd msl_raptor_ws/src/msl_raptor/src/front-end/yolov3/weights && \
+    cd msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/weights && \
     wget https://pjreddie.com/media/files/yolov3.weights && \
     wget https://pjreddie.com/media/files/yolov3-tiny.weights && \
     rm -rf /var/lib/apt/lists/*
