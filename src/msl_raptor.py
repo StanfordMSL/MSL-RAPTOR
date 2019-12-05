@@ -39,8 +39,6 @@ def run_execution_loop():
     loop_count = 0
     last_image_time = 0
 
-    tf_w_ego = pose_to_tf(ros.pose_ego_w)
-    tf_ego_w = inv_tf(tf_w_ego) # DEBUGGING
     rospy.logwarn("FIXING OUR POSE!!")
     while not rospy.is_shutdown():
         # store data locally (so it doesnt get overwritten in ROS object)
