@@ -4,6 +4,7 @@
 import pdb
 # math
 import numpy as np
+import numpy.linalg as la
 from bisect import bisect_left
 from pyquaternion import Quaternion
 # ros
@@ -69,7 +70,11 @@ def get_ros_camera_info():
     tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
     tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))
     pdb.set_trace()
-    return K, tf_cam_ego
+    # calculate field of view. First find top right point 1m along camera z axis. 
+    # This should be symetric, so fov_x or _y = 2*atan(x or y)
+    top_right_pnt_c = la.inv(K) @ np.concatenate([[camera_info.width/2], [camera_info.height/2], [1]])
+    fov_horz, fov_vert = 2 * np.arctan(top_right_pnt_c[0:2])
+    return K, tf_cam_ego, fov_horz, fov_vert
 
 
 def b_vs_debug():

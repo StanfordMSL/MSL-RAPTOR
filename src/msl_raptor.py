@@ -36,10 +36,13 @@ def run_execution_loop():
     ros = ROS(b_use_gt_bb)  # create a ros interface object
     wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
-    print('initializing image segmentor!!!!!!')
-    img_set = ImageSegmentor()
-    pdb.set_trace()
+    if b_use_gt_bb:
+        img_set = None
+    else:
+        print('initializing image segmentor!!!!!!')
+        img_set = ImageSegmentor()
     init_objects(ros, ukf)  # init camera, pose, etc
+    pdb.set_trace()
 
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
@@ -106,8 +109,38 @@ def wait_intil_ros_ready(ros, rate):
 
 class camera:
     def __init__(self, ros):
-         # camera intrinsic matrix K and pose relative to the quad (fixed)
-        self.K , self.tf_cam_ego = get_ros_camera_info()
+        """
+        K: camera intrinsic matrix 
+        tf_cam_ego: camera pose relative to the ego_quad (fixed)
+        fov_horz/fov_vert: Angular field of view (IN DEGREES) for horizontal and vertical directions
+        """
+        ns = rospy.get_param('~ns')
+        camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 5)
+        self.K = np.reshape(camera_info.K, (3, 3))
+        self.tf_cam_ego = np.eye(4)
+        self.tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
+        self.tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))
+        self.fov_horz, self.fov_vert = self.calc_fov()
+
+    def calc_fov(self):
+        """
+        - Find top, left point 1 meter along z axis in cam frame. the x and y values are 
+        half the width and height. Note: [x_tl, y_tl, 1 (= z_tl)] = inv(K) @ [0, 0, 1], 
+        which is just the first tow rows of the third col of inv(K).
+        - With these x and y, just use geometry (knowing z dist is 1) to get the angle 
+        spanning the x and y axis respectively.
+        """
+        return np.degrees(2 * np.arctan(-la.inv(self.K)[0:2, 2]))
+
+    def pix_to_pnt3d(self, row, col):
+        """
+        input: assumes rc is [row, col]
+        output: pnt_c = [x, y, z] in camera frame
+        """
+        pdb.set_trace()
+
+        pnt_c = la.inv(self.K) @ np.array([col, row, 1])
+        return pnt_c
 
     def pnt3d_to_pix(self, pnt_c):
         """
