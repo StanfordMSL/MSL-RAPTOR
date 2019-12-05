@@ -35,6 +35,11 @@ RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && \
 RUN apt-get update && \
     apt-get install -y libsm6 libxext6 libxrender-dev && \
     rm -rf /var/lib/apt/lists/*
+
+# Install 'ping'
+RUN apt-get update && \
+    apt-get install -y iputils-ping
+    
 # ---------------------------- Reset argument ------------------------------ #
 ARG rebuild=0
 # -------------------------------------------------------------------------- #
