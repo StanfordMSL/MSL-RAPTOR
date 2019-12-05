@@ -82,6 +82,7 @@ class ros_interface:
         recieve an image, process w/ NN, then set variables that the main function will access 
         note: set the time variable at the end (this signals the program when new data has arrived)
         """
+        print("in")
         if self.start_time is None:
             self.start_time = msg.header.stamp.to_sec()
             time = 0
@@ -92,7 +93,7 @@ class ros_interface:
         if len(self.pose_buffer[0]) == 0:
             return # this happens if we are just starting
 
-        self.pose_ego_w = find_closest_by_time(time, self.pose_buffer[1], self.pose_buffer[0])[0]
+        self.pose_w_ego = find_closest_by_time(time, self.pose_buffer[1], self.pose_buffer[0])[0]
 
         # call NN here!!!!
         image = msg.data

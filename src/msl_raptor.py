@@ -43,37 +43,25 @@ def run_execution_loop():
     tf_ego_w = inv_tf(tf_w_ego) # DEBUGGING
     rospy.logwarn("FIXING OUR POSE!!")
     while not rospy.is_shutdown():
+        # store data locally (so it doesnt get overwritten in ROS object)
         loop_time = ros.latest_time
         if loop_time <= last_image_time:
             # this means we dont have new data yet
             continue
-        dt = loop_time - last_image_time
-        # store data locally (so it doesnt get overwritten in ROS object)
-
+        tf_ego_w = inv_tf(pose_to_tf(ros.pose_w_ego))
         if 0:
             abb = ros.latest_bb  # angled bounding box
         else:
             abb = ukf.predict_measurement(pose_to_state_vec(ros.tracked_quad_pose_gt), tf_ego_w)
-        # tf_ego_w = inv_tf(pose_to_tf(ros.pose_ego_w))
         bb_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
 
-        # rospy.loginfo("Recieved new image at time {:.4f}".format(ros.latest_time))
-        # print(ukf.mu)
+        dt = loop_time - last_image_time
         ukf.itr_time = loop_time
         ukf.step_ukf(abb, tf_ego_w, dt)  # update ukf
-        # state_est[0:ukf.dim_state] = ukf.mu
-        # state_est[ukf.dim_state:] = np.reshape(ukf.sigma, (ukf.dim_sig**2,))
         last_image_time = loop_time  # this ensures we dont reuse the image
         
-        try:
-            ros.publish_filter_state(ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
-        except Exception as e:
-            print("failed pub (msl_raptor): {}".format(e))
-            if not b_vs_debug():
-                pdb.set_trace()
+        ros.publish_filter_state(ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
         
-        # [optional] update plots - to do
-
         rate.sleep()
         loop_count += 1
         print(" ")  # print blank line to separate iteration output
@@ -86,7 +74,8 @@ def init_objects(ros, ukf):
 
     # init ukf state
     rospy.logwarn('using ground truth to initialize filter!')
-    ukf.mu = pose_to_state_vec(ros.tracked_quad_pose_gt)
+    ukf.mu = pose_to_state_vec(ros.tracked_quad_pose_gt) 
+    # ukf.mu[0:3] += np.array([-2, .5, .5]) 
 
     # init 3d bounding box in quad frame
     half_length = rospy.get_param('~target_bound_box_l') / 2
@@ -106,6 +95,13 @@ def wait_intil_ros_ready(ros, timeout = 10):
     """ pause until ros is ready or timeout reached """
     rospy.loginfo("waiting for ros...")
     while ros.latest_time is None or ros.quad_pose_gt is None or ros.pose_ego_w is None:
+        if ros.latest_time is None:
+            print("latest_time")
+        if ros.pose_ego_w is None:
+            print("pose_ego_w")
+        if ros.pose_ego_w is None:
+            print("pose_ego_w")
+            time.sleep(0.1)
         continue
     rospy.loginfo("done!")
 
