@@ -47,11 +47,6 @@ RUN source /ros_python3_entrypoint.sh && \
     git pull && \
     catkin build
 
-ARG GIT_NAME=
-ARG GIT_EMAIL=
-RUN git config --global user.email "$GIT_EMAIL" && \
-    git config --global user.name "$GIT_NAME"
-
 COPY ./msl_raptor_entrypoint.sh /
 
 ENTRYPOINT ["/msl_raptor_entrypoint.sh"]
