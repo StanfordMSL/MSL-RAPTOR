@@ -21,8 +21,11 @@ class ros_interface:
         self.VERBOSE = True
 
         # Paramters #############################
-        self.b_detect_new_bb = True  # set to false if last frame we had a bb (if false, use a tracking network like SiamMask)
-        self.latest_bb = None
+        self.DETECT = 1
+        self.TRACK = 2
+        self.REINIT = 3
+        self.im_seg_mode = self.DETECT
+        self.latest_abb = None  # angled bound box [row, height, width, height, angle (radians)]
         self.pose_ego_w = None
         self.latest_bb_method = 1  # 1 for detect network, -1 for tracking network
         self.latest_time = -1
@@ -32,6 +35,7 @@ class ros_interface:
         self.start_time = 0
         self.quad_pose_gt = None
         self.start_time = None
+        self.img_seg  # object for parsing images into angled bounding boxes
         ####################################################################
 
         # Subscribers / Listeners & Publishers #############################   
@@ -94,14 +98,18 @@ class ros_interface:
 
         self.pose_w_ego = find_closest_by_time(time, self.pose_buffer[1], self.pose_buffer[0])[0]
 
-        # call NN here!!!!
+        # call NN here!!!!b_detect_new_bb
         image = msg.data
-        if self.b_detect_new_bb:
-            self.latest_bb_method = 1
+        self.latest_bb_method = self.im_seg_mode
+        if self.im_seg_mode == self.DETECT:
+            bb_no_angle = self.img_seg.detect(image)
+            self.img_seg.reinit_tracker(bb_no_angle, image)
+            self.latest_abb = self.img_seg.track(image)
+        elif self.im_seg_mode == self.TRACK:
+            self.latest_abb = self.img_seg.track(image)
         else:
-            self.latest_bb_method = -1
+            raise RuntimeError("Unknown image segmentation mode")
             
-        self.latest_bb = [120, 230, 40, 20, 10*np.pi/180]
         self.latest_time = time  # DO THIS LAST
 
 

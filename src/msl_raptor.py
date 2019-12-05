@@ -37,10 +37,10 @@ def run_execution_loop():
     wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
     if b_use_gt_bb:
-        img_set = None
+        img_seg = None
     else:
         print('initializing image segmentor!!!!!!')
-        img_set = ImageSegmentor()
+        ros.img_set = ImageSegmentor()
     init_objects(ros, ukf)  # init camera, pose, etc
     pdb.set_trace()
 
@@ -60,7 +60,7 @@ def run_execution_loop():
             abb = ros.latest_bb  # angled bounding box
         else:
             abb = ukf.predict_measurement(pose_to_state_vec(ros.tracked_quad_pose_gt), tf_ego_w)
-        bb_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
+        im_seg_mode = ros.im_seg_mode  # 1 for detect network, 2 for tracking network, 3 for reinitalized network
 
         dt = loop_time - last_image_time
         ukf.itr_time = loop_time
@@ -97,6 +97,8 @@ def init_objects(ros, ukf):
                           [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
                           [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
+     ros.im_seg_mode = ros.DETECT  # start of by detecting
+
 
 def wait_intil_ros_ready(ros, rate):
     """ pause until ros is ready or timeout reached """
@@ -112,7 +114,7 @@ class camera:
         """
         K: camera intrinsic matrix 
         tf_cam_ego: camera pose relative to the ego_quad (fixed)
-        fov_horz/fov_vert: Angular field of view (IN DEGREES) for horizontal and vertical directions
+        fov_horz/fov_vert: Angular field of view (IN RADIANS) for horizontal and vertical directions
         """
         ns = rospy.get_param('~ns')
         camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 5)
@@ -130,7 +132,7 @@ class camera:
         - With these x and y, just use geometry (knowing z dist is 1) to get the angle 
         spanning the x and y axis respectively.
         """
-        return np.degrees(2 * np.arctan(-la.inv(self.K)[0:2, 2]))
+        return 2 * np.arctan( -la.inv( self.K )[0:2, 2] )
 
     def pix_to_pnt3d(self, row, col):
         """
