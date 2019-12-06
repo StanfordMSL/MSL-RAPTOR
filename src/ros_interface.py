@@ -21,7 +21,7 @@ class ros_interface:
         self.VERBOSE = True
 
         # Paramters #############################
-        self.start_time = 0
+        self.start_time = None
         self.latest_img_time = -1
         self.DETECT = 1
         self.TRACK = 2

@@ -78,17 +78,14 @@ class UKF:
         # line 2
         sps = self.calc_sigma_points(self.mu, self.sigma)
 
-        pdb.set_trace()
 
         # line 3
         sps_prop = np.empty_like(sps)
         for sp_ind in range(sps.shape[1]):
             sps_prop[:, sp_ind] = self.propagate_dynamics(sps[:, sp_ind], dt)
-        pdb.set_trace()
 
         # lines 4 & 5
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
-        pdb.set_trace()
         
         # line 6
         try:
@@ -100,22 +97,18 @@ class UKF:
             print(eig_vals)
             if not b_vs_debug():
                 pdb.set_trace()
-        pdb.set_trace()
         
         # lines 7-9
         pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
         for sp_ind in range(sps.shape[1]):
             pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], tf_ego_w)
         z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
-        pdb.set_trace()
 
         # line 10
         S_xz = self.calc_cross_correlation(sps_recalc, mu_bar, z_hat, pred_meas)
-        pdb.set_trace()
 
         # lines 11-13
         mu_out, sigma_out = self.update_state(measurement, mu_bar, sig_bar, S, S_inv, S_xz, z_hat)
-        pdb.set_trace()
 
         self.mu = mu_out
         self.sigma = sigma_out

@@ -66,7 +66,6 @@ def run_execution_loop():
         ukf.itr_time = loop_time
         ukf.step_ukf(abb, tf_ego_w, dt)  # update ukf
         previous_image_time = loop_time  # this ensures we dont reuse the image
-        pdb.set_trace()
         
         ros.publish_filter_state(ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
         
