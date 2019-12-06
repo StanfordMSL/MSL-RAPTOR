@@ -42,37 +42,37 @@ def run_execution_loop():
         print('initializing image segmentor!!!!!!')
         ros.img_set = ImageSegmentor()
     init_objects(ros, ukf)  # init camera, pose, etc
-    pdb.set_trace()
 
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
-    last_image_time = 0
+    previous_image_time = 0
 
-    rospy.logwarn("FIXING OUR POSE!!")
     while not rospy.is_shutdown():
         # store data locally (so it doesnt get overwritten in ROS object)
-        loop_time = ros.latest_time
-        if loop_time <= last_image_time:
+        loop_time = ros.latest_img_time
+        if loop_time <= previous_image_time:
             # this means we dont have new data yet
             continue
-        tf_ego_w = inv_tf(pose_to_tf(ros.pose_w_ego))
+        tf_ego_w = inv_tf(ros.tf_w_ego)
         if not b_use_gt_bb:
-            abb = ros.latest_bb  # angled bounding box
+            abb = ros.latest_abb  # angled bounding box
         else:
-            abb = ukf.predict_measurement(pose_to_state_vec(ros.tracked_quad_pose_gt), tf_ego_w)
+            abb = ukf.predict_measurement(pose_to_state_vec(ros.ado_pose_gt_rosmsg), tf_ego_w)
+            rospy.logwarn("Faking measurement data")
         im_seg_mode = ros.im_seg_mode  # 1 for detect network, 2 for tracking network, 3 for reinitalized network
-
-        dt = loop_time - last_image_time
+        
+        # pdb.set_trace()
+        dt = loop_time - previous_image_time
         ukf.itr_time = loop_time
         ukf.step_ukf(abb, tf_ego_w, dt)  # update ukf
-        last_image_time = loop_time  # this ensures we dont reuse the image
+        previous_image_time = loop_time  # this ensures we dont reuse the image
+        pdb.set_trace()
         
         ros.publish_filter_state(ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
         
         rate.sleep()
         loop_count += 1
-        print(" ")  # print blank line to separate iteration output
-    print("ENDED")
+    ### DONE WITH MSL RAPTOR ####
 
 
 def init_objects(ros, ukf):
@@ -81,7 +81,7 @@ def init_objects(ros, ukf):
 
     # init ukf state
     rospy.logwarn('using ground truth to initialize filter!')
-    ukf.mu = pose_to_state_vec(ros.tracked_quad_pose_gt) 
+    ukf.mu = pose_to_state_vec(ros.ado_pose_gt_rosmsg) 
     # ukf.mu[0:3] += np.array([-2, .5, .5]) 
 
     # init 3d bounding box in quad frame
@@ -97,13 +97,13 @@ def init_objects(ros, ukf):
                           [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
                           [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
-     ros.im_seg_mode = ros.DETECT  # start of by detecting
+    ros.im_seg_mode = ros.DETECT  # start of by detecting
 
 
 def wait_intil_ros_ready(ros, rate):
     """ pause until ros is ready or timeout reached """
     rospy.loginfo("waiting for ros...")
-    while ros.latest_time is None:
+    while ros.latest_img_time is None:
         rate.sleep()
         continue
     rospy.loginfo("ROS is initialized!")
