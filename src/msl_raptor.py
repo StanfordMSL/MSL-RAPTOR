@@ -32,7 +32,6 @@ def run_execution_loop():
         rospy.logwarn("\n\n\n------------- IN DEBUG MODE (Using Ground Truth Bounding Boxes) -------------\n\n\n")
         time.sleep(0.5)
     rate = rospy.Rate(100) # max filter rate
-    b_target_in_view = True
     ros = ROS(b_use_gt_bb)  # create a ros interface object
     wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
@@ -42,6 +41,7 @@ def run_execution_loop():
         print('initializing image segmentor!!!!!!')
         ros.img_set = ImageSegmentor()
     init_objects(ros, ukf)  # init camera, pose, etc
+    pdb.set_trace()
 
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
@@ -114,6 +114,7 @@ class camera:
         K: camera intrinsic matrix 
         tf_cam_ego: camera pose relative to the ego_quad (fixed)
         fov_horz/fov_vert: Angular field of view (IN RADIANS) for horizontal and vertical directions
+        fov_lim_per_depth: how the boundary of the fov (width, heigh) changes per depth
         """
         ns = rospy.get_param('~ns')
         camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 5)
@@ -121,7 +122,19 @@ class camera:
         self.tf_cam_ego = np.eye(4)
         self.tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
         self.tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))
-        self.fov_horz, self.fov_vert = self.calc_fov()
+        (self.fov_horz, self.fov_vert), self.fov_lim_per_depth = self.calc_fov()
+
+    def b_is_pnt_in_fov(self, pnt_c, buffer=0):
+        """ 
+        - Use similar triangles to see if point (in camera frame!) is beyond limit of fov 
+        - buffer: an optional buffer region where if you are inside the fov by less than 
+            this the function returns false
+        """
+        if pnt_c[2] <= 0:
+            raise RuntimeError("Point is at or behind camera!")
+            return False
+        fov_lims = pnt_c[2] * self.fov_lim_per_depth - buffer
+        return np.all( np.abs(pnt_c[0:2]) < fov_lims )
 
     def calc_fov(self):
         """
@@ -130,8 +143,10 @@ class camera:
         which is just the first tow rows of the third col of inv(K).
         - With these x and y, just use geometry (knowing z dist is 1) to get the angle 
         spanning the x and y axis respectively.
+        - keeping the width and heigh of the point at 1m depth is useful for similar triangles
         """
-        return 2 * np.arctan( -la.inv( self.K )[0:2, 2] )
+        fov_lim_per_depth = -la.inv( self.K )[0:2, 2] 
+        return 2 * np.arctan( fov_lim_per_depth ), fov_lim_per_depth
 
     def pix_to_pnt3d(self, row, col):
         """
