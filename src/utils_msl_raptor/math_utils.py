@@ -39,7 +39,7 @@ def quat_to_axang(quat):
     takes in an orientation in axis-angle form s.t. |axang| = ang, and 
     axang/ang = unit vector about which the angle is rotated. Returns a quaternion
     """
-    return R.from_quat(np.roll(quat,3)).as_rotvec()
+    return R.from_quat(np.roll(quat,3,axis=1)).as_rotvec()
 
 
 def quat_inv(q):
@@ -63,7 +63,7 @@ def quat_to_ang(q):
     Convert a quaternion to euler angles (ASSUMES 'XYZ')
     note: ros functions expect last element of quat to be scalar
     """
-    return R.from_quat(np.roll(q,3)).as_euler('XYZ')
+    return R.from_quat(np.roll(q,3,axis=1)).as_euler('XYZ')
 
 def ang_to_quat(angs):
     """
@@ -141,5 +141,3 @@ def inv_tf(tf_in):
     # tf_inv[0:3, 0:3] = tf[0:3, 0:3].T
     # tf_inv[0:3, 3] = -tf_inv[0:3, 0:3] @ tf[0:3, 3]
     return tf.transformations.inverse_matrix(tf_in)
-
-# def

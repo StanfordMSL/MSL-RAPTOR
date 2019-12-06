@@ -143,7 +143,7 @@ class UKF:
 
         Wprime[idx_sigma_not_q, :]= sps[idx_mu_not_q, :] - mu_bar[idx_mu_not_q].reshape(-1,1)
         q = sps[6:10, :]
-        q_diff = quat_mul(q, quat_ave_inv)
+        q_diff = quat_mul(q.T, quat_ave_inv)
         axang_diff = quat_to_axang(q_diff)
         Wprime[6:9, :] = axang_diff.T
             
