@@ -32,44 +32,46 @@ def run_execution_loop():
         rospy.logwarn("\n\n\n------------- IN DEBUG MODE (Using Ground Truth Bounding Boxes) -------------\n\n\n")
         time.sleep(0.5)
     rate = rospy.Rate(100) # max filter rate
-    b_target_in_view = True
     ros = ROS(b_use_gt_bb)  # create a ros interface object
     wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
     ukf = UKF()  # create ukf object
-    print('initializing image segmentor!!!!!!')
-    img_set = ImageSegmentor()
-    pdb.set_trace()
+    if b_use_gt_bb:
+        img_seg = None
+    else:
+        print('initializing image segmentor!!!!!!')
+        ros.img_set = ImageSegmentor()
     init_objects(ros, ukf)  # init camera, pose, etc
+    pdb.set_trace()
 
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
-    last_image_time = 0
+    previous_image_time = 0
 
-    rospy.logwarn("FIXING OUR POSE!!")
     while not rospy.is_shutdown():
         # store data locally (so it doesnt get overwritten in ROS object)
-        loop_time = ros.latest_time
-        if loop_time <= last_image_time:
+        loop_time = ros.latest_img_time
+        if loop_time <= previous_image_time:
             # this means we dont have new data yet
             continue
-        tf_ego_w = inv_tf(pose_to_tf(ros.pose_w_ego))
+        tf_ego_w = inv_tf(ros.tf_w_ego)
         if not b_use_gt_bb:
-            abb = ros.latest_bb  # angled bounding box
+            abb = ros.latest_abb  # angled bounding box
         else:
-            abb = ukf.predict_measurement(pose_to_state_vec(ros.tracked_quad_pose_gt), tf_ego_w)
-        bb_method = ros.latest_bb_method  # 1 for detect network, -1 for tracking network
-
-        dt = loop_time - last_image_time
+            abb = ukf.predict_measurement(pose_to_state_vec(ros.ado_pose_gt_rosmsg), tf_ego_w)
+            rospy.logwarn("Faking measurement data")
+        im_seg_mode = ros.im_seg_mode  # 1 for detect network, 2 for tracking network, 3 for reinitalized network
+        
+        # pdb.set_trace()
+        dt = loop_time - previous_image_time
         ukf.itr_time = loop_time
         ukf.step_ukf(abb, tf_ego_w, dt)  # update ukf
-        last_image_time = loop_time  # this ensures we dont reuse the image
+        previous_image_time = loop_time  # this ensures we dont reuse the image
         
         ros.publish_filter_state(ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
         
         rate.sleep()
         loop_count += 1
-        print(" ")  # print blank line to separate iteration output
-    print("ENDED")
+    ### DONE WITH MSL RAPTOR ####
 
 
 def init_objects(ros, ukf):
@@ -78,7 +80,7 @@ def init_objects(ros, ukf):
 
     # init ukf state
     rospy.logwarn('using ground truth to initialize filter!')
-    ukf.mu = pose_to_state_vec(ros.tracked_quad_pose_gt) 
+    ukf.mu = pose_to_state_vec(ros.ado_pose_gt_rosmsg) 
     # ukf.mu[0:3] += np.array([-2, .5, .5]) 
 
     # init 3d bounding box in quad frame
@@ -94,11 +96,13 @@ def init_objects(ros, ukf):
                           [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
                           [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
+    ros.im_seg_mode = ros.DETECT  # start of by detecting
+
 
 def wait_intil_ros_ready(ros, rate):
     """ pause until ros is ready or timeout reached """
     rospy.loginfo("waiting for ros...")
-    while ros.latest_time is None:
+    while ros.latest_img_time is None:
         rate.sleep()
         continue
     rospy.loginfo("ROS is initialized!")
@@ -106,8 +110,53 @@ def wait_intil_ros_ready(ros, rate):
 
 class camera:
     def __init__(self, ros):
-         # camera intrinsic matrix K and pose relative to the quad (fixed)
-        self.K , self.tf_cam_ego = get_ros_camera_info()
+        """
+        K: camera intrinsic matrix 
+        tf_cam_ego: camera pose relative to the ego_quad (fixed)
+        fov_horz/fov_vert: Angular field of view (IN RADIANS) for horizontal and vertical directions
+        fov_lim_per_depth: how the boundary of the fov (width, heigh) changes per depth
+        """
+        ns = rospy.get_param('~ns')
+        camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 5)
+        self.K = np.reshape(camera_info.K, (3, 3))
+        self.tf_cam_ego = np.eye(4)
+        self.tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
+        self.tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))
+        (self.fov_horz, self.fov_vert), self.fov_lim_per_depth = self.calc_fov()
+
+    def b_is_pnt_in_fov(self, pnt_c, buffer=0):
+        """ 
+        - Use similar triangles to see if point (in camera frame!) is beyond limit of fov 
+        - buffer: an optional buffer region where if you are inside the fov by less than 
+            this the function returns false
+        """
+        if pnt_c[2] <= 0:
+            raise RuntimeError("Point is at or behind camera!")
+            return False
+        fov_lims = pnt_c[2] * self.fov_lim_per_depth - buffer
+        return np.all( np.abs(pnt_c[0:2]) < fov_lims )
+
+    def calc_fov(self):
+        """
+        - Find top, left point 1 meter along z axis in cam frame. the x and y values are 
+        half the width and height. Note: [x_tl, y_tl, 1 (= z_tl)] = inv(K) @ [0, 0, 1], 
+        which is just the first tow rows of the third col of inv(K).
+        - With these x and y, just use geometry (knowing z dist is 1) to get the angle 
+        spanning the x and y axis respectively.
+        - keeping the width and heigh of the point at 1m depth is useful for similar triangles
+        """
+        fov_lim_per_depth = -la.inv( self.K )[0:2, 2] 
+        return 2 * np.arctan( fov_lim_per_depth ), fov_lim_per_depth
+
+    def pix_to_pnt3d(self, row, col):
+        """
+        input: assumes rc is [row, col]
+        output: pnt_c = [x, y, z] in camera frame
+        """
+        pdb.set_trace()
+
+        pnt_c = la.inv(self.K) @ np.array([col, row, 1])
+        return pnt_c
 
     def pnt3d_to_pix(self, pnt_c):
         """

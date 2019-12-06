@@ -21,39 +21,47 @@ class ros_interface:
         self.VERBOSE = True
 
         # Paramters #############################
-        self.b_detect_new_bb = True  # set to false if last frame we had a bb (if false, use a tracking network like SiamMask)
-        self.latest_bb = None
-        self.pose_ego_w = None
-        self.latest_bb_method = 1  # 1 for detect network, -1 for tracking network
-        self.latest_time = -1
-        self.image_dims = None
-        self.pose_buffer = ([], [])
-        self.pose_queue_size = 50
-        self.start_time = 0
-        self.quad_pose_gt = None
         self.start_time = None
+        self.latest_img_time = -1
+        self.DETECT = 1
+        self.TRACK = 2
+        self.REINIT = 3
+        self.im_seg_mode = self.DETECT
+        self.latest_abb = None  # angled bound box [row, height, width, height, angle (radians)]
+        self.latest_bb_method = 1  # 1 for detect network, -1 for tracking network
+
+        self.ego_pose_rosmesg_buffer = ([], [])
+        self.ego_pose_rosmesg_buffer_len = 50
+        self.ego_pose_gt_rosmsg = None
+
+        self.img_seg = None  # object for parsing images into angled bounding boxes
+        self.b_use_gt_bb = b_use_gt_bb  # toggle for debugging using ground truth bounding boxes
         ####################################################################
 
         # Subscribers / Listeners & Publishers #############################   
         self.ns = rospy.get_param('~ns')  # robot namespace
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb)
-        rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.pose_ekf_cb, queue_size=10)  # internal ekf pose
-        rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.pose_gt_cb, queue_size=10)  # optitrack pose
+        rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
+        rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', PoseStamped, queue_size=5)
         ####################################################################
 
         # DEBUGGGGGGGGG
         if b_use_gt_bb:
-            self.tracked_quad_pose_gt = None
-            rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.debug_tracked_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
+            self.ado_pose_gt_rosmsg = None
+            rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.ado_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
         ##########################
     
     
-    def debug_tracked_pose_gt_cb(self, msg):
-        self.tracked_quad_pose_gt = msg.pose
+    def ado_pose_gt_cb(self, msg):
+        self.ado_pose_gt_rosmsg = msg.pose
 
 
-    def pose_ekf_cb(self, msg):
+    def ego_pose_gt_cb(self, msg):
+        self.ego_pose_gt_rosmsg = msg.pose
+
+
+    def ego_pose_ekf_cb(self, msg):
         """
         Maintains a buffer of poses and times. The first element is the earliest. 
         Stored in a way to interface with a quick method for finding closest match by time.
@@ -63,18 +71,14 @@ class ros_interface:
 
         time = get_ros_time(self.start_time)  # time in seconds
 
-        if len(self.pose_buffer[0]) < self.pose_queue_size:
-            self.pose_buffer[0].append(msg.pose)
-            self.pose_buffer[1].append(time)
+        if len(self.ego_pose_rosmesg_buffer[0]) < self.ego_pose_rosmesg_buffer_len:
+            self.ego_pose_rosmesg_buffer[0].append(msg.pose)
+            self.ego_pose_rosmesg_buffer[1].append(time)
         else:
-            self.pose_buffer[0][0:self.pose_queue_size] = self.pose_buffer[0][1:self.pose_queue_size]
-            self.pose_buffer[1][0:self.pose_queue_size] = self.pose_buffer[1][1:self.pose_queue_size]
-            self.pose_buffer[0][-1] = msg.pose
-            self.pose_buffer[1][-1] = time
-
-
-    def pose_gt_cb(self, msg):
-        self.quad_pose_gt = msg.pose
+            self.ego_pose_rosmesg_buffer[0][0:self.ego_pose_rosmesg_buffer_len] = self.ego_pose_rosmesg_buffer[0][1:self.ego_pose_rosmesg_buffer_len]
+            self.ego_pose_rosmesg_buffer[1][0:self.ego_pose_rosmesg_buffer_len] = self.ego_pose_rosmesg_buffer[1][1:self.ego_pose_rosmesg_buffer_len]
+            self.ego_pose_rosmesg_buffer[0][-1] = msg.pose
+            self.ego_pose_rosmesg_buffer[1][-1] = time
 
 
     def image_cb(self, msg):
@@ -85,24 +89,31 @@ class ros_interface:
         if self.start_time is None:
             self.start_time = msg.header.stamp.to_sec()
             time = 0
-            self.image_dims = (msg.height, msg.width)
         else:
-            time = msg.header.stamp.to_sec() - self.start_time  # timestamp in seconds
+            time = get_ros_time(self.start_time, msg)   # timestamp in seconds
 
-        if len(self.pose_buffer[0]) == 0:
+        if len(self.ego_pose_rosmesg_buffer[0]) == 0:
             return # this happens if we are just starting
 
-        self.pose_w_ego = find_closest_by_time(time, self.pose_buffer[1], self.pose_buffer[0])[0]
+        self.tf_w_ego = pose_to_tf(find_closest_by_time(time, self.ego_pose_rosmesg_buffer[1], self.ego_pose_rosmesg_buffer[0])[0])
 
         # call NN here!!!!
         image = msg.data
-        if self.b_detect_new_bb:
-            self.latest_bb_method = 1
-        else:
-            self.latest_bb_method = -1
+        self.latest_bb_method = self.im_seg_mode
+        if not self.b_use_gt_bb:
+            if self.im_seg_mode == self.DETECT:
+                pdb.set_trace()
+                bb_no_angle = self.img_seg.detect(image)
+                self.img_seg.reinit_tracker(bb_no_angle, image)
+                pdb.set_trace()
+                self.latest_abb = self.img_seg.track(image)
+                pdb.set_trace()
+            elif self.im_seg_mode == self.TRACK:
+                self.latest_abb = self.img_seg.track(image)
+            else:
+                raise RuntimeError("Unknown image segmentation mode")
             
-        self.latest_bb = [120, 230, 40, 20, 10*np.pi/180]
-        self.latest_time = time  # DO THIS LAST
+        self.latest_img_time = time  # DO THIS LAST
 
 
     def publish_filter_state(self, state_est, time, itr):

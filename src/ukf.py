@@ -74,7 +74,6 @@ class UKF:
             rospy.loginfo("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
         print(self.mu)
         
-
         # line 2
         sps = self.calc_sigma_points(self.mu, self.sigma)
 

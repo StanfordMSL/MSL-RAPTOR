@@ -4,6 +4,7 @@
 import pdb
 # math
 import numpy as np
+import numpy.linalg as la
 from bisect import bisect_left
 from pyquaternion import Quaternion
 # ros
@@ -33,12 +34,14 @@ def pose_to_state_vec(pose):
     return state
 
 
-def get_ros_time(start_time=0):
+def get_ros_time(start_time=0, msg=None):
     """
     returns ros time in seconds (minus time at start of program)
     """
-    ts = rospy.Time.now()
-    return ts.to_sec() - start_time
+    if msg is None:
+        return rospy.Time.now().to_sec() - start_time
+    else:
+        return msg.header.stamp.to_sec() - start_time
 
 
 def find_closest_by_time(time_to_match, time_list, message_list=None):
@@ -59,17 +62,6 @@ def find_closest_by_time(time_to_match, time_list, message_list=None):
        return message_list[pos], pos
     else:
        return message_list[pos - 1], pos - 1
-
-
-def get_ros_camera_info():
-    ns = rospy.get_param('~ns')
-    camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 5)
-    K = np.reshape(camera_info.K, (3, 3))
-    tf_cam_ego = np.eye(4)
-    tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
-    tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))
-    pdb.set_trace()
-    return K, tf_cam_ego
 
 
 def b_vs_debug():
