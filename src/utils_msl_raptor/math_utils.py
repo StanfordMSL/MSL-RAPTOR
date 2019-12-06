@@ -6,7 +6,6 @@ from copy import copy
 # math
 import numpy as np
 import numpy.linalg as la
-from pyquaternion import Quaternion
 import tf
 from scipy.spatial.transform import Rotation as R
 
@@ -19,7 +18,7 @@ def enforce_quat_format(quat):
     unit_quat = quat / la.norm(quat,axis=1).reshape(-1,1)
     s = np.sign(unit_quat[:,0])
     # Not change the quaternion when the scalar is 0
-    s = (s==0)*1+s
+    s = ( s== 0) * 1 + s
     unit_quat *= s.reshape(-1,1)
     return unit_quat
 
@@ -44,7 +43,12 @@ def quat_to_axang(quat):
 
 def quat_inv(q):
     """ technically this is the conjugate, for unit quats this is same as inverse """
-    return enforce_quat_format(Quaternion(array=q).inverse.elements)
+    q_inv = np.array(q, copy=True)
+    if q_inv[0] > 0:
+        q_inv[1:4] *= -1
+    else:
+        q_inv[0] *= -1
+    return q_inv
 
 
 def quat_mul(q, r):
@@ -53,7 +57,7 @@ def quat_mul(q, r):
     """
     q = q.reshape(-1,4)
     r = r.reshape(-1,4)
-    vec =np.array([np.multiply(q[:,0],r[:,1]),np.multiply(q[:,0],r[:,2]),np.multiply(q[:,0],r[:,3])]).T + np.array([np.multiply(r[:,0],q[:,1]),np.multiply(r[:,0],q[:,2]),np.multiply(r[:,0],q[:,3])]).T + np.array([np.multiply(q[:,2],r[:,3])-np.multiply(q[:,3],r[:,2]),np.multiply(q[:,3],r[:,1])-np.multiply(q[:,1],r[:,3]),np.multiply(q[:,1],r[:,2])-np.multiply(q[:,2],r[:,1])] ).T
+    vec = np.array([np.multiply(q[:,0],r[:,1]),np.multiply(q[:,0],r[:,2]),np.multiply(q[:,0],r[:,3])]).T + np.array([np.multiply(r[:,0],q[:,1]),np.multiply(r[:,0],q[:,2]),np.multiply(r[:,0],q[:,3])]).T + np.array([np.multiply(q[:,2],r[:,3])-np.multiply(q[:,3],r[:,2]),np.multiply(q[:,3],r[:,1])-np.multiply(q[:,1],r[:,3]),np.multiply(q[:,1],r[:,2])-np.multiply(q[:,2],r[:,1])] ).T
     scalar = (np.multiply(q[:,0] ,r[:,0]) - np.sum(np.multiply(q[:,1:],r[:,1:]),axis=1)).reshape(-1,1)
     qout = np.concatenate((scalar,vec),axis=1)
     return enforce_quat_format(qout)
@@ -61,14 +65,12 @@ def quat_mul(q, r):
 def quat_to_ang(q):
     """
     Convert a quaternion to euler angles (ASSUMES 'XYZ')
-    note: ros functions expect last element of quat to be scalar
     """
     return R.from_quat(np.roll(q,3,axis=1)).as_euler('XYZ')
 
 def ang_to_quat(angs):
     """
     Convert euler angles into a quaternion (ASSUMES 'XYZ')
-    note: ros functions expect last element of quat to be scalar
     """
     return np.roll(R.from_euler('XYZ',angs).as_quat(),1,axis=1)
 
@@ -78,7 +80,7 @@ def quat_to_rotm(quat):
     calculate the rotation matrix of a given quaternion (frames assumed to be consistant 
     with the UKF state quaternion). First element of quat is the scalar.
     """
-    return Quaternion(array=quat).rotation_matrix
+    return R.from_quat(quat).as_dcm()
 
 
 def quat_to_tf(quat):
@@ -86,7 +88,9 @@ def quat_to_tf(quat):
     calculate the rotation matrix of a given quaternion (frames assumed to be consistant 
     with the UKF state quaternion). First element of quat is the scalar.
     """
-    return Quaternion(array=quat).transformation_matrix
+    tf_out = np.eye(4)
+    tf_out[0:3, 0:3] = quat_to_rotm(quat)
+    return tf_out
     
 
 def average_quaternions(Q, w=None):
@@ -136,8 +140,4 @@ def average_quaternions(Q, w=None):
 
 
 def inv_tf(tf_in):
-    # tf_inv = np.empty_like(tf)
-    # tf_inv[3, 3] = 1
-    # tf_inv[0:3, 0:3] = tf[0:3, 0:3].T
-    # tf_inv[0:3, 3] = -tf_inv[0:3, 0:3] @ tf[0:3, 3]
     return tf.transformations.inverse_matrix(tf_in)

@@ -11,8 +11,7 @@ RUN source /ros_python3_entrypoint.sh && \
     git clone --recurse-submodules https://github.com/StanfordMSL/MSL-RAPTOR.git msl_raptor && \
     cd .. && \
     catkin build && \
-    pip3 install pyquaternion && \
-    pip3 install --upgrade scipy
+    pip3 install pyquaternion
 
 # Pytorch
 RUN apt-get update && \
@@ -31,6 +30,7 @@ RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
     apt-get install -y python3-h5py python3-scipy python3-llvmlite python3-pandas python3-numba && \
     pip3 install wheel && \
     pip3 install Cython==0.29.4 colorama==0.3.9 requests==2.21.0 fire==0.1.3 tqdm==4.29.1 tensorboardX==1.6 && \
+    pip3 install --upgrade scipy && \
     /bin/bash make.sh && \
     cd experiments/siammask_sharp && \
     # Download weights

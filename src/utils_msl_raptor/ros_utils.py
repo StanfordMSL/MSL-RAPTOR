@@ -6,12 +6,12 @@ import pdb
 import numpy as np
 import numpy.linalg as la
 from bisect import bisect_left
-from pyquaternion import Quaternion
 # ros
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
+from utils_msl_raptor.math_utils import *
 
 
 def pose_to_tf(pose):
@@ -19,7 +19,7 @@ def pose_to_tf(pose):
     tf_w_q (w:world, q:quad) s.t. if a point is in the quad frame (p_q) then
     the point transformed to be in the world frame is p_w = tf_w_q * p_q.
     """
-    tf_w_q = Quaternion(w=pose.orientation.w, x=pose.orientation.x, y=pose.orientation.y, z=pose.orientation.z).transformation_matrix
+    tf_w_q = quat_to_tf([pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z])
     tf_w_q[0:3, 3] = np.array([pose.position.x, pose.position.y, pose.position.z])
     return tf_w_q
 

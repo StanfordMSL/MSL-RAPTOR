@@ -41,7 +41,6 @@ def run_execution_loop():
         print('initializing image segmentor!!!!!!')
         ros.img_set = ImageSegmentor()
     init_objects(ros, ukf)  # init camera, pose, etc
-    pdb.set_trace()
 
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
@@ -117,7 +116,7 @@ class camera:
         fov_lim_per_depth: how the boundary of the fov (width, heigh) changes per depth
         """
         ns = rospy.get_param('~ns')
-        camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 5)
+        camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 10)
         self.K = np.reshape(camera_info.K, (3, 3))
         self.tf_cam_ego = np.eye(4)
         self.tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))

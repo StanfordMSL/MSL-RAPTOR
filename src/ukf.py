@@ -7,7 +7,6 @@ import cv2
 # math
 import numpy as np
 import numpy.linalg as la
-from pyquaternion import Quaternion
 # plots
 # import matplotlib
 # from matplotlib import pyplot as plt
@@ -32,11 +31,7 @@ class UKF:
         self.dim_sig = 12  # covariance is 1 less dimension due to quaternion
         self.dim_meas = 5  # angled bounding box: row, col, width, height, angle
 
-        # alpha = .1  # scaling param - how far sig. points are from mean
-        # kappa = 2  # scaling param - how far sig. points are from mean
-        # beta = 2  # optimal choice according to probablistic robotics (textbook)
-        # ukf_lambda = alpha**2 * (self.dim_sig + kappa) - self.dim_sig
-        kappa = 2
+        kappa = 2  # based on State Estimation for Robotics (Barfoot)
         self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
 
         self.w0 = kappa / (kappa + self.dim_sig)
