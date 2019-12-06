@@ -63,18 +63,14 @@ def quat_to_ang(q):
     Convert a quaternion to euler angles (ASSUMES 'XYZ')
     note: ros functions expect last element of quat to be scalar
     """
-    q = q.squeeze()
-    roll, pitch, yaw = tf.transformations.euler_from_quaternion(np.array([q[1], q[2], q[3], q[0]]), 'rxyz')
-    return roll, pitch, yaw
-
+    return R.from_quat(np.roll(q,3)).as_euler('XYZ')
 
 def ang_to_quat(angs):
     """
     Convert euler angles into a quaternion (ASSUMES 'XYZ')
     note: ros functions expect last element of quat to be scalar
     """
-    q = tf.transformations.quaternion_from_euler(angs[0], angs[1], angs[2], 'rxyz')
-    return np.array([q[3], q[0], q[1], q[2]])
+    return np.roll(R.from_euler('XYZ',angs).as_quat(),1,axis=1)
 
 
 def quat_to_rotm(quat):

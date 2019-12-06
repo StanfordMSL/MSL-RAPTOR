@@ -79,10 +79,7 @@ class UKF:
         sps = self.calc_sigma_points(self.mu, self.sigma)
 
         # line 3
-        sps_prop = np.empty_like(sps)
-        for sp_ind in range(sps.shape[1]):
-            sps_prop[:, sp_ind] = self.propagate_dynamics(sps[:, sp_ind], dt)
-
+        sps_prop = self.propagate_dynamics(sps, dt)
         # lines 4 & 5
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
         
@@ -140,20 +137,21 @@ class UKF:
         
         quat_ave_inv = quat_inv(mu_bar[6:10])
         Wprime = np.zeros((dim_covar, num_sps))
-        for sp_ind in range(num_sps):
-            Wprime[0:6, sp_ind] = sps[0:6, sp_ind] - mu_bar[0:6]
-            Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13] 
-            
-            q = sps[6:10, sp_ind]
-            q_diff = quat_mul(q, quat_ave_inv)
-            axang_diff = quat_to_axang(q_diff)
-            Wprime[6:9, sp_ind] = axang_diff
 
+        idx_mu_not_q = list(np.arange(6)) + list(np.arange(10,13))
+        idx_sigma_not_q = list(np.arange(6)) + list(np.arange(9,12)) 
+
+        Wprime[idx_sigma_not_q, :]= sps[idx_mu_not_q, :] - mu_bar[idx_mu_not_q].reshape(-1,1)
+        q = sps[6:10, :]
+        q_diff = quat_mul(q, quat_ave_inv)
+        axang_diff = quat_to_axang(q_diff)
+        Wprime[6:9, :] = axang_diff.T
+            
         z_hat_2d = np.expand_dims(z_hat, axis=1)
-        # note: [:, 0:1] results in shape (n,1) vs. []:, 0] --> shape of (n,)
-        sigma_xz = self.w0 * Wprime[:, 0:1] @ (pred_meas[:, 0:1] - z_hat_2d).T
-        for i in range(1, num_sps):
-            sigma_xz = sigma_xz + self.wi * Wprime[:, i:i+1] @ (pred_meas[:, i:i+1] - z_hat_2d).T
+
+        w_arr = np.ones(num_sps)*self.wi
+        w_arr[0] = self.w0
+        sigma_xz = w_arr * Wprime @ (pred_meas - z_hat_2d).T
 
         return sigma_xz
         
@@ -166,11 +164,10 @@ class UKF:
         z_hat_2d = np.expand_dims(z_hat, axis=1)
         S = self.w0 * (sps_meas[:, 0:1] - z_hat_2d) @ (sps_meas[:, 0:1] - z_hat_2d).T
         dim_covar = self.dim_sig
-        for obs_ind in range(dim_covar):
-            col_ind_1 = obs_ind + 1
-            col_ind_2 = col_ind_1 + dim_covar
-            S = S + self.wi * (sps_meas[:, col_ind_1:(col_ind_1 + 1)] - z_hat_2d) @ (sps_meas[:, col_ind_1:(col_ind_1 + 1)] - z_hat_2d).T
-            S = S + self.wi * (sps_meas[:, col_ind_2:(col_ind_2 + 1)] - z_hat_2d) @ (sps_meas[:, col_ind_2:(col_ind_2 + 1)] - z_hat_2d).T
+        w_arr = np.ones(sps_meas.shape[1])*self.wi
+        w_arr[0] = self.w0
+        S = w_arr*(sps_meas - z_hat_2d) @ (sps_meas - z_hat_2d).T
+
         
         S += self.R  # add measurement noise
         S = enforce_pos_def_sym_mat(S) # project S to pos. def. cone to avoid numeric issues
@@ -229,46 +226,49 @@ class UKF:
         sps[6:10, 1:] = quat_mul(q_perturb, q_nom).T
         return sps
     
-    
-    def propagate_dynamics(self, state, dt):
+    def propagate_dynamics(self, states, dt):
         """
         Estimate the next state vector. Assumes no control input (velocities stay the same)
+        states are 13xn
         """
-        next_state = copy(state)
+        states = states.reshape(13,-1)
+        next_states = copy(states)
 
         # update position
-        next_state[0:3] += dt * state[3:6]
+        next_states[0:3,:] += dt * states[3:6,:]
 
         # update orientation
-        quat = state[6:10]  # current orientation
-        omegas = state[10:13]  # angular velocity vector
-        om_norm = la.norm(omegas)  # rate of change of all angles
-        if om_norm > 0:
-            ang = om_norm * dt  # change in angle in this small timestep
-            ax = omegas / om_norm  # axis about angle change
-            quat_delta = axang_to_quat(ax * ang)
-            quat_new = quat_mul(quat_delta, quat)
-        else:
-            quat_new = quat
+        quat = states[6:10,:].T  # current orientation
+        omegas = states[10:13,:]  # angular velocity vector
+        om_norm = la.norm(omegas,axis=0)  # rate of change of all angles
+        # zeros_rot_idx = 
+        # omega[:,zeros_rot_idx] = 0
+        om_norm[np.argwhere(om_norm == 0)] = 1
+        ang = om_norm * dt  # change in angle in this small timestep
+        ax = omegas / om_norm  # axis about angle change
+        quat_delta = axang_to_quat((ax * ang).T)
+        quat_new = quat_mul(quat_delta, quat)
 
-        next_state[6:10] = quat_new
+        next_states[6:10,:] = quat_new.T
         if self.b_enforce_0_yaw:
-            next_state[6:10] = remove_yaw(quat_new)
+            next_states[6:10,:] = remove_yaw(quat_new).T
 
-        return next_state
-
+        return next_states
     
     def extract_mean_and_cov_from_state_sigma_points(self, sps):
         mu_bar = self.w0 * sps[:, 0] + self.wi*np.sum(sps[:, 1:], 1)
         mu_bar[6:10], ei_vec_set = average_quaternions(sps[6:10, :].T, self.w_arr)
 
+        idx_mu_not_q = list(np.arange(6)) + list(np.arange(10,13))
+        idx_sigma_not_q = list(np.arange(6)) + list(np.arange(9,12)) 
+
         Wprime = np.zeros((self.dim_sig, sps.shape[1]))
         sig_bar = np.zeros((self.dim_sig, self.dim_sig))
-        for sp_ind in range(sps.shape[1]):
-            Wprime[0:6, sp_ind] = sps[0:6, sp_ind] - mu_bar[0:6]  # still need to overwrite the quat parts of this
-            Wprime[9:12, sp_ind] = sps[10:13, sp_ind] - mu_bar[10:13]  # still need to overwrite the quat parts of this
-            Wprime[6:9, sp_ind] = ei_vec_set[:, sp_ind]
-            sig_bar = sig_bar + self.w_arr[sp_ind] * Wprime[:, sp_ind:sp_ind+1] @ Wprime[:, sp_ind:sp_ind+1].T
+
+        Wprime[idx_sigma_not_q, :] = sps[idx_mu_not_q, :] - mu_bar[idx_mu_not_q].reshape(-1,1)  # still need to overwrite the quat parts of this
+        Wprime[6:9, :] = ei_vec_set
+
+        sig_bar = (self.w_arr * Wprime) @ Wprime.T
         
         sig_bar = enforce_pos_def_sym_mat(sig_bar + self.Q)  # add noise & project sig_bar to pos. def. cone to avoid numeric issues
         return mu_bar, sig_bar

@@ -134,6 +134,8 @@ def bb_corners_to_angled_bb(points, output_coord_type='xy'):
     return output
 
 
-def remove_yaw(quat):
-    [roll, pitch, yaw] = quat_to_ang(quat)
-    return ang_to_quat([roll, pitch, 0])
+def remove_yaw(quats):
+    quats = quats.reshape(-1,4)
+    angles= quat_to_ang(quats)
+    angles[:,2] = 0
+    return ang_to_quat(angles)
