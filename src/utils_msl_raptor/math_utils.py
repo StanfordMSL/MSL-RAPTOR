@@ -136,7 +136,7 @@ def average_quaternions(Q, w=None):
         ei_quat = quat_mul(qi, q_mean_inv)
         ei_vec_set[:, i] = quat_to_axang(ei_quat)
 
-    return q_mean, ei_vec_set
+    return enforce_quat_format(q_mean), ei_vec_set
 
 
 def inv_tf(tf_in):

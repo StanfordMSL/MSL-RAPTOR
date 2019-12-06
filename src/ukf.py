@@ -113,7 +113,7 @@ class UKF:
         mu_out = copy(mu_bar)
         sigma_out = copy(sig_bar)
         mu_out[0:6] += innovation[0:6]
-        mu_out[6:10] = quat_mul(axang_to_quat(innovation[6:9]), mu_bar[6:10])
+        mu_out[6:10] = enforce_quat_format(quat_mul(axang_to_quat(innovation[6:9]), mu_bar[6:10]))
         mu_out[10:13] += innovation[9:12]
 
         if self.b_enforce_0_yaw:
