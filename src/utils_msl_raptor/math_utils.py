@@ -8,16 +8,19 @@ import numpy as np
 import numpy.linalg as la
 from pyquaternion import Quaternion
 import tf
-
+from scipy.spatial.transform import Rotation as R
 
 def enforce_quat_format(quat):
     """
     quat should have norm 1 and a positive first element (note orientation represented by q is same as -q)
+    input: nx4 array
     """
-    unit_quat = quat / la.norm(quat)
-    s = np.sign(unit_quat[0])
-    if not s == 0:
-        unit_quat *= s
+    quat = quat.reshape(-1,4)
+    unit_quat = quat / la.norm(quat,axis=1).reshape(-1,1)
+    s = np.sign(unit_quat[:,0])
+    # Not change the quaternion when the scalar is 0
+    s = (s==0)*1+s
+    unit_quat *= s.reshape(-1,1)
     return unit_quat
 
 
@@ -26,13 +29,9 @@ def axang_to_quat(axang):
     takes in an orientation in axis-angle form s.t. |axang| = ang, and 
     axang/ang = unit vector about which the angle is rotated. Returns a quaternion
     """
-    ang = la.norm(axang)
-    # deal with numeric issues if angle is 0
-    if abs(ang) > 0.0001:
-        quat = enforce_quat_format(Quaternion(axis=axang, angle=ang).elements)
-    else:
-        quat = np.array([1., 0., 0., 0.])
-    return quat
+    axang = axang.reshape(-1,3)
+    quat = np.roll(R.from_rotvec(axang).as_quat(),1,axis=1)
+    return enforce_quat_format(quat)
 
 
 def quat_to_axang(quat):
@@ -40,8 +39,7 @@ def quat_to_axang(quat):
     takes in an orientation in axis-angle form s.t. |axang| = ang, and 
     axang/ang = unit vector about which the angle is rotated. Returns a quaternion
     """
-    q_obj = Quaternion(array=quat)  # turn a numpy array into a pyquaternion object
-    return q_obj.radians * q_obj.axis  # will be [0, 0, 0] if no rotation
+    return R.from_quat(np.roll(quat,3)).as_rotvec()
 
 
 def quat_inv(q):
@@ -49,18 +47,23 @@ def quat_inv(q):
     return enforce_quat_format(Quaternion(array=q).inverse.elements)
 
 
-def quat_mul(q0, q1):
+def quat_mul(q, r):
     """
-    multiply q0 by q1. first element in quat is scalar value
+    multiply q by r. first element in quat is scalar value. Can be nx4 sized numpy arrays
     """
-    return enforce_quat_format((Quaternion(array=q0) * Quaternion(array=q1)).elements)
-
+    q = q.reshape(-1,4)
+    r = r.reshape(-1,4)
+    vec =np.array([np.multiply(q[:,0],r[:,1]),np.multiply(q[:,0],r[:,2]),np.multiply(q[:,0],r[:,3])]).T + np.array([np.multiply(r[:,0],q[:,1]),np.multiply(r[:,0],q[:,2]),np.multiply(r[:,0],q[:,3])]).T + np.array([np.multiply(q[:,2],r[:,3])-np.multiply(q[:,3],r[:,2]),np.multiply(q[:,3],r[:,1])-np.multiply(q[:,1],r[:,3]),np.multiply(q[:,1],r[:,2])-np.multiply(q[:,2],r[:,1])] ).T
+    scalar = (np.multiply(q[:,0] ,r[:,0]) - np.sum(np.multiply(q[:,1:],r[:,1:]),axis=1)).reshape(-1,1)
+    qout = np.concatenate((scalar,vec),axis=1)
+    return enforce_quat_format(qout)
 
 def quat_to_ang(q):
     """
     Convert a quaternion to euler angles (ASSUMES 'XYZ')
     note: ros functions expect last element of quat to be scalar
     """
+    q = q.squeeze()
     roll, pitch, yaw = tf.transformations.euler_from_quaternion(np.array([q[1], q[2], q[3], q[0]]), 'rxyz')
     return roll, pitch, yaw
 

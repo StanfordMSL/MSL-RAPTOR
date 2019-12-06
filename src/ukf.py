@@ -213,27 +213,20 @@ class UKF:
     def calc_sigma_points(self, mu, sigma):
         sps = np.zeros((self.dim_state, 2 * self.dim_sig + 1))
         sps[:, 0] = mu
-        sig_step = self.sig_pnt_multiplier * la.cholesky(sigma).T
+        sig_step_p = self.sig_pnt_multiplier * la.cholesky(sigma).T
+        sig_step_m = -sig_step_p
+        sig_step_all = np.stack((sig_step_p,sig_step_m),2).reshape(self.dim_sig,-1)
+        idx_mu_not_q = list(np.arange(6)) + list(np.arange(10,13))
+        idx_sigma_not_q = list(np.arange(6)) + list(np.arange(9,12)) 
 
+
+        sps[idx_mu_not_q,1:] = mu[idx_mu_not_q].reshape(-1,1) + sig_step_all[idx_sigma_not_q,:]
         if self.b_enforce_0_yaw:
-            sig_step[8, :] = 0
+            sig_step_all[8, :] = 0
 
         q_nom = mu[6:10]
-        # loop over half (-1) the num sigma points and update two at once
-        for sp_ind in range(self.dim_sig):
-            # first step in positive direction
-            sp_col_1 = 1 + 2 * sp_ind  # starting in the second col, count by pairs
-            sps[0:6, sp_col_1] = mu[0:6] + sig_step[0:6, sp_ind]
-            sps[10:, sp_col_1] = mu[10:13] + sig_step[9:12, sp_ind]
-            q_perturb = axang_to_quat(sig_step[6:9, sp_ind])
-            sps[6:10, sp_col_1] = quat_mul(q_perturb, q_nom)
-
-            # next step in positive direction
-            sp_col_2 = sp_col_1 + 1
-            sps[0:6, sp_col_2] = mu[0:6] - sig_step[0:6, sp_ind]
-            sps[10:, sp_col_2] = mu[10:13] - sig_step[9:12, sp_ind]
-            q_perturb = axang_to_quat(-sig_step[6:9, sp_ind])
-            sps[6:10, sp_col_2] = quat_mul(q_perturb, q_nom)
+        q_perturb = axang_to_quat(sig_step_all[6:9, :].T)
+        sps[6:10, 1:] = quat_mul(q_perturb, q_nom).T
         return sps
     
     
