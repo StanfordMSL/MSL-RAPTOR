@@ -11,8 +11,7 @@ RUN source /ros_python3_entrypoint.sh && \
     git clone --recurse-submodules https://github.com/StanfordMSL/MSL-RAPTOR.git msl_raptor && \
     cd .. && \
     catkin build && \
-    pip3 install pyquaternion && \
-    pip3 install --upgrade scipy
+    pip3 install pyquaternion
 
 # Set up SiamMask
 RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
@@ -20,7 +19,8 @@ RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
     /bin/bash make.sh && \
     cd experiments/siammask_sharp && \
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_VOT.pth  && \
-    wget http://www.robots.ox.ac.uk/~qwang/SiamMask_DAVIS.pth
+    wget http://www.robots.ox.ac.uk/~qwang/SiamMask_DAVIS.pth && \
+    pip3 install scipy --upgrade
 
 # Set up YOLO
 RUN apt-get update && \
