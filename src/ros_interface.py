@@ -13,6 +13,7 @@ import tf
 # libs & utils
 from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.ukf_utils import *
+from cv_bridge import CvBridge, CvBridgeError
 
 class ros_interface:
 
@@ -38,21 +39,28 @@ class ros_interface:
         self.b_use_gt_bb = b_use_gt_bb  # toggle for debugging using ground truth bounding boxes
         ####################################################################
 
-        # Subscribers / Listeners & Publishers #############################   
         self.ns = rospy.get_param('~ns')  # robot namespace
+
+        self.bridge = CvBridge()
+        # DEBUGGGGGGGGG
+        if b_use_gt_bb or not b_use_gt_bb:
+            rospy.logwarn("!!!ALWAYS INITIALIZING WITH GT POSE!!!!!!")
+            self.ado_pose_gt_rosmsg = None
+            rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.ado_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
+
+        ##########################
+    
+    def get_first_image(self):
+        return self.bridge.imgmsg_to_cv2(rospy.wait_for_message(self.ns + '/camera/image_raw',Image), desired_encoding="passthrough")
+
+    def create_subs_and_pubs(self):
+        # Subscribers / Listeners & Publishers #############################   
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', PoseStamped, queue_size=5)
         ####################################################################
 
-        # DEBUGGGGGGGGG
-        if b_use_gt_bb:
-            self.ado_pose_gt_rosmsg = None
-            rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.ado_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
-        ##########################
-    
-    
     def ado_pose_gt_cb(self, msg):
         self.ado_pose_gt_rosmsg = msg.pose
 
@@ -97,7 +105,7 @@ class ros_interface:
 
         self.tf_w_ego = pose_to_tf(find_closest_by_time(time, self.ego_pose_rosmesg_buffer[1], self.ego_pose_rosmesg_buffer[0])[0])
 
-        image = msg.data
+        image = self.bridge.imgmsg_to_cv2(msg,desired_encoding="passthrough")
         self.latest_bb_method = self.im_seg_mode
         if not self.b_use_gt_bb:
             if self.im_seg_mode == self.DETECT:
