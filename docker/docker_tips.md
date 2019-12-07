@@ -51,3 +51,13 @@ Next, I use avahi daemon to resolve the hostname (ours is `relay.local`). The -4
 Finally, this last function uses the previous two. The first part overwrites the existing .env file with the ROS_HOSTNAME variable. The next appends to it with the ROS_MASTER_URI.
 >`create_env() { echo 'ROS_HOSTNAME='$(get_ip_addr) > [path_to_env_file]/.env && echo 'ROS_MASTER_URI=http://'$(resolve_ros_hs)':11311' >> [path_to_env_file]/.env; }`
 
+
+
+<FILL IN REST>
+## logging into the tx2
+
+ssh (thorugh vs code insdier?)
+cd Documents/MSL-RAPTOR
+git pull
+use vs code to run image interactive
+
