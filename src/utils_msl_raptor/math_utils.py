@@ -80,7 +80,7 @@ def quat_to_rotm(quat):
     calculate the rotation matrix of a given quaternion (frames assumed to be consistant 
     with the UKF state quaternion). First element of quat is the scalar.
     """
-    return R.from_quat(quat).as_dcm()
+    return R.from_quat(np.roll(np.reshape(quat, (-1, 4)),3,axis=1)).as_dcm()
 
 
 def quat_to_tf(quat):
