@@ -12,7 +12,7 @@ from std_msgs.msg import Float32MultiArray, MultiArrayDimension
 import tf
 # libs & utils
 from utils_msl_raptor.ros_utils import *
-
+from utils_msl_raptor.ukf_utils import *
 
 class ros_interface:
 
@@ -83,7 +83,7 @@ class ros_interface:
 
     def image_cb(self, msg):
         """
-        recieve an image, process w/ NN, then set variables that the main function will access 
+        receive an image, process w/ NN, then set variables that the main function will access 
         note: set the time variable at the end (this signals the program when new data has arrived)
         """
         if self.start_time is None:
@@ -97,19 +97,20 @@ class ros_interface:
 
         self.tf_w_ego = pose_to_tf(find_closest_by_time(time, self.ego_pose_rosmesg_buffer[1], self.ego_pose_rosmesg_buffer[0])[0])
 
-        # call NN here!!!!
         image = msg.data
         self.latest_bb_method = self.im_seg_mode
         if not self.b_use_gt_bb:
             if self.im_seg_mode == self.DETECT:
-                pdb.set_trace()
                 bb_no_angle = self.img_seg.detect(image)
+                if not bb_no_angle:
+                    rospy.loginfo("Did not detect object")
+                    return
                 self.img_seg.reinit_tracker(bb_no_angle, image)
-                pdb.set_trace()
                 self.latest_abb = self.img_seg.track(image)
-                pdb.set_trace()
+                self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
             elif self.im_seg_mode == self.TRACK:
                 self.latest_abb = self.img_seg.track(image)
+                self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
             else:
                 raise RuntimeError("Unknown image segmentation mode")
             

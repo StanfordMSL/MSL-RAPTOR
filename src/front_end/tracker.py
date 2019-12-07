@@ -34,6 +34,7 @@ class SiammaskTracker:
         return location,mask
 
     def reinit(self,new_box,im):
+        # new_box format: x,y,w,h (where x,y correspond to the top left corner)
         (x,y,w,h) = new_box
         target_pos = np.array([x + w / 2, y + h / 2])
         target_sz = np.array([w, h])

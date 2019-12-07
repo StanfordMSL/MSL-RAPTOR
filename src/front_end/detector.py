@@ -7,7 +7,7 @@ from yolov3.utils.utils import *
 
 # Adapted from detect.py of https://github.com/ultralytics/yolov3
 class YoloDetector:
-    def __init__(self, base_dir='', cfg='yolov3/cfg/yolov3.cfg',data='yolov3/data/coco.data',weights='yolov3/weights/yolov3.weights',img_size=416,conf_thres=0.3,nms_thres=0.5,half=True):
+    def __init__(self, base_dir='', cfg='yolov3/cfg/yolov3.cfg',data='yolov3/data/coco.data',weights='yolov3/weights/yolov3.weights',img_size=416,conf_thres=0.3,nms_thres=0.5,half=True,class_id=0):
         self.img_size = img_size
         self.conf_thres = conf_thres
         self.nms_thres = nms_thres
@@ -63,7 +63,16 @@ class YoloDetector:
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img0.shape).round()
 
-        return det
+        # Check if wanted class found, and choose the one with highest confidence above threshold
+        det = det[d[:,-1] == class_id]
+        if len(det) == 0:
+            return False
+        else:
+            det = det[torch.argmax(det[:,4])]
+
+        # Reformat det to x,y,w,h (x and y are top left corner's position)
+        det = det.cpu().detach().numpy()
+        return [det[0],det[1],det[2]-det[0],det[3]-det[1]]
 
 
 
