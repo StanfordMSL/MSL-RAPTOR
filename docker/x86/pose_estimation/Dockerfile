@@ -25,6 +25,13 @@ RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
 RUN apt-get update && \
     apt-get install -y python3-tk && \
     touch msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/__init__.py && \
+    # Download drone detection weights
+    pip3 install gdown && \
+    cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/weights && \
+    gdown https://drive.google.com/uc?id=1UYu8E8ZmwSz2xkTCBYq44vOAn28fjdXa && \
+    cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/cfg && \
+    gdown https://drive.google.com/uc?id=140b6leURXKktVPk1qGG5IvsHYGq2mGos && \
+    pip3 uninstall -y gdown && \
     rm -rf /var/lib/apt/lists/*
 
 # Torch to TensorRT package

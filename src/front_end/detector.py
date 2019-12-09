@@ -7,7 +7,7 @@ from yolov3.utils.utils import *
 
 # Adapted from detect.py of https://github.com/ultralytics/yolov3
 class YoloDetector:
-    def __init__(self, base_dir='', cfg='yolov3/cfg/yolov3.cfg',data='yolov3/data/coco.data',weights='yolov3/weights/yolov3.weights',img_size=416,conf_thres=0.3,nms_thres=0.5,half=True):
+    def __init__(self, base_dir='', cfg='yolov3/cfg/yolov3_drone_infer.cfg',weights='yolov3/weights/yolov3_drone.weights',img_size=416,conf_thres=0.3,nms_thres=0.5,half=True):
         self.img_size = img_size
         self.conf_thres = conf_thres
         self.nms_thres = nms_thres
