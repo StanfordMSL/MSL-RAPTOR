@@ -1,6 +1,8 @@
 <launch>
   <arg name="id"              default="7" />
   <arg name="robot_type"      default="quad" />
+  <arg name="b_use_gt_bb"     default="false" />
+  <arg name="b_enforce_0_yaw" default="true" />
   <arg name="ns"              value="/$(arg robot_type)$(arg id)" />
   <arg name="b_rosbag"        default="false" />  <!-- boolean if we are reading data from a rosbag -->
   <arg name="rb_path"         default="/bags" />  <!-- path to the rosbag -->
@@ -18,6 +20,8 @@
   <!-- Launch our main node -->
   <node name="MSL_RAPTOR" pkg="msl_raptor" type="msl_raptor.py" output="screen">
     <param name="ns"  value="$(arg ns)"/> 
+    <param name="b_use_gt_bb"  value="$(arg b_use_gt_bb)"/> 
+    <param name="b_enforce_0_yaw"  value="$(arg b_enforce_0_yaw)"/> 
     <rosparam command="load" file="$(find msl_raptor)/params/quad7.yaml" />
   </node>
 

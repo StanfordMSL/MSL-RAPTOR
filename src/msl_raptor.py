@@ -27,21 +27,28 @@ from image_segmentor import ImageSegmentor
 
 
 def run_execution_loop():
-    b_use_gt_bb = True
+    b_enforce_0_yaw = rospy.get_param('~b_enforce_0_yaw') 
+    b_use_gt_bb = rospy.get_param('~b_use_gt_bb') 
+    
+    ros = ROS(b_use_gt_bb)  # create a ros interface object
+
     if b_use_gt_bb:
         rospy.logwarn("\n\n\n------------- IN DEBUG MODE (Using Ground Truth Bounding Boxes) -------------\n\n\n")
         time.sleep(0.5)
-    rate = rospy.Rate(100) # max filter rate
-    ros = ROS(b_use_gt_bb)  # create a ros interface object
-    wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
-    ukf = UKF()  # create ukf object
+    
     if b_use_gt_bb:
         img_seg = None
     else:
+        print('Waiting for first image')
+        im = ros.get_first_image()
         print('initializing image segmentor!!!!!!')
-        ros.img_set = ImageSegmentor()
+        ros.img_seg = ImageSegmentor(im)
+    
+    rate = rospy.Rate(100) # max filter rate
+    wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
+    ukf = UKF(b_enforce_0_yaw,b_use_gt_bb)  # create ukf object
     init_objects(ros, ukf)  # init camera, pose, etc
-
+    ros.create_subs_and_pubs()
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
     previous_image_time = 0
@@ -53,7 +60,7 @@ def run_execution_loop():
             # this means we dont have new data yet
             continue
         tf_ego_w = inv_tf(ros.tf_w_ego)
-        if not b_use_gt_bb:
+        if not ukf.b_use_gt_bb:
             abb = ros.latest_abb  # angled bounding box
         else:
             abb = ukf.predict_measurement(pose_to_state_vec(ros.ado_pose_gt_rosmsg), tf_ego_w)

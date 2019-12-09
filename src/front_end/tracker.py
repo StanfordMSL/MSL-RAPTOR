@@ -1,7 +1,7 @@
 from SiamMask.tools.test import *
 
 class SiammaskTracker:
-    def __init__(self, base_dir='', x=0 ,y=0,w=10,h=10,sample_im='SiamMask/data/tennis/00000.jpg',fp16_mode=True,features_trt=True,rpn_trt=False,mask_trt=False,refine_trt=False):
+    def __init__(self,sample_im, base_dir='', x=0 ,y=0,w=10,h=10,fp16_mode=True,features_trt=True,rpn_trt=False,mask_trt=False,refine_trt=False):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         torch.backends.cudnn.benchmark = True
 
@@ -18,12 +18,10 @@ class SiammaskTracker:
             siammask = load_pretrain(siammask, args.resume)
 
         siammask.eval().to(self.device)
-        
     
         target_pos = np.array([x + w / 2, y + h / 2])
         target_sz = np.array([w, h])
-        im = cv2.imread(sample_im)
-        self.state = siamese_init(im, target_pos, target_sz, siammask, self.cfg['hp'], device=self.device)  # init tracker
+        self.state = siamese_init(sample_im, target_pos, target_sz, siammask, self.cfg['hp'], device=self.device)  # init tracker
         self.state['net'].init_trt(fp16_mode,features_trt,rpn_trt,mask_trt,refine_trt)
 
 
@@ -34,6 +32,7 @@ class SiammaskTracker:
         return location,mask
 
     def reinit(self,new_box,im):
+        # new_box format: x,y,w,h (where x,y correspond to the top left corner)
         (x,y,w,h) = new_box
         target_pos = np.array([x + w / 2, y + h / 2])
         target_sz = np.array([w, h])

@@ -7,11 +7,13 @@ from yolov3.utils.utils import *
 
 # Adapted from detect.py of https://github.com/ultralytics/yolov3
 class YoloDetector:
-    def __init__(self, base_dir='', cfg='yolov3/cfg/yolov3_drone_infer.cfg',weights='yolov3/weights/yolov3_drone.weights',img_size=416,conf_thres=0.3,nms_thres=0.5,half=True):
-        self.img_size = img_size
+    def __init__(self,sample_im, base_dir='', cfg='yolov3/cfg/yolov3_drone_infer.cfg',weights='yolov3/weights/yolov3_drone.weights',img_size=416,conf_thres=0.3,nms_thres=0.5,half=True,class_id=0):
+        # TODO Make sure this is valid
+        self.img_size = 416#sample_im.shape[:2]
         self.conf_thres = conf_thres
         self.nms_thres = nms_thres
         self.half = half
+        self.class_id = class_id
 
         # Initialize
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -57,13 +59,26 @@ class YoloDetector:
         # Apply NMS
         pred = non_max_suppression(pred, self.conf_thres, self.nms_thres)
 
+        if not torch.is_tensor(pred[0]):
+            return False
+
         # Process detections
         for i, det in enumerate(pred):  # detections per image
             if det is not None and len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img0.shape).round()
 
-        return det
+        # Check if wanted class found, and choose the one with highest confidence above threshold
+        det = det[det[:,-1] == self.class_id]
+
+        if len(det) == 0:
+            return False
+        else:
+            det = det[torch.argmax(det[:,4])]
+
+        # Reformat det to x,y,w,h (x and y are top left corner's position)
+        det = det.cpu().detach().numpy()
+        return [det[0],det[1],det[2]-det[0],det[3]-det[1]]
 
 
 

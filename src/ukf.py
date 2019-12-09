@@ -21,12 +21,13 @@ from utils_msl_raptor.math_utils import *
 
 class UKF:
 
-    def __init__(self):
+    def __init__(self,b_enforce_0_yaw=True,b_use_gt_bb=False):
 
         self.VERBOSE = True
 
         # Paramters #############################
-        self.b_enforce_0_yaw = True
+        self.b_enforce_0_yaw = b_enforce_0_yaw
+        self.b_use_gt_bb = b_use_gt_bb
         self.dim_state = 13
         self.dim_sig = 12  # covariance is 1 less dimension due to quaternion
         self.dim_meas = 5  # angled bounding box: row, col, width, height, angle
