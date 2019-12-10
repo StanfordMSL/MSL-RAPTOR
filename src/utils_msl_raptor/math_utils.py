@@ -154,8 +154,6 @@ def average_quaternions(Q, w=None):
     ei_quat = quat_mul(Q, q_mean_inv)
     ei_vec_set = quat_to_axang(ei_quat).T
 
-    print(la.norm(ei_vec_set - ei_vec_set2))
-
     return enforce_quat_format(q_mean), ei_vec_set
 
 
