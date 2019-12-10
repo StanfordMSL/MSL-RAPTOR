@@ -55,7 +55,7 @@ class ros_interface:
 
     def create_subs_and_pubs(self):
         # Subscribers / Listeners & Publishers #############################   
-        rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb)
+        rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb,queue_size=1,buff_size=2**21)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', PoseStamped, queue_size=5)
@@ -116,6 +116,7 @@ class ros_interface:
                 self.img_seg.reinit_tracker(bb_no_angle, image)
                 self.latest_abb = self.img_seg.track(image)
                 self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
+                self.im_seg_mode - self.TRACK
             elif self.im_seg_mode == self.TRACK:
                 self.latest_abb = self.img_seg.track(image)
                 self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
