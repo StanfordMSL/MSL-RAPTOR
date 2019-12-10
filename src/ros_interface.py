@@ -27,6 +27,7 @@ class ros_interface:
         self.DETECT = 1
         self.TRACK = 2
         self.REINIT = 3
+        self.IGNORE = 4
         self.im_seg_mode = self.DETECT
         self.latest_abb = None  # angled bound box [row, height, width, height, angle (radians)]
         self.latest_bb_method = 1  # 1 for detect network, -1 for tracking network
@@ -77,16 +78,16 @@ class ros_interface:
         if self.start_time is None:
             return
 
-        time = get_ros_time(self.start_time)  # time in seconds
+        my_time = get_ros_time(self.start_time)  # time in seconds
 
         if len(self.ego_pose_rosmesg_buffer[0]) < self.ego_pose_rosmesg_buffer_len:
             self.ego_pose_rosmesg_buffer[0].append(msg.pose)
-            self.ego_pose_rosmesg_buffer[1].append(time)
+            self.ego_pose_rosmesg_buffer[1].append(my_time)
         else:
             self.ego_pose_rosmesg_buffer[0][0:self.ego_pose_rosmesg_buffer_len] = self.ego_pose_rosmesg_buffer[0][1:self.ego_pose_rosmesg_buffer_len]
             self.ego_pose_rosmesg_buffer[1][0:self.ego_pose_rosmesg_buffer_len] = self.ego_pose_rosmesg_buffer[1][1:self.ego_pose_rosmesg_buffer_len]
             self.ego_pose_rosmesg_buffer[0][-1] = msg.pose
-            self.ego_pose_rosmesg_buffer[1][-1] = time
+            self.ego_pose_rosmesg_buffer[1][-1] = my_time
 
 
     def image_cb(self, msg):
@@ -94,16 +95,20 @@ class ros_interface:
         receive an image, process w/ NN, then set variables that the main function will access 
         note: set the time variable at the end (this signals the program when new data has arrived)
         """
+        tic = time.clock()
         if self.start_time is None:
             self.start_time = msg.header.stamp.to_sec()
-            time = 0
+            my_time = 0
         else:
-            time = get_ros_time(self.start_time, msg)   # timestamp in seconds
+            my_time = get_ros_time(self.start_time, msg)   # timestamp in seconds
+
+        if self.im_seg_mode == self.IGNORE:
+            return
 
         if len(self.ego_pose_rosmesg_buffer[0]) == 0:
             return # this happens if we are just starting
 
-        self.tf_w_ego = pose_to_tf(find_closest_by_time(time, self.ego_pose_rosmesg_buffer[1], self.ego_pose_rosmesg_buffer[0])[0])
+        self.tf_w_ego = pose_to_tf(find_closest_by_time(my_time, self.ego_pose_rosmesg_buffer[1], self.ego_pose_rosmesg_buffer[0])[0])
 
         image = self.bridge.imgmsg_to_cv2(msg,desired_encoding="passthrough")
         self.latest_bb_method = self.im_seg_mode
@@ -116,23 +121,25 @@ class ros_interface:
                 self.img_seg.reinit_tracker(bb_no_angle, image)
                 self.latest_abb = self.img_seg.track(image)
                 self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
-                self.im_seg_mode - self.TRACK
+                self.im_seg_mode = self.TRACK
             elif self.im_seg_mode == self.TRACK:
                 self.latest_abb = self.img_seg.track(image)
                 self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
             else:
                 raise RuntimeError("Unknown image segmentation mode")
             
-        self.latest_img_time = time  # DO THIS LAST
+        self.latest_img_time = my_time  # DO THIS LAST
+        self.img_seg_mode = self.IGNORE
+        print("Image Callback time: {:.4f}".format(time.clock() - tic))
 
 
-    def publish_filter_state(self, state_est, time, itr):
+    def publish_filter_state(self, state_est, my_time, itr):
         """
         Broadcast the estimated state of the filter. 
         State assumed to be a Nx1 numpy array of floats
         """
         pose_msg = PoseStamped()
-        pose_msg.header.stamp = rospy.Time(time)
+        pose_msg.header.stamp = rospy.Time(my_time)
         pose_msg.header.frame_id = 'world'
         pose_msg.header.seq = np.uint32(itr)
         pose_msg.pose.position.x = state_est[0]

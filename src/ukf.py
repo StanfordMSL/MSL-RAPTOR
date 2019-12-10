@@ -5,6 +5,7 @@ from multiprocessing import Pool, cpu_count
 from functools import partial
 from copy import copy
 import cv2
+import time
 import pdb
 # math
 import numpy as np
@@ -68,26 +69,44 @@ class UKF:
         """
         UKF iteration following pseudo code from probablistic robotics
         """
-        if b_vs_debug():
-            print("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
-        else:
-            rospy.loginfo("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
-        print(self.mu)
+        # if b_vs_debug():
+        #     print("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
+        # else:
+        #     rospy.loginfo("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
+        # print(self.mu)
         
         # line 2
+        b_outer_only = True
+        tic0 = time.clock()
         sps = self.calc_sigma_points(self.mu, self.sigma)
+        if not b_outer_only:
+            print("calc sig pnts1: {:.4f}".format(time.clock() - tic0))
 
         # line 3
+        if not b_outer_only:
+            tic = time.clock()
         sps_prop = self.propagate_dynamics(sps, dt)
+        if not b_outer_only:
+            print("propagate_dynamics: {:.4f}".format(time.clock() - tic))
 
         # lines 4 & 5
+        if not b_outer_only:
+            tic = time.clock()
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
+        if not b_outer_only:
+            print("extract_mean_and_cov_from_STATE_sigma_points: {:.4f}".format(time.clock() - tic))
         
         # line 6
+        if not b_outer_only:
+            tic = time.clock()
         sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
+        if not b_outer_only:
+            print("calc sig pnts2: {:.4f}".format(time.clock() - tic))
         
         # lines 7-9
-        if self.parallelize:
+        if False and self.parallelize:
+            if not b_outer_only:
+                tic = time.clock()
             my_pool = Pool(cpu_count() - 1)  # keep 1 core free for now to avoid lockup issues? [THIS IS PURELY SPECULATIVE ON MY PART!!!]
             b_use_partial = True
             if b_use_partial:
@@ -100,21 +119,48 @@ class UKF:
                 result = my_pool.imap(func=self.predict_measurement_par2, iterable=sps_recalc.T)
             pred_meas = np.array(list(result), dtype=np.float32).T
             my_pool.close()
+            if not b_outer_only:
+                print("pred_meas par: {:.4f}".format(time.clock() - tic))
+
+            if not b_outer_only:
+                tic = time.clock()
+            pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
+            for sp_ind in range(sps.shape[1]):
+                pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], tf_ego_w)
+            if not b_outer_only:
+                print("pred_meas: {:.4f}".format(time.clock() - tic))
         else:
             pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
             for sp_ind in range(sps.shape[1]):
                 pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], tf_ego_w)
+
+        if not b_outer_only:
+            tic = time.clock()
         z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
+        if not b_outer_only:
+            print("extract_mean_and_cov_from_OBS_sigma_points: {:.4f}".format(time.clock() - tic))
 
         # line 10
+        if not b_outer_only:
+            tic = time.clock()
         S_xz = self.calc_cross_correlation(sps_recalc, mu_bar, z_hat, pred_meas)
+        if not b_outer_only:
+            print("calc_cross_correlation: {:.4f}".format(time.clock() - tic))
 
         # lines 11-13
+        if not b_outer_only:
+            tic = time.clock()
         mu_out, sigma_out = self.update_state(measurement, mu_bar, sig_bar, S, S_inv, S_xz, z_hat)
 
         self.mu = mu_out
         self.sigma = sigma_out
         self.itr += 1
+        tic1 = time.clock()
+        if not b_outer_only:
+            print("update_state: {:.4f}\nTOTAL time (with prints): {:.4f}".format(tic1 - tic, tic1 - tic0))
+        else:
+            print("TOTAL time (no prints): {:.4f}".format(tic1 - tic0))
+
 
 
     def update_state(self, z, mu_bar, sig_bar, S, S_inv, S_xz, z_hat):

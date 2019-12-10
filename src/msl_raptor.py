@@ -43,22 +43,27 @@ def run_execution_loop():
         im = ros.get_first_image()
         print('initializing image segmentor!!!!!!')
         ros.img_seg = ImageSegmentor(im)
+
+    
+    print('initializing DONE - PLAY BAG NOW!!!!!!')
     
     rate = rospy.Rate(100) # max filter rate
-    wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
-    ukf = UKF(b_enforce_0_yaw,b_use_gt_bb)  # create ukf object
+    # wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
+    ukf = UKF(b_enforce_0_yaw, b_use_gt_bb)  # create ukf object
     init_objects(ros, ukf)  # init camera, pose, etc
     ros.create_subs_and_pubs()
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
     previous_image_time = 0
 
+    tic = time.clock()
     while not rospy.is_shutdown():
         # store data locally (so it doesnt get overwritten in ROS object)
         loop_time = ros.latest_img_time
         if loop_time <= previous_image_time:
             # this means we dont have new data yet
             continue
+        ros.im_seg_mode = ros.IGNORE
         tf_ego_w = inv_tf(ros.tf_w_ego)
         if not ukf.b_use_gt_bb:
             abb = ros.latest_abb  # angled bounding box
@@ -75,7 +80,10 @@ def run_execution_loop():
         
         ros.publish_filter_state(ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
         
+        ros.im_seg_mode = ros.TRACK
         rate.sleep()
+        print("FULL END-TO-END time = {:4f}\n".format(time.clock() - tic))
+        tic = time.clock()
         loop_count += 1
     ### DONE WITH MSL RAPTOR ####
 
