@@ -51,15 +51,15 @@ RUN apt-get update && \
 ARG rebuild=0
 # -------------------------------------------------------------------------- #
 
-# Make sure avahi-daemon is running and avahi-resolve is installed
+# Make sure avahi-utils is installed and modify avahi-config
 RUN apt-get update && \
-    apt-get install -y avahi-utils 
-    # /etc/init.d/dbus start && \
-    # service avahi-daemon start
+    apt-get install -y avahi-utils && \
+    perl -p -i -e 's|#allow-interfaces=eth0|allow-interfaces=wlp2s0|g' /etc/avahi/avahi-daemon.conf  
+    # same as: sed -i 's|#allow-interfaces=eth0|allow-interfaces=wlp2s0|g' /etc/avahi/avahi-daemon.conf
 
 # Add aliases to bashrc in docker containers
-RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch b_rosbag:=true"' >> ~/.bashrc
-RUN echo 'alias avahi_go="/etc/init.d/dbus start && service avahi-daemon start"' >> ~/.bashrc
+RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch b_rosbag:=true"' >> ~/.bashrc && \
+    echo 'alias avahi_go="/etc/init.d/dbus start && service avahi-daemon start"' >> ~/.bashrc
 
 RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \
@@ -73,6 +73,11 @@ RUN git config --global user.email "$GIT_EMAIL" && \
     git config --global user.name "$GIT_NAME"
 
 COPY ./msl_raptor_entrypoint.sh /
+
+# start avahi-daemon
+# RUN /etc/init.d/dbus start && \
+#     /etc/init.d/avahi-daemon start
+#    service avahi-daemon enable
 
 ENTRYPOINT ["/msl_raptor_entrypoint.sh"]
 CMD ["bash"]
