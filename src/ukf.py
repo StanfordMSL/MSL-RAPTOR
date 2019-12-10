@@ -1,9 +1,11 @@
 
 # IMPORTS
-#tools
+# system & tools
+from multiprocessing import Pool, cpu_count
+from functools import partial
 from copy import copy
-import pdb
 import cv2
+import pdb
 # math
 import numpy as np
 import numpy.linalg as la
@@ -50,6 +52,7 @@ class UKF:
 
         self.Q = self.sigma/10  # Process Noise
         self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
+        self.parallelize = True
         ####################################################################
 
         # init vars #############################
@@ -57,6 +60,7 @@ class UKF:
         self.bb_3d = np.zeros((8, 3))  # set by main function initialization
         self.itr = 0
         self.itr_time = 0
+        self.tf_ego_w_tmp = None
         ####################################################################
 
 
@@ -90,9 +94,23 @@ class UKF:
                 pdb.set_trace()
         
         # lines 7-9
-        pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
-        for sp_ind in range(sps.shape[1]):
-            pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], tf_ego_w)
+        if self.parallelize:
+            my_pool = Pool(cpu_count() - 1)  # keep 1 core free for now to avoid lockup issues? [THIS IS PURELY SPECULATIVE ON MY PART!!!]
+            b_use_partial = True
+            if b_use_partial:
+                # the "right" way (I think) - check time again alteran
+                par_func = partial(self.predict_measurement_par, tf_ego_w)  # creates wrapper for function predict_meas with only one parameters (the state)
+                result = my_pool.imap(func=par_func, iterable=sps_recalc.T)
+            else:
+                # w/o using partial (hacky way to pass in tf_ego_w):
+                self.tf_ego_w_tmp = tf_ego_w
+                result = my_pool.imap(func=self.predict_measurement_par2, iterable=sps_recalc.T)
+            pred_meas = np.array(list(result), dtype=np.float32).T
+            my_pool.close()
+        else:
+            pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
+            for sp_ind in range(sps.shape[1]):
+                pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], tf_ego_w)
         z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
 
         # line 10
@@ -168,6 +186,70 @@ class UKF:
         S = enforce_pos_def_sym_mat(S) # project S to pos. def. cone to avoid numeric issues
         S_inv = la.inv(S)
         return z_hat, S, S_inv
+
+
+    def predict_measurement_par2(self, state):
+        """
+        use camera model & relative states to predict the angled 2d 
+        bounding box seen by the ego drone 
+        """
+        tf_ego_w = self.tf_ego_w_tmp
+        # get relative transform from camera to quad
+        tf_w_quad = state_to_tf(state)
+        tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
+        # tf_cam_quad = np.array([[-0.0956 ,  -0.9951  ,  0.0258 ,  -0.1867],
+        #                          [   0.0593,   -0.0316,   -0.9977,    0.6696],
+        #                          [   0.9936 ,  -0.0939 ,   0.0620,    4.7865],
+        #                          [       0  ,       0 ,        0 ,   1.0000]])
+
+        # tranform 3d bounding box from quad frame to camera frame
+        bb_3d_cam = (tf_cam_quad @ self.bb_3d.T).T[:, 0:3]
+
+        # transform each 3d point to a 2d pixel (row, col)
+        bb_rc_list = np.zeros((bb_3d_cam.shape[0], 2))
+        for i, bb_vert in enumerate(bb_3d_cam):
+            bb_rc_list[i, :] = self.camera.pnt3d_to_pix(bb_vert)
+
+        # construct sensor output
+        # minAreaRect sometimes flips the w/h and angle from how we want the output to be
+        # to fix this, we can use boxPoints to get the x,y of the bb rect, and use our function
+        # to get the output in the form we want 
+        rect = cv2.minAreaRect(np.fliplr(bb_rc_list.astype('float32')))  # apparently float64s cause this function to fail
+        box = cv2.boxPoints(rect)
+        output = bb_corners_to_angled_bb(box, output_coord_type='rc')
+        return output
+
+
+    def predict_measurement_par(self, tf_ego_w, state):
+        """
+        use camera model & relative states to predict the angled 2d 
+        bounding box seen by the ego drone 
+        """
+        # get relative transform from camera to quad
+        tf_w_quad = state_to_tf(state)
+        tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
+        # tf_cam_quad = np.array([[-0.0956 ,  -0.9951  ,  0.0258 ,  -0.1867],
+        #                          [   0.0593,   -0.0316,   -0.9977,    0.6696],
+        #                          [   0.9936 ,  -0.0939 ,   0.0620,    4.7865],
+        #                          [       0  ,       0 ,        0 ,   1.0000]])
+
+        # tranform 3d bounding box from quad frame to camera frame
+        bb_3d_cam = (tf_cam_quad @ self.bb_3d.T).T[:, 0:3]
+
+        # transform each 3d point to a 2d pixel (row, col)
+        bb_rc_list = np.zeros((bb_3d_cam.shape[0], 2))
+        for i, bb_vert in enumerate(bb_3d_cam):
+            bb_rc_list[i, :] = self.camera.pnt3d_to_pix(bb_vert)
+
+        # construct sensor output
+        # minAreaRect sometimes flips the w/h and angle from how we want the output to be
+        # to fix this, we can use boxPoints to get the x,y of the bb rect, and use our function
+        # to get the output in the form we want 
+        rect = cv2.minAreaRect(np.fliplr(bb_rc_list.astype('float32')))  # apparently float64s cause this function to fail
+        box = cv2.boxPoints(rect)
+        output = bb_corners_to_angled_bb(box, output_coord_type='rc')
+
+        return output
 
 
     def predict_measurement(self, state, tf_ego_w):
