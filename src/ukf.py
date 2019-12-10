@@ -79,19 +79,12 @@ class UKF:
 
         # line 3
         sps_prop = self.propagate_dynamics(sps, dt)
+
         # lines 4 & 5
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
         
         # line 6
-        try:
-            sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
-        except Exception as e:
-            print(e)
-            print(sig_bar)
-            eig_vals, eig_vecs = la.eig(sig_bar)
-            print(eig_vals)
-            if not b_vs_debug():
-                pdb.set_trace()
+        sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
         
         # lines 7-9
         if self.parallelize:

@@ -107,17 +107,29 @@ def average_quaternions(Q, w=None):
     if w is None:
         w = np.ones((M,)) / M  # DEFAULT: equally weighted
 
-    A = np.zeros((4,4))
-    weightSum = 0
+    ###############################################
+    # using einsum we can avoid using the for loop for both the outer products but also the sums and the element-wise weighting
 
-    for i in range(0,M):
-        q = Q[i, :]
-        A = w[i] * np.outer(q, q) + A
-        weightSum += w[i]
+    # http://ajcr.net/Basic-guide-to-einsum/ 
+    # https://stackoverflow.com/questions/48498662/numpy-row-wise-outer-product-of-two-matrices/48501287
 
+    # A = np.zeros((4,4))
+    # weightSum = 0
+
+    # for i in range(0,M):
+    #     q = Q[i, :]
+    #     A = w[i] * np.outer(q, q) + A
+    #     weightSum += w[i]
+    
     # scale
-    A = (1.0/weightSum) * A
+    # A = (1.0/weightSum) * A   <---- weightSum should always be 1 for us!
+    
+    # np.sum(np.einsum('bi,bo->bio', q*np.reshape(w, (-1,1)), Q), axis=0)  # works, but has 2 things that can be improved
+    # np.sum(np.einsum('bi,bo->bio', np.einsum('i, ij->ij', w, Q), Q), axis=0) # works, but still could be better
+    ###############################################
+    A = np.einsum('bi,bo->io', np.einsum('i, ij->ij', w, Q), Q)  # most efficient
 
+    
     # compute eigenvalues and -vectors
     eigenValues, eigenVectors = la.eig(A)
 
@@ -130,11 +142,19 @@ def average_quaternions(Q, w=None):
         q_mean *= -1
         
     # calc set of differences from each quat to the mean (in ax-angle rep.)
+    ###############################################
+    # ei_vec_set2 = np.zeros((3, M)) 
+    # q_mean_inv2 = quat_inv(q_mean)
+    # for i, qi in enumerate(Q):
+    #     ei_quat2 = quat_mul(qi, q_mean_inv2)
+    #     ei_vec_set2[:, i] = quat_to_axang(ei_quat2)
+    ###############################################
     ei_vec_set = np.zeros((3, M)) 
     q_mean_inv = quat_inv(q_mean)
-    for i, qi in enumerate(Q):
-        ei_quat = quat_mul(qi, q_mean_inv)
-        ei_vec_set[:, i] = quat_to_axang(ei_quat)
+    ei_quat = quat_mul(Q, q_mean_inv)
+    ei_vec_set = quat_to_axang(ei_quat).T
+
+    print(la.norm(ei_vec_set - ei_vec_set2))
 
     return enforce_quat_format(q_mean), ei_vec_set
 
