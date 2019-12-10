@@ -95,14 +95,16 @@ class UKF:
         
         # lines 7-9
         if self.parallelize:
-            self.tf_ego_w_tmp = tf_ego_w
             my_pool = Pool(cpu_count() - 1)  # keep 1 core free for now to avoid lockup issues? [THIS IS PURELY SPECULATIVE ON MY PART!!!]
-            # par_func = partial(self.predict_measurement_par, tf_ego_w)  # creates wrapper for function predict_meas with only one parameters (the state)
-            # result_one = my_pool.imap(func=par_func, iterable=sps_recalc.T)
-            # pdb.set_trace()
-            # results_all = np.array(list(result_one), dtype=default_dtype)
-
-            result = my_pool.imap(func=self.predict_measurement_par2, iterable=sps_recalc.T)
+            b_use_partial = True
+            if b_use_partial:
+                # the "right" way (I think) - check time again alteran
+                par_func = partial(self.predict_measurement_par, tf_ego_w)  # creates wrapper for function predict_meas with only one parameters (the state)
+                result = my_pool.imap(func=par_func, iterable=sps_recalc.T)
+            else:
+                # w/o using partial (hacky way to pass in tf_ego_w):
+                self.tf_ego_w_tmp = tf_ego_w
+                result = my_pool.imap(func=self.predict_measurement_par2, iterable=sps_recalc.T)
             pred_meas = np.array(list(result), dtype=np.float32).T
             my_pool.close()
         else:
@@ -185,6 +187,7 @@ class UKF:
         S_inv = la.inv(S)
         return z_hat, S, S_inv
 
+
     def predict_measurement_par2(self, state):
         """
         use camera model & relative states to predict the angled 2d 
@@ -192,8 +195,6 @@ class UKF:
         """
         tf_ego_w = self.tf_ego_w_tmp
         # get relative transform from camera to quad
-        print(state.shape)
-        print(tf_ego_w.shape)
         tf_w_quad = state_to_tf(state)
         tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
         # tf_cam_quad = np.array([[-0.0956 ,  -0.9951  ,  0.0258 ,  -0.1867],
@@ -218,15 +219,13 @@ class UKF:
         output = bb_corners_to_angled_bb(box, output_coord_type='rc')
         return output
 
-    def predict_measurement_par(self, state, tf_ego_w):
+
+    def predict_measurement_par(self, tf_ego_w, state):
         """
         use camera model & relative states to predict the angled 2d 
         bounding box seen by the ego drone 
         """
-        # tf_ego_w = self.tf_ego_w_tmp
         # get relative transform from camera to quad
-        print(state.shape)
-        print(tf_ego_w.shape)
         tf_w_quad = state_to_tf(state)
         tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
         # tf_cam_quad = np.array([[-0.0956 ,  -0.9951  ,  0.0258 ,  -0.1867],
@@ -249,7 +248,9 @@ class UKF:
         rect = cv2.minAreaRect(np.fliplr(bb_rc_list.astype('float32')))  # apparently float64s cause this function to fail
         box = cv2.boxPoints(rect)
         output = bb_corners_to_angled_bb(box, output_coord_type='rc')
+
         return output
+
 
     def predict_measurement(self, state, tf_ego_w):
         """
