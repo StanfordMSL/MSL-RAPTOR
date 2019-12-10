@@ -10,8 +10,7 @@ RUN source /ros_python3_entrypoint.sh && \
     cd  src && \
     git clone --recurse-submodules https://github.com/StanfordMSL/MSL-RAPTOR.git msl_raptor && \
     cd .. && \
-    catkin build && \
-    pip3 install pyquaternion
+    catkin build
 
 # Pytorch
 RUN apt-get update && \

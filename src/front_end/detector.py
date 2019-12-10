@@ -51,7 +51,9 @@ class YoloDetector:
         img = torch.from_numpy(img).to(self.device)
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
-        pred = self.model(img)[0]
+            
+        with torch.no_grad():
+            pred = self.model(img)[0]
 
         if self.half:
             pred = pred.float()
