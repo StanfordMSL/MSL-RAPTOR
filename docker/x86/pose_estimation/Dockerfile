@@ -51,8 +51,15 @@ RUN apt-get update && \
 ARG rebuild=0
 # -------------------------------------------------------------------------- #
 
+# Make sure avahi-daemon is running and avahi-resolve is installed
+RUN apt-get update && \
+    apt-get install -y avahi-utils 
+    # /etc/init.d/dbus start && \
+    # service avahi-daemon start
+
 # Add aliases to bashrc in docker containers
 RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch b_rosbag:=true"' >> ~/.bashrc
+RUN echo 'alias avahi_go="/etc/init.d/dbus start && service avahi-daemon start"' >> ~/.bashrc
 
 RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \
