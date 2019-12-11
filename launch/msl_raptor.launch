@@ -2,6 +2,7 @@
   <arg name="id"              default="7" />
   <arg name="robot_type"      default="quad" />
   <arg name="ns"              value="/$(arg robot_type)$(arg id)" />
+  <arg name="b_camera"        default="true" />
   <arg name="b_use_gt_bb"     default="false" />
   <arg name="b_enforce_0_yaw" default="true" />
   <arg name="b_rosbag"        default="false" />  <!-- boolean if we are reading data from a rosbag -->
@@ -24,6 +25,16 @@
     <param name="b_enforce_0_yaw"  value="$(arg b_enforce_0_yaw)"/> 
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
   </node>
+
+  <!-- IF using camera, launch our node -->
+  <group if="$(arg b_camera)">
+    <include file="$(find msl_vision)/launch/ocam_ros.launch" >
+        <arg name="frame_rate"       value="30"/>
+        <arg name="image_width"      value="640"/>
+        <arg name="image_height"     value="480" />
+        <arg name="camera_frame_id"  value="$(arg ns)/camera" />
+    </include>
+  </group>
 
   <!-- IF using rosbag, launch our node then play the rosbag (using a delay to ensure msl_raptor starts first) -->
   <group if="$(arg b_rosbag)">
