@@ -46,7 +46,7 @@ def run_execution_loop():
         print('initializing DONE - PLAY BAG NOW!!!!!!')
         time.sleep(0.5)
     
-    rate = rospy.Rate(100) # max filter rate
+    rate = rospy.Rate(30) # max filter rate
     # wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
     ukf = UKF(b_enforce_0_yaw, b_use_gt_bb)  # create ukf object
     init_objects(ros, ukf)  # init camera, pose, etc
