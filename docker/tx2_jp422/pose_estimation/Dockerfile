@@ -62,6 +62,22 @@ RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && \
 RUN apt-get update && \
     apt-get install -y libsm6 libxext6 libxrender-dev && \
     rm -rf /var/lib/apt/lists/*
+
+# Make sure avahi-utils is installed and modify avahi-config
+RUN apt-get update && \
+    apt-get install -y avahi-utils && \
+    perl -p -i -e 's|#allow-interfaces=eth0|allow-interfaces=wlan1|g' /etc/avahi/avahi-daemon.conf  
+    # same as: sed -i 's|#allow-interfaces=eth0|allow-interfaces=wlan1|g' /etc/avahi/avahi-daemon.conf
+
+# Clone OCAM github (and install dependences) --> this allows us to use our camera
+RUN apt-get update && \
+    apt-get install -y libudev-dev && apt-get install -y libv4l-dev && \
+    cd ~/msl_raptor_ws/src/ && \
+    git clone https://github.com/StanfordMSL/ocam_msl.git && \
+    cd ~/msl_raptor_ws/ && \
+    catkin build && \
+    rm -rf /var/lib/apt/lists/*
+
 # ---------------------------- Reset argument ------------------------------ #
 ARG rebuild=0
 # -------------------------------------------------------------------------- #

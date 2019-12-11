@@ -45,7 +45,17 @@ RUN apt-get update && \
 
 # Install 'ping'
 RUN apt-get update && \
-    apt-get install -y iputils-ping
+    apt-get install -y iputils-ping && \
+    rm -rf /var/lib/apt/lists/*
+
+# Clone OCAM github (and install dependences) --> this allows us to use our camera
+RUN apt-get update && \
+    apt-get install -y libudev-dev && apt-get install -y libv4l-dev && \
+    cd ~/msl_raptor_ws/src/ && \
+    git clone https://github.com/StanfordMSL/ocam_msl.git && \
+    cd ~/msl_raptor_ws/ && \
+    catkin build && \
+    rm -rf /var/lib/apt/lists/*
     
 # ---------------------------- Reset argument ------------------------------ #
 ARG rebuild=0

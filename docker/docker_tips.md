@@ -54,6 +54,9 @@ Finally, this last function uses the previous two. The first part overwrites the
 
 
 <FILL IN REST>
+
+update avahi_go etc
+
 ## logging into the tx2
 
 ssh (thorugh vs code insdier?)
@@ -61,3 +64,7 @@ cd Documents/MSL-RAPTOR
 git pull
 use vs code to run image interactive
 
+
+
+for camera: 
+needed sudo apt-get install libudev-dev

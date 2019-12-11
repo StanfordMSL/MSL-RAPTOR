@@ -22,11 +22,10 @@ class ros_interface:
         self.VERBOSE = True
 
         # Paramters #############################
-        self.start_time = None
         self.latest_img_time = -1
         self.DETECT = 1
         self.TRACK = 2
-        self.REINIT = 3
+        self.FAKED_BB = 3
         self.IGNORE = 4
         self.im_seg_mode = self.DETECT
         self.latest_abb = None  # angled bound box [row, height, width, height, angle (radians)]
@@ -56,11 +55,11 @@ class ros_interface:
 
     def create_subs_and_pubs(self):
         # Subscribers / Listeners & Publishers #############################   
-        rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb,queue_size=1,buff_size=2**21)
+        rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1,buff_size=2**21)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', PoseStamped, queue_size=5)
-        self.image_bb_pub = rospy.Publisher(self.ns + '/image_with_bb', Image, queue_size=2)
+        self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', Float32MultiArray, queue_size=5)
         ####################################################################
 
     def ado_pose_gt_cb(self, msg):
@@ -76,10 +75,7 @@ class ros_interface:
         Maintains a buffer of poses and times. The first element is the earliest. 
         Stored in a way to interface with a quick method for finding closest match by time.
         """
-        if self.start_time is None:
-            return
-
-        my_time = get_ros_time(self.start_time)  # time in seconds
+        my_time = get_ros_time(msg)  # time in seconds
 
         if len(self.ego_pose_rosmesg_buffer[0]) < self.ego_pose_rosmesg_buffer_len:
             self.ego_pose_rosmesg_buffer[0].append(msg.pose)
@@ -97,11 +93,7 @@ class ros_interface:
         note: set the time variable at the end (this signals the program when new data has arrived)
         """
         tic = time.time()
-        if self.start_time is None:
-            self.start_time = msg.header.stamp.to_sec()
-            my_time = 0
-        else:
-            my_time = get_ros_time(self.start_time, msg)   # timestamp in seconds
+        my_time = get_ros_time(msg)   # timestamp in seconds of msg
 
         # if self.im_seg_mode == self.IGNORE:
         #     return
@@ -128,6 +120,8 @@ class ros_interface:
                 self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
             else:
                 raise RuntimeError("Unknown image segmentation mode")
+        else:
+            self.im_seg_mode = self.FAKED_BB
             
         self.latest_img_time = my_time  # DO THIS LAST
         # self.img_seg_mode = self.IGNORE
@@ -152,10 +146,19 @@ class ros_interface:
         pose_msg.pose.orientation.z = state_est[9]
         self.state_pub.publish(pose_msg)
 
-    def publish_image_with_bb(self, img_msg, bb):
-        # cv2_im = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="passthrough")
 
-        # cv2.drawContours(cv2_im,[bb],0,(0,191,255),2)
-
-        # self.image_bb_pub.publish()
-        pass
+    def publish_image_with_bb(self, bb, bb_seg_mode, bb_ts):
+        bb_data = np.concatenate([bb, [bb_seg_mode], [bb_ts]])
+        data_len = len(bb_data)
+        bb_msg = Float32MultiArray()
+        bb_msg.layout.dim.append(MultiArrayDimension())
+        bb_msg.layout.dim.append(MultiArrayDimension())
+        bb_msg.layout.dim[0].size = data_len
+        bb_msg.layout.dim[1].size = 1
+        bb_msg.layout.dim[0].stride = data_len*1
+        bb_msg.layout.dim[1].stride = data_len
+        bb_msg.layout.dim[0].label = "rows"
+        bb_msg.layout.dim[1].label = "cols"
+        bb_msg.layout.data_offset = 0
+        bb_msg.data = list(bb_data)
+        self.bb_data_pub.publish(bb_msg)
