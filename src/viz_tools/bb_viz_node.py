@@ -46,7 +46,8 @@ class bb_viz_node:
         Stored in a way to interface with a quick method for finding closest match by time.
         """
 
-        my_time = rospy.Time.now().to_sec()  # time in seconds
+        # my_time = rospy.Time.now().to_sec()  # time in seconds
+        my_time = msg.header.stamp.to_sec()  # time in seconds
 
         if len(self.img_buffer[0]) < self.img_rosmesg_buffer_len:
             self.img_buffer[0].append(msg)
@@ -83,12 +84,19 @@ class bb_viz_node:
             return
         my_time = msg.data[-1]
         im_seg_mode = msg.data[-2]
+        if im_seg_mode == self.DETECT:
+            box_color = (0,255,0)
+        if im_seg_mode == self.TRACK:
+            box_color = (0,255,0)
+        else:
+            print("not detecting nor tracking! (seg mode: {})".format(im_seg_mode))
+            box_color = (255,0,0)
         bb_data = msg.data[0:-2]
         im_msg = self.find_closest_by_time_ros2(my_time, self.img_buffer[1], self.img_buffer[0])[0]
         image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="passthrough")
         box = np.int0(cv2.boxPoints( ( (bb_data[1], bb_data[0]), (bb_data[2], bb_data[3]), -np.degrees(bb_data[4]))) )
-        cv2.drawContours(image,[box],0,(0,255,0),2)
-        print(bb_data)
+        cv2.drawContours(image,[box],0,box_color,2)
+        # print(bb_data)
         self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(image, "passthrough"))
         # cv2.imwrite('/test_img{}.png'.format(self.itr), image)
         self.itr += 1
