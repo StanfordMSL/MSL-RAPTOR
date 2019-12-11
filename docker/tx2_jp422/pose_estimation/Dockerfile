@@ -62,8 +62,8 @@ RUN apt-get update && \
 # Make sure avahi-utils is installed and modify avahi-config
 RUN apt-get update && \
     apt-get install -y avahi-utils && \
-    perl -p -i -e 's|#allow-interfaces=eth0|allow-interfaces=wlan0|g' /etc/avahi/avahi-daemon.conf  
-    # same as: sed -i 's|#allow-interfaces=eth0|allow-interfaces=wlan0|g' /etc/avahi/avahi-daemon.conf
+    perl -p -i -e 's|#allow-interfaces=eth0|allow-interfaces=wlan1|g' /etc/avahi/avahi-daemon.conf  
+    # same as: sed -i 's|#allow-interfaces=eth0|allow-interfaces=wlan1|g' /etc/avahi/avahi-daemon.conf
 
 # Clone OCAM github (and install dependences) --> this allows us to use our camera
 RUN apt-get update && \
