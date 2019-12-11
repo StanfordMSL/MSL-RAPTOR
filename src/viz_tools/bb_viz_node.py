@@ -24,7 +24,7 @@ class bb_viz_node:
         rospy.init_node('bb_viz_node', anonymous=True)
         self.DETECT = 1
         self.TRACK = 2
-        self.REINIT = 3
+        self.FAKED_BB = 3
         self.IGNORE = 4
 
         self.bridge = CvBridge()
@@ -85,9 +85,13 @@ class bb_viz_node:
         my_time = msg.data[-1]
         im_seg_mode = msg.data[-2]
         if im_seg_mode == self.DETECT:
-            box_color = (0,255,0)
-        if im_seg_mode == self.TRACK:
-            box_color = (0,255,0)
+            box_color = (0,0,255)  # RED
+        elif im_seg_mode == self.TRACK:
+            box_color = (0,255,0)  # GREEN
+        elif im_seg_mode == self.FAKED_BB:
+            box_color = (255,0,0)  # BLUE
+            if self.itr % 50 == 0:
+                print("simulating bounding box - DEBUGGING ONLY")
         else:
             print("not detecting nor tracking! (seg mode: {})".format(im_seg_mode))
             box_color = (255,0,0)
