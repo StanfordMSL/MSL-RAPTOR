@@ -34,14 +34,14 @@ def pose_to_state_vec(pose):
     return state
 
 
-def get_ros_time(start_time=0, msg=None):
+def get_ros_time(msg=None):
     """
-    returns ros time in seconds (minus time at start of program)
+    returns ros time currently or of a message in seconds 
     """
     if msg is None:
-        return rospy.Time.now().to_sec() - start_time
+        return rospy.Time.now().to_sec()
     else:
-        return msg.header.stamp.to_sec() - start_time
+        return msg.header.stamp.to_sec()
 
 
 def find_closest_by_time(time_to_match, time_list, message_list=None):

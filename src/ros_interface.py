@@ -22,7 +22,6 @@ class ros_interface:
         self.VERBOSE = True
 
         # Paramters #############################
-        self.start_time = None
         self.latest_img_time = -1
         self.DETECT = 1
         self.TRACK = 2
@@ -76,10 +75,7 @@ class ros_interface:
         Maintains a buffer of poses and times. The first element is the earliest. 
         Stored in a way to interface with a quick method for finding closest match by time.
         """
-        if self.start_time is None:
-            return
-
-        my_time = get_ros_time(self.start_time)  # time in seconds
+        my_time = get_ros_time(msg)  # time in seconds
 
         if len(self.ego_pose_rosmesg_buffer[0]) < self.ego_pose_rosmesg_buffer_len:
             self.ego_pose_rosmesg_buffer[0].append(msg.pose)
@@ -97,11 +93,7 @@ class ros_interface:
         note: set the time variable at the end (this signals the program when new data has arrived)
         """
         tic = time.time()
-        if self.start_time is None:
-            self.start_time = msg.header.stamp.to_sec()
-            my_time = 0
-        else:
-            my_time = get_ros_time(self.start_time, msg)   # timestamp in seconds
+        my_time = get_ros_time(msg)   # timestamp in seconds of msg
 
         # if self.im_seg_mode == self.IGNORE:
         #     return
