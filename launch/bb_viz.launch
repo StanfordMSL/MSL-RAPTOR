@@ -1,0 +1,13 @@
+<launch>
+  <arg name="id"              default="7" />
+  <arg name="robot_type"      default="quad" />
+  <arg name="ns"              value="/$(arg robot_type)$(arg id)" />
+  
+
+  <!-- Launch our main node -->
+  <node name="bb_viz_node_$(arg robot_type)$(arg id)" pkg="msl_raptor" type="bb_viz_node.py" output="screen">
+    <param name="ns"  value="$(arg ns)"/> 
+    <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
+  </node>
+
+</launch>

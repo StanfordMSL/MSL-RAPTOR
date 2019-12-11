@@ -56,11 +56,11 @@ class ros_interface:
 
     def create_subs_and_pubs(self):
         # Subscribers / Listeners & Publishers #############################   
-        rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb,queue_size=1,buff_size=2**21)
+        rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1,buff_size=2**21)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', PoseStamped, queue_size=5)
-        self.image_bb_pub = rospy.Publisher(self.ns + '/image_with_bb', Image, queue_size=2)
+        self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', Float32MultiArray, queue_size=5)
         ####################################################################
 
     def ado_pose_gt_cb(self, msg):
@@ -152,10 +152,19 @@ class ros_interface:
         pose_msg.pose.orientation.z = state_est[9]
         self.state_pub.publish(pose_msg)
 
-    def publish_image_with_bb(self, img_msg, bb):
-        # cv2_im = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="passthrough")
 
-        # cv2.drawContours(cv2_im,[bb],0,(0,191,255),2)
-
-        # self.image_bb_pub.publish()
-        pass
+    def publish_image_with_bb(self, bb, bb_seg_mode, bb_ts):
+        bb_data = np.concatenate([bb, [bb_seg_mode], [bb_ts]])
+        data_len = len(bb_data)
+        bb_msg = Float32MultiArray()
+        bb_msg.layout.dim.append(MultiArrayDimension())
+        bb_msg.layout.dim.append(MultiArrayDimension())
+        bb_msg.layout.dim[0].size = data_len
+        bb_msg.layout.dim[1].size = 1
+        bb_msg.layout.dim[0].stride = data_len*1
+        bb_msg.layout.dim[1].stride = data_len
+        bb_msg.layout.dim[0].label = "rows"
+        bb_msg.layout.dim[1].label = "cols"
+        bb_msg.layout.data_offset = 0
+        bb_msg.data = list(state)
+        self.bb_data_pub.publish(bb_msg)

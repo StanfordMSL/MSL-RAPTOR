@@ -1,9 +1,9 @@
 <launch>
   <arg name="id"              default="7" />
   <arg name="robot_type"      default="quad" />
+  <arg name="ns"              value="/$(arg robot_type)$(arg id)" />
   <arg name="b_use_gt_bb"     default="false" />
   <arg name="b_enforce_0_yaw" default="true" />
-  <arg name="ns"              value="/$(arg robot_type)$(arg id)" />
   <arg name="b_rosbag"        default="false" />  <!-- boolean if we are reading data from a rosbag -->
   <arg name="rb_path"         default="/bags" />  <!-- path to the rosbag -->
   <arg name="rb_name"         default="quad7_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
@@ -22,17 +22,12 @@
     <param name="ns"  value="$(arg ns)"/> 
     <param name="b_use_gt_bb"  value="$(arg b_use_gt_bb)"/> 
     <param name="b_enforce_0_yaw"  value="$(arg b_enforce_0_yaw)"/> 
-    <rosparam command="load" file="$(find msl_raptor)/params/quad7.yaml" />
+    <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
   </node>
 
   <!-- IF using rosbag, launch our node then play the rosbag (using a delay to ensure msl_raptor starts first) -->
   <group if="$(arg b_rosbag)">
     <node pkg="rosbag" type="play" name="player" args="--clock $(arg rb_path)/$(arg rb_name).bag" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
   </group>
-
-  <!-- <group if="$(arg b_rosbag)">
-    <node pkg="rosbag" type="play" name="player" args="$(arg rb_path)/$(arg rb_name)" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
-  </group> -->
-
 
 </launch>
