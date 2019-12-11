@@ -60,6 +60,7 @@ class ros_interface:
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', PoseStamped, queue_size=5)
+        self.image_bb_pub = rospy.Publisher(self.ns + '/image_with_bb', Image, queue_size=2)
         ####################################################################
 
     def ado_pose_gt_cb(self, msg):
@@ -95,15 +96,15 @@ class ros_interface:
         receive an image, process w/ NN, then set variables that the main function will access 
         note: set the time variable at the end (this signals the program when new data has arrived)
         """
-        tic = time.clock()
+        tic = time.time()
         if self.start_time is None:
             self.start_time = msg.header.stamp.to_sec()
             my_time = 0
         else:
             my_time = get_ros_time(self.start_time, msg)   # timestamp in seconds
 
-        if self.im_seg_mode == self.IGNORE:
-            return
+        # if self.im_seg_mode == self.IGNORE:
+        #     return
 
         if len(self.ego_pose_rosmesg_buffer[0]) == 0:
             return # this happens if we are just starting
@@ -129,8 +130,8 @@ class ros_interface:
                 raise RuntimeError("Unknown image segmentation mode")
             
         self.latest_img_time = my_time  # DO THIS LAST
-        self.img_seg_mode = self.IGNORE
-        print("Image Callback time: {:.4f}".format(time.clock() - tic))
+        # self.img_seg_mode = self.IGNORE
+        print("Image Callback time: {:.4f}".format(time.time() - tic))
 
 
     def publish_filter_state(self, state_est, my_time, itr):
@@ -150,3 +151,11 @@ class ros_interface:
         pose_msg.pose.orientation.y = state_est[8]
         pose_msg.pose.orientation.z = state_est[9]
         self.state_pub.publish(pose_msg)
+
+    def publish_image_with_bb(self, img_msg, bb):
+        # cv2_im = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="passthrough")
+
+        # cv2.drawContours(cv2_im,[bb],0,(0,191,255),2)
+
+        # self.image_bb_pub.publish()
+        pass

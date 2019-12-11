@@ -56,14 +56,14 @@ def run_execution_loop():
     loop_count = 0
     previous_image_time = 0
 
-    tic = time.clock()
+    tic = time.time()
     while not rospy.is_shutdown():
         # store data locally (so it doesnt get overwritten in ROS object)
         loop_time = ros.latest_img_time
         if loop_time <= previous_image_time:
             # this means we dont have new data yet
             continue
-        ros.im_seg_mode = ros.IGNORE
+        # ros.im_seg_mode = ros.IGNORE
         tf_ego_w = inv_tf(ros.tf_w_ego)
         if not ukf.b_use_gt_bb:
             abb = ros.latest_abb  # angled bounding box
@@ -80,10 +80,10 @@ def run_execution_loop():
         
         ros.publish_filter_state(ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
         
-        ros.im_seg_mode = ros.TRACK
+        # ros.im_seg_mode = ros.TRACK
         rate.sleep()
-        print("FULL END-TO-END time = {:4f}\n".format(time.clock() - tic))
-        tic = time.clock()
+        print("FULL END-TO-END time = {:4f}\n".format(time.time() - tic))
+        tic = time.time()
         loop_count += 1
     ### DONE WITH MSL RAPTOR ####
 

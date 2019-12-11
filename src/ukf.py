@@ -77,36 +77,36 @@ class UKF:
         
         # line 2
         b_outer_only = True
-        tic0 = time.clock()
+        tic0 = time.time()
         sps = self.calc_sigma_points(self.mu, self.sigma)
         if not b_outer_only:
-            print("calc sig pnts1: {:.4f}".format(time.clock() - tic0))
+            print("calc sig pnts1: {:.4f}".format(time.time() - tic0))
 
         # line 3
         if not b_outer_only:
-            tic = time.clock()
+            tic = time.time()
         sps_prop = self.propagate_dynamics(sps, dt)
         if not b_outer_only:
-            print("propagate_dynamics: {:.4f}".format(time.clock() - tic))
+            print("propagate_dynamics: {:.4f}".format(time.time() - tic))
 
         # lines 4 & 5
         if not b_outer_only:
-            tic = time.clock()
+            tic = time.time()
         mu_bar, sig_bar = self.extract_mean_and_cov_from_state_sigma_points(sps_prop)
         if not b_outer_only:
-            print("extract_mean_and_cov_from_STATE_sigma_points: {:.4f}".format(time.clock() - tic))
+            print("extract_mean_and_cov_from_STATE_sigma_points: {:.4f}".format(time.time() - tic))
         
         # line 6
         if not b_outer_only:
-            tic = time.clock()
+            tic = time.time()
         sps_recalc = self.calc_sigma_points(mu_bar, sig_bar)
         if not b_outer_only:
-            print("calc sig pnts2: {:.4f}".format(time.clock() - tic))
+            print("calc sig pnts2: {:.4f}".format(time.time() - tic))
         
         # lines 7-9
         if False and self.parallelize:
             if not b_outer_only:
-                tic = time.clock()
+                tic = time.time()
             my_pool = Pool(cpu_count() - 1)  # keep 1 core free for now to avoid lockup issues? [THIS IS PURELY SPECULATIVE ON MY PART!!!]
             b_use_partial = True
             if b_use_partial:
@@ -120,42 +120,42 @@ class UKF:
             pred_meas = np.array(list(result), dtype=np.float32).T
             my_pool.close()
             if not b_outer_only:
-                print("pred_meas par: {:.4f}".format(time.clock() - tic))
+                print("pred_meas par: {:.4f}".format(time.time() - tic))
 
             if not b_outer_only:
-                tic = time.clock()
+                tic = time.time()
             pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
             for sp_ind in range(sps.shape[1]):
                 pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], tf_ego_w)
             if not b_outer_only:
-                print("pred_meas: {:.4f}".format(time.clock() - tic))
+                print("pred_meas: {:.4f}".format(time.time() - tic))
         else:
             pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
             for sp_ind in range(sps.shape[1]):
                 pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], tf_ego_w)
 
         if not b_outer_only:
-            tic = time.clock()
+            tic = time.time()
         z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
         if not b_outer_only:
-            print("extract_mean_and_cov_from_OBS_sigma_points: {:.4f}".format(time.clock() - tic))
+            print("extract_mean_and_cov_from_OBS_sigma_points: {:.4f}".format(time.time() - tic))
 
         # line 10
         if not b_outer_only:
-            tic = time.clock()
+            tic = time.time()
         S_xz = self.calc_cross_correlation(sps_recalc, mu_bar, z_hat, pred_meas)
         if not b_outer_only:
-            print("calc_cross_correlation: {:.4f}".format(time.clock() - tic))
+            print("calc_cross_correlation: {:.4f}".format(time.time() - tic))
 
         # lines 11-13
         if not b_outer_only:
-            tic = time.clock()
+            tic = time.time()
         mu_out, sigma_out = self.update_state(measurement, mu_bar, sig_bar, S, S_inv, S_xz, z_hat)
 
         self.mu = mu_out
         self.sigma = sigma_out
         self.itr += 1
-        tic1 = time.clock()
+        tic1 = time.time()
         if not b_outer_only:
             print("update_state: {:.4f}\nTOTAL time (with prints): {:.4f}".format(tic1 - tic, tic1 - tic0))
         else:

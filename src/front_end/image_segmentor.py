@@ -18,16 +18,17 @@ class ImageSegmentor:
         self.last_box = None
         
     def track(self,image):
-        tic = time.clock()
+        tic = time.time()
         self.last_box,_ = self.tracker.track(image)
-        print("track time = {:.4f}".format(time.clock() - tic))
+        tic2 = time.time()
+        print("track time = {:.4f}".format(tic2- tic))
         return self.last_box
 
     def reinit_tracker(self,new_box,image):
         self.tracker.reinit(new_box,image)
 
     def detect(self,image):
-        tic = time.clock()
+        tic = time.time()
         detections = self.detector.detect(image)
-        print("detect time = {:.4f}".format(time.clock() - tic))
+        print("detect time = {:.4f}".format(time.time() - tic))
         return detections
