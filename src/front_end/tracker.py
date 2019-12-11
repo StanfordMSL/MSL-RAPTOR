@@ -26,7 +26,8 @@ class SiammaskTracker:
 
 
     def track(self,im):
-        self.state = siamese_track(self.state, im, mask_enable=True, refine_enable=True, device=self.device)  # track
+        with torch.no_grad():
+            self.state = siamese_track(self.state, im, mask_enable=True, refine_enable=True, device=self.device)  # track
         location = self.state['ploygon'].flatten()
         mask = self.state['mask'] > self.state['p'].seg_thr
         return location,mask

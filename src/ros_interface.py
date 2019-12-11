@@ -166,5 +166,5 @@ class ros_interface:
         bb_msg.layout.dim[0].label = "rows"
         bb_msg.layout.dim[1].label = "cols"
         bb_msg.layout.data_offset = 0
-        bb_msg.data = list(state)
+        bb_msg.data = list(bb_data)
         self.bb_data_pub.publish(bb_msg)
