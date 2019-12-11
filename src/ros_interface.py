@@ -26,7 +26,7 @@ class ros_interface:
         self.latest_img_time = -1
         self.DETECT = 1
         self.TRACK = 2
-        self.REINIT = 3
+        self.FAKED_BB = 3
         self.IGNORE = 4
         self.im_seg_mode = self.DETECT
         self.latest_abb = None  # angled bound box [row, height, width, height, angle (radians)]
@@ -128,6 +128,8 @@ class ros_interface:
                 self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
             else:
                 raise RuntimeError("Unknown image segmentation mode")
+        else:
+            self.im_seg_mode = self.FAKED_BB
             
         self.latest_img_time = my_time  # DO THIS LAST
         # self.img_seg_mode = self.IGNORE
