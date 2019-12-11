@@ -21,7 +21,6 @@ from ukf import UKF
 # libs & utils
 from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.math_utils import *
-# sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/front_end/')
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/src/front_end')
 from image_segmentor import ImageSegmentor
 
