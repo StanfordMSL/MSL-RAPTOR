@@ -111,3 +111,6 @@ data/
 .idea/
 __MACOSX/
 *.DS_Store
+
+# temp files
+foo.py
