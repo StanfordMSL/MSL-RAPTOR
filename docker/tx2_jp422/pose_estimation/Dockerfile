@@ -12,6 +12,12 @@ RUN source /ros_python3_entrypoint.sh && \
     cd .. && \
     catkin build
 
+# Scipy
+RUN apt-get update && \
+    apt-get install -y libatlas-base-dev gfortran && \
+    pip3 install wheel && \
+    pip3 install scipy
+
 # Pytorch
 RUN apt-get update && \
     apt-get install -y python3-pip libatlas-base-dev git libjpeg-dev zlib1g-dev && \
@@ -26,10 +32,8 @@ RUN wget https://nvidia.box.com/shared/static/phqe92v26cbhqjohwtvxorrwnmrnfx1o.w
 # SiamMask
 RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
     apt-get update && \
-    apt-get install -y python3-h5py python3-scipy python3-llvmlite python3-pandas python3-numba && \
-    pip3 install wheel && \
+    apt-get install -y python3-h5py python3-llvmlite python3-pandas python3-numba && \
     pip3 install Cython==0.29.4 colorama==0.3.9 requests==2.21.0 fire==0.1.3 tqdm==4.29.1 tensorboardX==1.6 && \
-    pip3 install --upgrade scipy && \
     /bin/bash make.sh && \
     cd experiments/siammask_sharp && \
     # Download weights
