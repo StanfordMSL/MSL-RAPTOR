@@ -98,7 +98,7 @@ class bb_viz_node:
         bb_data = msg.data[0:-2]
         im_msg = self.find_closest_by_time_ros2(my_time, self.img_buffer[1], self.img_buffer[0])[0]
         image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="passthrough")
-        box = np.int0(cv2.boxPoints( ( (bb_data[1], bb_data[0]), (bb_data[2], bb_data[3]), -np.degrees(bb_data[4]))) )
+        box = np.int0(cv2.boxPoints( ( (bb_data[0], bb_data[1]), (bb_data[2], bb_data[3]), -np.degrees(bb_data[4]))) )
         cv2.drawContours(image,[box],0,box_color,2)
         # print(bb_data)
         self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(image, "passthrough"))
