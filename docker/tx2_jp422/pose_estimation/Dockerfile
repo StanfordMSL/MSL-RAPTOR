@@ -63,12 +63,6 @@ RUN apt-get update && \
     apt-get install -y libsm6 libxext6 libxrender-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Make sure avahi-utils is installed and modify avahi-config
-RUN apt-get update && \
-    apt-get install -y avahi-utils && \
-    perl -p -i -e 's|#allow-interfaces=eth0|allow-interfaces=wlan1|g' /etc/avahi/avahi-daemon.conf  
-    # same as: sed -i 's|#allow-interfaces=eth0|allow-interfaces=wlan1|g' /etc/avahi/avahi-daemon.conf
-
 # Clone OCAM github (and install dependences) --> this allows us to use our camera
 RUN apt-get update && \
     apt-get install -y libudev-dev && apt-get install -y libv4l-dev && \
@@ -78,9 +72,18 @@ RUN apt-get update && \
     catkin build && \
     rm -rf /var/lib/apt/lists/*
 
+# Modify avahi-config (this has to be done)
+RUN perl -p -i -e 's|#deny-interfaces=eth1|deny-interfaces=eth0,eth1|g' /etc/avahi/avahi-daemon.conf
+
 # ---------------------------- Reset argument ------------------------------ #
 ARG rebuild=0
 # -------------------------------------------------------------------------- #
+
+#############   DEBUG TOOLS   ################
+# Install avahi debug tools such as avahi-resolve (good for testing, not needed for running)
+RUN apt-get update && \
+    apt-get install -y avahi-utils
+##############################################
 
 # Add aliases to bashrc in docker containers
 RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch"' >> ~/.bashrc && \
