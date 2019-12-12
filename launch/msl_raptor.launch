@@ -29,6 +29,7 @@
   <!-- IF using camera, launch our node -->
   <group if="$(arg b_camera)">
     <include file="$(find msl_vision)/launch/ocam_ros.launch" >
+        <arg name="resolution"       value="2"/> <!-- These are the default cropping configurations from Ocam:  resolution: 0: 1280x960, 1: 1280x720, 2: 640x480, 3: 640x360    frame_rate: USB3.0 - 1280x960@45fps, 1280x720@60fps, 640x480@80fps, 320x240@160fps   USB2.0 - 1280x960@22.5fps, 1280x720@30fps, 640x480@80fps, 320x240@160fps -->
         <arg name="frame_rate"       value="30"/>
         <arg name="image_width"      value="640"/>
         <arg name="image_height"     value="480" />
