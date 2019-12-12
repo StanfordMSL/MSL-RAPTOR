@@ -12,6 +12,8 @@ RUN source /ros_python3_entrypoint.sh && \
     cd .. && \
     catkin build
 
+
+
 # Set up SiamMask
 RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
     pip3 install -r requirements.txt && \
@@ -19,7 +21,15 @@ RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
     cd experiments/siammask_sharp && \
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_VOT.pth  && \
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_DAVIS.pth && \
-    pip3 install scipy --upgrade
+    pip3 install scipy --upgrade && \
+    # Torch2trt weights
+    pip3 install gdown && \
+    mkdir ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt && \
+    cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt && \
+    gdown https://drive.google.com/uc?id=1_VR2c2UpW8UoZz5k4LS835jFj_7K2bAR && \
+    pip3 uninstall -y gdown && \
+    tar -xzvf siammask_trt_weights.tar.gz && \
+    rm siammask_trt_weights.tar.gz
 
 # Set up YOLO
 RUN apt-get update && \
