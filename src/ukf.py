@@ -53,7 +53,8 @@ class UKF:
 
         self.Q = self.sigma/10  # Process Noise
         self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
-        self.parallelize = True
+        self.last_dt = 0.03
+
         ####################################################################
 
         # init vars #############################
@@ -76,6 +77,13 @@ class UKF:
         # print(self.mu)
         
         # line 2
+        # Rescale noises based on dt
+        self.sigma = enforce_pos_def_sym_mat(self.sigma*(dt/self.last_dt))
+        self.Q = self.Q*(dt/self.last_dt)
+        self.R = self.R*(dt/self.last_dt)
+
+        self.last_dt = dt
+
         b_outer_only = True
         tic0 = time.time()
         sps = self.calc_sigma_points(self.mu, self.sigma)
@@ -132,6 +140,7 @@ class UKF:
 
         self.mu = mu_out
         self.sigma = sigma_out
+
         self.itr += 1
         tic1 = time.time()
         if not b_outer_only:
