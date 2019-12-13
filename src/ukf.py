@@ -21,10 +21,11 @@ from utils_msl_raptor.ukf_utils import *
 from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.math_utils import *
 
+import math
 
 class UKF:
 
-    def __init__(self,b_enforce_0_yaw=True,b_use_gt_bb=False):
+    def __init__(self,b_enforce_0_yaw=True,b_use_gt_bb=False,im_width=640,im_height=480):
 
         self.VERBOSE = True
 
@@ -64,6 +65,16 @@ class UKF:
         self.itr_time = 0
         self.tf_ego_w_tmp = None
         ####################################################################
+
+        # Keep last measurements estimation
+        self.mu_obs = None
+        self.S_obs = None
+
+        # Statistics used for testing new measurements
+        self.z_095_two_sided = 1.96
+        self.F_005 = 161.4476
+        self.im_width = im_width
+        self.im_height = im_height
 
 
     def step_ukf(self, measurement, tf_ego_w, dt):
@@ -123,6 +134,8 @@ class UKF:
         if not b_outer_only:
             tic = time.time()
         z_hat, S, S_inv = self.extract_mean_and_cov_from_obs_sigma_points(pred_meas)
+        self.mu_obs = z_hat
+        self.S_obs = S
         if not b_outer_only:
             print("extract_mean_and_cov_from_OBS_sigma_points: {:.4f}".format(time.time() - tic))
 
@@ -311,3 +324,37 @@ class UKF:
         
         sig_bar = enforce_pos_def_sym_mat(sig_bar + self.Q)  # add noise & project sig_bar to pos. def. cone to avoid numeric issues
         return mu_bar, sig_bar
+
+    def check_measurement_valid(self,abb):
+        if self.mu_obs is None:
+            return True
+        # Check if row or column valid
+        mu_x = abb[0]
+        sigma_x = math.sqrt(self.S_obs[0,0])
+        z_x_l = (0-mu_x)/sigma_x
+        z_x_r = (self.im_width-mu_x)/sigma_x
+
+        if z_x_l > -self.z_095_two_sided or z_x_r < self.z_095_two_sided:
+            rospy.loginfo("Rejected measurement with values left {} and right {}".format(z_x_l,z_x_r))
+            return False
+
+        mu_y = abb[1]
+        sigma_y = math.sqrt(self.S_obs[1,1])
+        z_y_l = (0-mu_y)/sigma_y
+        z_y_r = (self.im_height-mu_y)/sigma_y
+
+        if z_y_l > -self.z_095_two_sided or z_y_r < self.z_095_two_sided:
+            rospy.loginfo("Rejected measurement with values top {} and bottom {}".format(z_y_l,z_y_r))
+            return False
+
+
+        # Check if new measurement is too far from distribution of previous measurement
+        # Hotelling's t-squared statistic
+        t = math.sqrt((abb-self.mu_obs)@ la.inv(self.S_obs) @ (abb-self.mu_obs).T)
+        if t > self.F_005:
+            rospy.loginfo("Rejected measurement too far from distribution: F={}".format(t))
+            return False
+
+        return True
+
+

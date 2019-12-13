@@ -28,6 +28,7 @@ from image_segmentor import ImageSegmentor
 def run_execution_loop():
     b_enforce_0_yaw = rospy.get_param('~b_enforce_0_yaw') 
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb') 
+    b_filter_meas = False
     
     ros = ROS(b_use_gt_bb)  # create a ros interface object
 
@@ -78,7 +79,12 @@ def run_execution_loop():
         else:
             abb = ukf.predict_measurement(pose_to_state_vec(ros.ado_pose_gt_rosmsg), tf_ego_w)
             rospy.logwarn("Faking measurement data")
-        
+
+        if b_filter_meas and not ukf.check_measurement_valid(abb):
+            ros.im_seg_mode = ros.DETECT
+            rate.sleep()
+            continue
+
         # pdb.set_trace()
         dt = loop_time - previous_image_time
         ukf.itr_time = loop_time
