@@ -29,7 +29,7 @@ class ros_interface:
         self.IGNORE = 4
         self.im_seg_mode = self.DETECT
         self.latest_abb = None  # angled bound box [row, height, width, height, angle (radians)]
-        self.latest_bb_method = 1  # 1 for detect network, -1 for tracking network
+        self.latest_bb_method = self.DETECT  
 
         self.ego_pose_rosmesg_buffer = ([], [])
         self.ego_pose_rosmesg_buffer_len = 50
@@ -114,7 +114,6 @@ class ros_interface:
                 self.img_seg.reinit_tracker(bb_no_angle, image)
                 self.latest_abb = self.img_seg.track(image)
                 self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
-                self.im_seg_mode = self.TRACK
             elif self.im_seg_mode == self.TRACK:
                 self.latest_abb = self.img_seg.track(image)
                 self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))

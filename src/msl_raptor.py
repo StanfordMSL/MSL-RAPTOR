@@ -28,7 +28,7 @@ from image_segmentor import ImageSegmentor
 def run_execution_loop():
     b_enforce_0_yaw = rospy.get_param('~b_enforce_0_yaw') 
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb') 
-    b_filter_meas = False
+    b_filter_meas = True
     
     ros = ROS(b_use_gt_bb)  # create a ros interface object
 
@@ -36,9 +36,8 @@ def run_execution_loop():
         rospy.logwarn("\n\n\n------------- IN DEBUG MODE (Using Ground Truth Bounding Boxes) -------------\n\n\n")
         time.sleep(0.5)
     
-    if b_use_gt_bb:
-        img_seg = None
-    else:
+        
+    if not b_use_gt_bb:
         print('Waiting for first image')
         im = ros.get_first_image()
         print('initializing image segmentor!!!!!!')
@@ -55,6 +54,11 @@ def run_execution_loop():
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
     previous_image_time = 0
+
+    if b_use_gt_bb:
+        init_state_from_gt(ros,ukf)  
+        img_seg = None
+        
 
     tic = time.time()
     while not rospy.is_shutdown():
@@ -80,10 +84,28 @@ def run_execution_loop():
             abb = ukf.predict_measurement(pose_to_state_vec(ros.ado_pose_gt_rosmsg), tf_ego_w)
             rospy.logwarn("Faking measurement data")
 
-        if b_filter_meas and not ukf.check_measurement_valid(abb):
-            ros.im_seg_mode = ros.DETECT
-            rate.sleep()
-            continue
+        if ros.latest_bb_method == ros.DETECT:
+            if ukf.check_measurement_valid_detect(abb):
+                ukf.reinit_filter(abb)
+                ros.im_seg_mode = ros.TRACK
+
+            else:
+                rospy.loginfo("Detected box not valid")
+                rate.sleep()
+                continue
+                        
+        
+        elif ros.latest_bb_method == ros.TRACK:
+            # check measurement
+            if not ukf.check_measurement_valid_track(abb):
+                rospy.loginfo("Tracked box not valid")
+                ros.im_seg_mode = ros.DETECT
+                ros.publish_image_with_bb(abb, im_seg_mode, loop_time)
+                ukf.mu_obs = None
+                ukf.S_obs = None
+                rate.sleep()
+                continue
+
 
         # pdb.set_trace()
         dt = loop_time - previous_image_time
@@ -101,15 +123,15 @@ def run_execution_loop():
         loop_count += 1
     ### DONE WITH MSL RAPTOR ####
 
+def init_state_from_gt(ros, ukf):
+    # init ukf state
+    rospy.logwarn('using ground truth to initialize filter!')
+    ukf.mu = pose_to_state_vec(ros.ado_pose_gt_rosmsg) 
+    ukf.mu[0:3] += np.array([-2, .5, .5]) 
 
 def init_objects(ros, ukf):
     # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
     ukf.camera = camera(ros)
-
-    # init ukf state
-    rospy.logwarn('using ground truth to initialize filter!')
-    ukf.mu = pose_to_state_vec(ros.ado_pose_gt_rosmsg) 
-    # ukf.mu[0:3] += np.array([-2, .5, .5]) 
 
     # init 3d bounding box in quad frame
     half_length = rospy.get_param('~target_bound_box_l') / 2
@@ -123,6 +145,8 @@ def init_objects(ros, ukf):
                           [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
                           [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
                           [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
+
+    ukf.quad_width = 2*half_width
 
     ros.im_seg_mode = ros.DETECT  # start of by detecting
 
@@ -147,6 +171,7 @@ class camera:
         ns = rospy.get_param('~ns')
         camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 10)
         self.K = np.reshape(camera_info.K, (3, 3))
+        self.K_inv = la.inv(self.K)
         self.tf_cam_ego = np.eye(4)
         self.tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
         self.tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))

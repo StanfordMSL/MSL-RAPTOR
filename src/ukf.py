@@ -46,6 +46,32 @@ class UKF:
 
         self.camera = None
 
+        self.init_filter_elements()
+        
+        ####################################################################
+
+        # init vars #############################
+        self.bb_3d = np.zeros((8, 3))  # set by main function initialization
+        self.quad_width = 0 # set by main function initialization
+        self.itr = 0
+        self.itr_time = 0
+        self.tf_ego_w_tmp = None
+        ####################################################################
+
+        # Statistics used for testing new measurements
+        self.z_090_one_sided = 1.282
+        self.z_075_one_sided = 0.674
+        self.z_050_one_sided = 0.0
+
+        self.min_pix_from_edge = 5
+        self.min_aspect_ratio = 1
+        self.max_aspect_ratio = 2
+
+        self.F_005 = 161.4476
+        self.im_width = im_width
+        self.im_height = im_height
+
+    def init_filter_elements(self, mu = None):
         dp = 0.1  # [m]
         dv = 0.005  # [m/s]
         dq = 0.1  # [rad] in ax ang 
@@ -55,26 +81,11 @@ class UKF:
         self.Q = self.sigma/10  # Process Noise
         self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
         self.last_dt = 0.03
+        if mu is None:
+            self.mu = np.zeros((self.dim_state, 1))  # set by main function initialization
+        else:
+            self.mu = mu
 
-        ####################################################################
-
-        # init vars #############################
-        self.mu = np.zeros((self.dim_state, 1))  # set by main function initialization
-        self.bb_3d = np.zeros((8, 3))  # set by main function initialization
-        self.itr = 0
-        self.itr_time = 0
-        self.tf_ego_w_tmp = None
-        ####################################################################
-
-        # Keep last measurements estimation
-        self.mu_obs = None
-        self.S_obs = None
-
-        # Statistics used for testing new measurements
-        self.z_095_two_sided = 1.96
-        self.F_005 = 161.4476
-        self.im_width = im_width
-        self.im_height = im_height
 
 
     def step_ukf(self, measurement, tf_ego_w, dt):
@@ -325,25 +336,68 @@ class UKF:
         sig_bar = enforce_pos_def_sym_mat(sig_bar + self.Q)  # add noise & project sig_bar to pos. def. cone to avoid numeric issues
         return mu_bar, sig_bar
 
-    def check_measurement_valid(self,abb):
+
+    def reinit_filter(self,bb):
+        """
+        Initialize a state with approximations using a single bounding box
+        """
+        z = self.camera.K[0,0]* self.quad_width /bb[2]
+        im_coor = z*np.array([bb[0],bb[1],1.0])
+        (x,y,z) = self.camera.K_inv @ im_coor
+
+        mu = np.array([z,-x,-y,0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
+
+        self.init_filter_elements(mu)
+
+
+
+    def check_measurement_valid_detect(self,abb):
+        # Left side in image
+        if (abb[0] - abb[2]/2) < self.min_pix_from_edge:
+            return False
+        
+        # Right side in image
+        if (abb[0] + abb[2]/2) > self.im_width - self.min_pix_from_edge:
+            return False
+
+        # Top in image
+        if (abb[1] - abb[3]/2) < self.min_pix_from_edge:
+            return False
+        
+        # Bottom in image
+        if (abb[1] + abb[3]/2) > self.im_height - self.min_pix_from_edge:
+            return False
+
+        # Aspect ratio valid
+        ar = abb[2]/abb[3]
+        if ar < self.min_aspect_ratio or ar > self.max_aspect_ratio:
+            return False
+
+        return True
+        
+
+
+    def check_measurement_valid_track(self,abb):
         if self.mu_obs is None:
             return True
         # Check if row or column valid
-        mu_x = abb[0]
-        sigma_x = math.sqrt(self.S_obs[0,0])
-        z_x_l = (0-mu_x)/sigma_x
-        z_x_r = (self.im_width-mu_x)/sigma_x
+        mu_x_l = abb[0] - abb[2]/2
+        mu_x_r = abb[0] + abb[2]/2
+        sigma_x = math.sqrt(self.S_obs[0,0] + self.S_obs[2,2]/4)
+        z_x_l = (0-mu_x_l)/sigma_x
+        z_x_r = (self.im_width-mu_x_r)/sigma_x
 
-        if z_x_l > -self.z_095_two_sided or z_x_r < self.z_095_two_sided:
+        if z_x_l > -self.z_075_one_sided or z_x_r < self.z_075_one_sided:
             rospy.loginfo("Rejected measurement with values left {} and right {}".format(z_x_l,z_x_r))
             return False
 
-        mu_y = abb[1]
-        sigma_y = math.sqrt(self.S_obs[1,1])
-        z_y_l = (0-mu_y)/sigma_y
-        z_y_r = (self.im_height-mu_y)/sigma_y
+        mu_y_l = abb[1] - abb[3]/2
+        mu_y_r = abb[1] + abb[3]/2
+        sigma_y = math.sqrt(self.S_obs[1,1]+ self.S_obs[3,3]/4)
+        z_y_l = (0-mu_y_l)/sigma_y
+        z_y_r = (self.im_height-mu_y_r)/sigma_y
 
-        if z_y_l > -self.z_095_two_sided or z_y_r < self.z_095_two_sided:
+        if z_y_l > -self.z_075_one_sided or z_y_r < self.z_075_one_sided:
             rospy.loginfo("Rejected measurement with values top {} and bottom {}".format(z_y_l,z_y_r))
             return False
 
