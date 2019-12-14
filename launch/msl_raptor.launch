@@ -5,6 +5,7 @@
   <arg name="b_camera"        default="true" />
   <arg name="b_use_gt_bb"     default="false" />
   <arg name="b_enforce_0_yaw" default="true" />
+  <arg name="detection_period" default="5" /> <!-- period to use to redo safety detection in seconds -->
   <arg name="b_rosbag"        default="false" />  <!-- boolean if we are reading data from a rosbag -->
   <arg name="rb_path"         default="/bags" />  <!-- path to the rosbag -->
   <arg name="rb_name"         default="quad7_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
@@ -23,6 +24,7 @@
     <param name="ns"  value="$(arg ns)"/> 
     <param name="b_use_gt_bb"  value="$(arg b_use_gt_bb)"/> 
     <param name="b_enforce_0_yaw"  value="$(arg b_enforce_0_yaw)"/> 
+    <param name="detection_period"  value="$(arg detection_period)"/> 
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
   </node>
 

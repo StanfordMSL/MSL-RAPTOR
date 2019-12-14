@@ -28,6 +28,7 @@ from image_segmentor import ImageSegmentor
 def run_execution_loop():
     b_enforce_0_yaw = rospy.get_param('~b_enforce_0_yaw') 
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb') 
+    detection_period = rospy.get_param('~detection_period') # In seconds
     b_filter_meas = True
     
     ros = ROS(b_use_gt_bb)  # create a ros interface object
@@ -54,6 +55,7 @@ def run_execution_loop():
     state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
     loop_count = 0
     previous_image_time = 0
+    time_since_last_detection = 0.
 
     if b_use_gt_bb:
         init_state_from_gt(ros,ukf)  
@@ -88,14 +90,13 @@ def run_execution_loop():
             if ukf.check_measurement_valid_detect(abb):
                 ukf.reinit_filter(abb)
                 ros.im_seg_mode = ros.TRACK
-
+                time_since_last_detection = 0.
             else:
                 rospy.loginfo("Detected box not valid")
                 rate.sleep()
                 continue
-                        
-        
         elif ros.latest_bb_method == ros.TRACK:
+            time_since_last_detection+=  loop_time - previous_image_time
             # check measurement
             if not ukf.check_measurement_valid_track(abb):
                 rospy.loginfo("Tracked box not valid")
@@ -105,7 +106,10 @@ def run_execution_loop():
                 ukf.S_obs = None
                 rate.sleep()
                 continue
-
+        
+        if time_since_last_detection > detection_period:
+            ros.im_seg_mode = ros.DETECT
+            time_since_last_detection = 0.
 
         # pdb.set_trace()
         dt = loop_time - previous_image_time
