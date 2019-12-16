@@ -337,15 +337,18 @@ class UKF:
         return mu_bar, sig_bar
 
 
-    def reinit_filter(self,bb):
+    def reinit_filter(self,bb,tf_w_ego):
         """
         Initialize a state with approximations using a single bounding box
         """
         z = self.camera.K[0,0]* self.quad_width /bb[2]
         im_coor = z*np.array([bb[0],bb[1],1.0])
-        (x,y,z) = self.camera.K_inv @ im_coor
+        pos = self.camera.K_inv @ im_coor
 
-        mu = np.array([z,-x,-y,0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
+        # NOT TESTED YET
+        # pos = tf_w_ego @ inv_tf(self.camera.tf_cam_ego) @ pos
+        # mu = np.array([pos[0],pos[1],pos[2],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
+        mu = np.array([pos[2],-pose[0],-pos[1],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
 
         self.init_filter_elements(mu)
 
