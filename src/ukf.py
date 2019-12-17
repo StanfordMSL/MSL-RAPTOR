@@ -346,9 +346,9 @@ class UKF:
         pos = self.camera.K_inv @ im_coor
 
         # NOT TESTED YET
-        # pos = tf_w_ego @ inv_tf(self.camera.tf_cam_ego) @ pos
-        # mu = np.array([pos[0],pos[1],pos[2],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
-        mu = np.array([pos[2],-pose[0],-pos[1],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
+        pos = tf_w_ego @ inv_tf(self.camera.tf_cam_ego) @ np.concatenate([pos, [1]])
+        mu = np.array([pos[0],pos[1],pos[2],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
+        # mu = np.array([pos[2],-pos[0],-pos[1],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
 
         self.init_filter_elements(mu)
 
