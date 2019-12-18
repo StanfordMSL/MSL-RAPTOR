@@ -304,8 +304,6 @@ class UKF:
         quat = states[6:10,:].T  # current orientation
         omegas = states[10:13,:]  # angular velocity vector
         om_norm = la.norm(omegas,axis=0)  # rate of change of all angles
-        # zeros_rot_idx = 
-        # omega[:,zeros_rot_idx] = 0
         om_norm[np.argwhere(om_norm == 0)] = 1
         ang = om_norm * dt  # change in angle in this small timestep
         ax = omegas / om_norm  # axis about angle change

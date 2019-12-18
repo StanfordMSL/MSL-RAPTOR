@@ -14,6 +14,7 @@ import tf
 from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.ukf_utils import *
 from cv_bridge import CvBridge, CvBridgeError
+import cv2
 
 class ros_interface:
 
@@ -42,12 +43,12 @@ class ros_interface:
         self.ns = rospy.get_param('~ns')  # robot namespace
 
         self.bridge = CvBridge()
+        self.camera = None
+
         # DEBUGGGGGGGGG
-        if b_use_gt_bb or not b_use_gt_bb:
-            rospy.logwarn("!!!ALWAYS INITIALIZING WITH GT POSE!!!!!!")
+        if b_use_gt_bb:
             self.ado_pose_gt_rosmsg = None
             rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.ado_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
-
         ##########################
     
     def get_first_image(self):
@@ -104,19 +105,26 @@ class ros_interface:
         self.tf_w_ego = pose_to_tf(find_closest_by_time(my_time, self.ego_pose_rosmesg_buffer[1], self.ego_pose_rosmesg_buffer[0])[0])
 
         image = self.bridge.imgmsg_to_cv2(msg,desired_encoding="passthrough")
+        
+        # undistort the fisheye effect in the image
+        if self.camera is not None:
+            image = cv2.undistort(image, self.camera.K, self.camera.dist_coefs, None, self.camera.new_camera_matrix)
+        
         self.latest_bb_method = self.im_seg_mode
         if not self.b_use_gt_bb:
             if self.im_seg_mode == self.DETECT:
                 bb_no_angle = self.img_seg.detect(image)
                 if not bb_no_angle:
+                    self.latest_abb = None
+                    self.latest_img_time = -1
                     rospy.loginfo("Did not detect object")
                     return
                 self.img_seg.reinit_tracker(bb_no_angle, image)
-                self.latest_abb = self.img_seg.track(image)
-                self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
+                bb_4_corners = self.img_seg.track(image)
+                self.latest_abb = bb_corners_to_angled_bb(bb_4_corners.reshape(-1,2))
             elif self.im_seg_mode == self.TRACK:
-                self.latest_abb = self.img_seg.track(image)
-                self.latest_abb = bb_corners_to_angled_bb(self.latest_abb.reshape(-1,2))
+                bb_4_corners = self.img_seg.track(image)
+                self.latest_abb = bb_corners_to_angled_bb(bb_4_corners.reshape(-1,2))
             else:
                 raise RuntimeError("Unknown image segmentation mode")
         else:

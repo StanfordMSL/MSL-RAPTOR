@@ -9,6 +9,7 @@ import pdb
 # import pickle
 # math
 import numpy as np
+import cv2
 # plots
 # import matplotlib
 # from matplotlib import pyplot as plt
@@ -136,6 +137,7 @@ def init_state_from_gt(ros, ukf):
 def init_objects(ros, ukf):
     # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
     ukf.camera = camera(ros)
+    ros.camera = ukf.camera
 
     # init 3d bounding box in quad frame
     half_length = rospy.get_param('~target_bound_box_l') / 2
@@ -175,6 +177,13 @@ class camera:
         ns = rospy.get_param('~ns')
         camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 10)
         self.K = np.reshape(camera_info.K, (3, 3))
+        self.dist_coefs = np.reshape(camera_info.D, (5,))
+        self.K = np.reshape([485.79641681, 0.0, 326.60190546, 0.0, 485.52205586, 238.75637649, 0.0, 0.0, 1.0], (3, 3))
+        print(self.dist_coefs)
+        # self.dist_coefs = np.array([-4.53688801e-01,  3.00365838e-01,  2.37608009e-03,  9.88600494e-05, -1.52199277e-01])
+        # [-0.40031982  0.14257124  0.00020686  0.00030526  0.]
+        self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 1, (camera_info.width, camera_info.height))
+
         self.K_inv = la.inv(self.K)
         self.tf_cam_ego = np.eye(4)
         self.tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
