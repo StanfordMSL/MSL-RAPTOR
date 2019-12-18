@@ -179,9 +179,6 @@ class camera:
         self.K = np.reshape(camera_info.K, (3, 3))
         self.dist_coefs = np.reshape(camera_info.D, (5,))
         self.K = np.reshape([485.79641681, 0.0, 326.60190546, 0.0, 485.52205586, 238.75637649, 0.0, 0.0, 1.0], (3, 3))
-        print(self.dist_coefs)
-        # self.dist_coefs = np.array([-4.53688801e-01,  3.00365838e-01,  2.37608009e-03,  9.88600494e-05, -1.52199277e-01])
-        # [-0.40031982  0.14257124  0.00020686  0.00030526  0.]
         self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 1, (camera_info.width, camera_info.height))
 
         self.K_inv = la.inv(self.K)
