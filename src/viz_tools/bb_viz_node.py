@@ -44,7 +44,7 @@ class bb_viz_node:
         self.dist_coefs = np.reshape(camera_info.D, (5,))
         self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 1, (camera_info.width, camera_info.height))
         
-        self.all_white_image = 255 * np.ones((height,width,3), np.uint8)
+        self.all_white_image = 255 * np.ones((camera_info.height, camera_info.width, 3), np.uint8)
 
     # def image_cb(self, msg):
     #     """
