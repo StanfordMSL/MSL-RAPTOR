@@ -45,6 +45,7 @@ class bb_viz_node:
         self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 1, (camera_info.width, camera_info.height))
         
         self.all_white_image = 255 * np.ones((camera_info.height, camera_info.width, 3), np.uint8)
+        self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(self.all_white_image, "passthrough"))
 
     # def image_cb(self, msg):
     #     """
@@ -86,8 +87,8 @@ class bb_viz_node:
 
 
     def bb_viz_cb(self, msg):
-        if not self.img_buffer or len(self.img_buffer[0]) == 0:
-            return
+        # if not self.img_buffer or len(self.img_buffer[0]) == 0:
+        #     return
         my_time = msg.data[-1]
         im_seg_mode = msg.data[-2]
         if im_seg_mode == self.DETECT:

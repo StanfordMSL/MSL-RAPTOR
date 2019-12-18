@@ -122,8 +122,8 @@ def run_execution_loop():
         ros.publish_image_with_bb(abb, im_seg_mode, loop_time)
         
         # ros.im_seg_mode = ros.TRACK
-        rate.sleep()
         print("FULL END-TO-END time = {:4f}\n".format(time.time() - tic))
+        rate.sleep()
         tic = time.time()
         loop_count += 1
     ### DONE WITH MSL RAPTOR ####
