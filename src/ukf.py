@@ -65,7 +65,7 @@ class UKF:
 
         self.min_pix_from_edge = 5
         self.min_aspect_ratio = 1
-        self.max_aspect_ratio = 2
+        self.max_aspect_ratio = 5
 
         self.F_005 = 161.4476
         self.im_width = im_width
