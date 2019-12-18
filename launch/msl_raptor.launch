@@ -14,6 +14,9 @@
   <group if="$(arg b_rosbag)">
     <param name="use_sim_time" value="true" />   <!--use the rosbag time instead of the computer's time. If using this use clock option in rosbag-->
   </group>
+  <group unless="$(arg b_rosbag)">
+    <param name="use_sim_time" value="false" />
+  </group>
   
   <node pkg="tf" type="static_transform_publisher" name="trans_pub_map_world"
         args="0 0 0 0 0 0 /map /world 10"> 
@@ -45,5 +48,4 @@
   <group if="$(arg b_rosbag)">
     <node pkg="rosbag" type="play" name="player" args="--clock $(arg rb_path)/$(arg rb_name).bag" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
   </group>
-
 </launch>

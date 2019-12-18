@@ -178,10 +178,10 @@ class camera:
         camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 10)
         self.K = np.reshape(camera_info.K, (3, 3))
         self.dist_coefs = np.reshape(camera_info.D, (5,))
-        self.K = np.reshape([485.79641681, 0.0, 326.60190546, 0.0, 485.52205586, 238.75637649, 0.0, 0.0, 1.0], (3, 3))
         self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 1, (camera_info.width, camera_info.height))
 
         self.K_inv = la.inv(self.K)
+        self.new_camera_matrix_inv = la.inv(self.new_camera_matrix)
         self.tf_cam_ego = np.eye(4)
         self.tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
         self.tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))
@@ -208,7 +208,7 @@ class camera:
         spanning the x and y axis respectively.
         - keeping the width and heigh of the point at 1m depth is useful for similar triangles
         """
-        fov_lim_per_depth = -la.inv( self.K )[0:2, 2] 
+        fov_lim_per_depth = -la.inv( self.new_camera_matrix )[0:2, 2] 
         return 2 * np.arctan( fov_lim_per_depth ), fov_lim_per_depth
 
     def pix_to_pnt3d(self, row, col):
@@ -216,9 +216,7 @@ class camera:
         input: assumes rc is [row, col]
         output: pnt_c = [x, y, z] in camera frame
         """
-        pdb.set_trace()
-
-        pnt_c = la.inv(self.K) @ np.array([col, row, 1])
+        raise RuntimeError("FUNCTION NOT YET IMPLEMENTED")
         return pnt_c
 
     def pnt3d_to_pix(self, pnt_c):
@@ -226,7 +224,7 @@ class camera:
         input: assumes pnt in camera frame
         output: [row, col] i.e. the projection of xyz onto camera plane
         """
-        rc = self.K @ np.reshape(pnt_c[0:3], 3, 1)
+        rc = self.new_camera_matrix @ np.reshape(pnt_c[0:3], 3, 1)
         rc = np.array([rc[1], rc[0]]) / rc[2]
         return rc
 

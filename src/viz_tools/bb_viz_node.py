@@ -2,6 +2,7 @@
 # IMPORTS
 # system
 import sys, time
+from copy import copy
 import pdb
 # math
 import numpy as np
@@ -38,6 +39,10 @@ class bb_viz_node:
         self.bb_data_sub = rospy.Subscriber(self.ns + '/bb_data', Float32MultiArray, self.bb_viz_cb, queue_size=5)
         self.img_overlay_pub = rospy.Publisher(self.ns + '/image_bb_overlay', Image, queue_size=5)
         self.itr = 0
+        camera_info = rospy.wait_for_message(self.ns + '/camera/camera_info', CameraInfo, 30)
+        self.K = np.reshape(camera_info.K, (3, 3))
+        self.dist_coefs = np.reshape(camera_info.D, (5,))
+        self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 1, (camera_info.width, camera_info.height))
         
 
     def image_cb(self, msg):
@@ -98,10 +103,13 @@ class bb_viz_node:
         bb_data = msg.data[0:-2]
         im_msg = self.find_closest_by_time_ros2(my_time, self.img_buffer[1], self.img_buffer[0])[0]
         image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="passthrough")
+
+        image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
+
         box = np.int0(cv2.boxPoints( ( (bb_data[0], bb_data[1]), (bb_data[2], bb_data[3]), -np.degrees(bb_data[4]))) )
         cv2.drawContours(image,[box],0,box_color,2)
-        # print(bb_data)
         self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(image, "passthrough"))
+
         # cv2.imwrite('/test_img{}.png'.format(self.itr), image)
         self.itr += 1
         # pdb.set_trace()

@@ -339,9 +339,9 @@ class UKF:
         """
         Initialize a state with approximations using a single bounding box
         """
-        z = self.camera.K[0,0]* self.quad_width /bb[2]
+        z = self.camera.new_camera_matrix[0,0]* self.quad_width /bb[2]
         im_coor = z*np.array([bb[0],bb[1],1.0])
-        pos = self.camera.K_inv @ im_coor
+        pos = self.camera.new_camera_matrix_inv @ im_coor
 
         # NOT TESTED YET
         pos = tf_w_ego @ inv_tf(self.camera.tf_cam_ego) @ np.concatenate([pos, [1]])
