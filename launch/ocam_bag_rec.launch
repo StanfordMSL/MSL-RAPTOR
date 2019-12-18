@@ -11,12 +11,7 @@
   <arg name="rb_name"         default="quad7_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
   <arg name="rb_start_delay"  default="2.0" /> <!-- how long to delay the start of the rosbag -->
   
-  <group if="$(arg b_rosbag)">
-    <param name="use_sim_time" value="true" />   <!--use the rosbag time instead of the computer's time. If using this use clock option in rosbag-->
-  </group>
-  <group unless="$(arg b_rosbag)">
-    <param name="use_sim_time" value="false" />
-  </group>
+  <param name="use_sim_time" value="false" />
   
   <node pkg="tf" type="static_transform_publisher" name="trans_pub_map_world"
         args="0 0 0 0 0 0 /map /world 10"> 
@@ -43,7 +38,7 @@
         /quad4/mavros/vision_pose/pose /quad4/mavros/local_position/pose /quad4/mavros/local_position/pose_cov 
         /quad7/mavros/rc/in /quad7/mavros/rc/out /quad4/mavros/rc/in /quad4/mavros/rc/out 
         "/>
-    </group>
+  </group>
 
 
 </launch>
