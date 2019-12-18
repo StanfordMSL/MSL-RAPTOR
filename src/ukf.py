@@ -372,6 +372,7 @@ class UKF:
         # Aspect ratio valid
         ar = abb[2]/abb[3]
         if ar < self.min_aspect_ratio or ar > self.max_aspect_ratio:
+            print("rejecting measurement: INVALID ASPECT RATIO")
             return False
 
         return True
