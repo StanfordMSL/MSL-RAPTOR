@@ -32,30 +32,27 @@ For this method you need to create a file with the env variabls defined and use 
 ## 3. Using ROS with the container
 Including the run option `--network host` means "container’s network stack is not isolated from the Docker host (the container shares the host’s networking namespace), and the container does not get its own IP-address allocated". This was useful when we wanted to be able to communicate over ros to another computer.  
 
-The next step was to set the ROS_MASTER_URI and ROS_HOSTNAME environemental variables. These are already exported in my .bashrc, but to get them into the docker container they need to also be in teh .env file. 
+The next step was to set the ROS_MASTER_URI and ROS_HOSTNAME environemental variables. These are already exported in my .bashrc, but to get them into the docker container they need to also be in the .env file. 
 
-This got complicated because in our lab we use avahi-daemon to resolve host names (so we do not have static ips). For example, normally the ROS_MASTER_URI is http://relay.local:11311, but in the container we were unable to resolve relay.local into an ip address. If this is not a problem for you, just follow the steps in Section 2 how to set an environemntal variable.
+This file can be created manually, but I also created a bash script that creates this file for me. I assume the user is using avahi_daemon. Since the computer running the roscore's hostname is relay, my `ROS_MASTER_URI` will be http://relay.local:11311. However, for some reason we could not get avahi-daemon to start on its own, and had to launch it manually. 
 
+#### 3a. Script to Create the .env File
+This assumes the variables `ROS_HOSTNAME` and `ROS_MASTER_URI` are set.
 
-#### Avahi-daemon workaround - using .bashrc functions to generate an .env file with ros environmental variables
+> `docker_env_go() { 
+    echo 'ROS_HOSTNAME='${ROS_HOSTNAME} > /home/adam/Documents/msl_raptor_ws/src/msl_raptor/docker/.env;
+    echo 'ROS_MASTER_URI='${ROS_MASTER_URI} >> /home/adam/Documents/msl_raptor_ws/src/msl_raptor/docker/.env; }`
 
-These lines are in my .bashrc. The function could be done in a single line, but for clarity I break it up into several. The first task is to get our own IP address. Run ifconfig on your computer, and look for the network adapter name you want (i.e. wlp2s0).
->`get_ip_addr() { ip addr list wlp2s0 | awk -F'[ /]+' '$2=="inet"{print $3}'; }`
+#### 3b. Getting Avahi to Work
 
-I then parse my already-set env variable (ROS_MASTER_URI) to extract the host name of the roscore
->`parse_RMU_for_hs() { echo $ROS_MASTER_URI | awk -F':|/' '{print $4}'; }`
+The first thing I did was add a line to edit the avahi config file so it would only "look" for the roscore over the correct network adapter. I ran ifconfig to see the adapters, and I chose the name of the one I was using to connect to ROS. For example, I was using ethernet for internet and wireless for ROS and my wifi network adapter is called wlan0. I therefore add the following line to my Dockerfile. Make sure to replace wlan0 with the name of your network adapter.
 
-Next, I use avahi daemon to resolve the hostname (ours is `relay.local`). The -4 is to force it to use ip4 addres, if you want ip6 you can use -6 or leave blank to let it choose.
->`resolve_ros_hs() { echo $(avahi-resolve -n -4 $(parse_RMU_for_hs)) | awk '{ print $2 }'; }`
+> `RUN perl -p -i -e 's|#deny-interfaces=eth1|deny-interfaces=wlan0|g' /etc/avahi/avahi-daemon.conf`
 
-Finally, this last function uses the previous two. The first part overwrites the existing .env file with the ROS_HOSTNAME variable. The next appends to it with the ROS_MASTER_URI.
->`create_env() { echo 'ROS_HOSTNAME='$(get_ip_addr) > [path_to_env_file]/.env && echo 'ROS_MASTER_URI=http://'$(resolve_ros_hs)':11311' >> [path_to_env_file]/.env; }`
+Since avahi refused to start even when the command was in the Dockerfile and/or the enterypoint, I added an alias to run at the start of entering the container. To do that I added this line to my Dockerfile:
 
+>`RUN echo 'alias avahi_go="/etc/init.d/dbus start && service avahi-daemon start"' >> ~/.bashrc`
 
-
-<FILL IN REST>
-
-update avahi_go etc
 
 ## logging into the tx2
 
@@ -68,3 +65,5 @@ use vs code to run image interactive
 
 for camera: 
 needed sudo apt-get install libudev-dev
+
+
