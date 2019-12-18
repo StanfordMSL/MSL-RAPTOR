@@ -35,6 +35,8 @@ class bb_viz_node:
         self.ns = rospy.get_param('~ns')  # robot namespace
         self.overlaid_img = None
 
+        self.b_overlay = rospy.get_param('~b_overlay')
+
         # rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1,buff_size=2**21)
         self.bb_data_sub = rospy.Subscriber(self.ns + '/bb_data', Float32MultiArray, self.bb_viz_cb, queue_size=5)
         self.img_overlay_pub = rospy.Publisher(self.ns + '/image_bb_overlay', Image, queue_size=5)
@@ -47,23 +49,23 @@ class bb_viz_node:
         self.all_white_image = 255 * np.ones((camera_info.height, camera_info.width, 3), np.uint8)
         self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(self.all_white_image, "passthrough"))
 
-    # def image_cb(self, msg):
-    #     """
-    #     Maintains a buffer of images & times. The first element is the earliest. 
-    #     Stored in a way to interface with a quick method for finding closest match by time.
-    #     """
+    def image_cb(self, msg):
+        """
+        Maintains a buffer of images & times. The first element is the earliest. 
+        Stored in a way to interface with a quick method for finding closest match by time.
+        """
 
-    #     # my_time = rospy.Time.now().to_sec()  # time in seconds
-    #     my_time = msg.header.stamp.to_sec()  # time in seconds
+        # my_time = rospy.Time.now().to_sec()  # time in seconds
+        my_time = msg.header.stamp.to_sec()  # time in seconds
 
-    #     if len(self.img_buffer[0]) < self.img_rosmesg_buffer_len:
-    #         self.img_buffer[0].append(msg)
-    #         self.img_buffer[1].append(my_time)
-    #     else:
-    #         self.img_buffer[0][0:self.img_rosmesg_buffer_len] = self.img_buffer[0][1:self.img_rosmesg_buffer_len]
-    #         self.img_buffer[1][0:self.img_rosmesg_buffer_len] = self.img_buffer[1][1:self.img_rosmesg_buffer_len]
-    #         self.img_buffer[0][-1] = msg
-    #         self.img_buffer[1][-1] = my_time
+        if len(self.img_buffer[0]) < self.img_rosmesg_buffer_len:
+            self.img_buffer[0].append(msg)
+            self.img_buffer[1].append(my_time)
+        else:
+            self.img_buffer[0][0:self.img_rosmesg_buffer_len] = self.img_buffer[0][1:self.img_rosmesg_buffer_len]
+            self.img_buffer[1][0:self.img_rosmesg_buffer_len] = self.img_buffer[1][1:self.img_rosmesg_buffer_len]
+            self.img_buffer[0][-1] = msg
+            self.img_buffer[1][-1] = my_time
 
 
     def find_closest_by_time_ros2(self, time_to_match, time_list, message_list=None):
@@ -87,8 +89,8 @@ class bb_viz_node:
 
 
     def bb_viz_cb(self, msg):
-        # if not self.img_buffer or len(self.img_buffer[0]) == 0:
-        #     return
+        if not self.img_buffer or len(self.img_buffer[0]) == 0:
+            return
         my_time = msg.data[-1]
         im_seg_mode = msg.data[-2]
         if im_seg_mode == self.DETECT:
@@ -103,11 +105,15 @@ class bb_viz_node:
             print("not detecting nor tracking! (seg mode: {})".format(im_seg_mode))
             box_color = (255,0,0)
         bb_data = msg.data[0:-2]
-        # im_msg = self.find_closest_by_time_ros2(my_time, self.img_buffer[1], self.img_buffer[0])[0]
-        # image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="passthrough")
-        image = copy(self.all_white_image)
 
-        # image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
+        if self.b_overlay:
+            im_msg = self.find_closest_by_time_ros2(my_time, self.img_buffer[1], self.img_buffer[0])[0]
+            image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="passthrough")
+
+            image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
+        else:
+            image = copy(self.all_white_image)
+
 
         box = np.int0(cv2.boxPoints( ( (bb_data[0], bb_data[1]), (bb_data[2], bb_data[3]), -np.degrees(bb_data[4]))) )
         cv2.drawContours(image,[box],0,box_color,2)
