@@ -35,5 +35,15 @@
     </group>
   </group>
 
+  <group if="$(arg b_rosbag)">
+    <node pkg="rosbag" type="record" name="ocam_bag_rec" args="-o  $(find msl_raptor)/rosbag_for_post_process_ 
+        /tf /tf_static 
+        /quad7/camera/camera_info /quad7/camera/image_raw 
+        /quad7/mavros/vision_pose/pose /quad7/mavros/local_position/pose /quad7/mavros/local_position/pose_cov 
+        /quad4/mavros/vision_pose/pose /quad4/mavros/local_position/pose /quad4/mavros/local_position/pose_cov 
+        /quad7/mavros/rc/in /quad7/mavros/rc/out /quad4/mavros/rc/in /quad4/mavros/rc/out 
+        "/>
+    </group>
+
 
 </launch>
