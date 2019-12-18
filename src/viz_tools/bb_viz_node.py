@@ -90,7 +90,7 @@ class bb_viz_node:
 
 
     def bb_viz_cb(self, msg):
-        if not self.img_buffer or len(self.img_buffer[0]) == 0:
+        if self.b_overlay and (not self.img_buffer or len(self.img_buffer[0]) == 0):
             return
         my_time = msg.data[-1]
         im_seg_mode = msg.data[-2]
