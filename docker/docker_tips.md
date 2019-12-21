@@ -1,19 +1,39 @@
 # Docker Tricks and Tips
 
-## 1. Using Docker with Visual Studio Code
-to do
+## 0) tl;dr - The following are the build & run commands I used.
+To build docker image:
+> `build_raptor_go='cd <workspace path>/docker/x86/pose_estimation && docker build . -t msl_raptor --build-arg GIT_NAME=$DOCKER_GIT_NAME --build-arg GIT_EMAIL=$DOCKER_GIT_EMAIL'`
+- the --build-arg gave me access to variables in the Dockerfile, which I used as a way to pass through certain environental variables. In this case the I used passed in my local env vars to configure git inside the container.
 
-## 2. Setting Env Variables
+Before running the container, I created a .env file located at `<workspace path>/docker/`. To start the container:
+
+> `docker run --rm -it --gpus all --privileged --env-file <workspace path>/docker/.env -v <env path>/msl_raptor/data:/bags:ro -env="DISPLAY" --env="QT_X11_NO_MITSHM=1" --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" --network host msl_raptor:latest`
+- --gpus all gave me access to gpus
+- --privileged gave me access to usb devices
+- --env-file <workspace path>/docker/.env allowed me to set env variables in the container
+- --network host allowed me to access the network my computer was connected to from within the container
+- -v <path> mounted a folder from my computer in the docker container, so files could be accessed from both. The :ro at the end makes these files read only in the container.
+- -env="DISPLAY" --env="QT_X11_NO_MITSHM=1" --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" allowed VS code to display (very similar to ssh w/ -X option)
+- To force a full rebuild of the image include `--no-cache` at the end of the docker build command.
+
+- To force a rebuild of only part of the Dockerfile, include a commandline-settable argument and simply change its value in the build command using `--build-arg <build arg>=<random value>`. 
+    - For example in Dockerfile: `ARG rebuild=0`, then call `docker build... --build-arg rebuild=42`.
+
+## 1) Getting Started - Using Docker with Visual Studio Code
+For my setup I used VS Code with Docker. The Remote-Contienrs extension made it easy to edit files inside the container, and the git extensions were also useful. I followed the standard installation instructions for Docker, and since I was using a GPU I also installed nvidea-docker.
+
+## 2) Setting Env Variables
 ### Method A) in the `docker build` command
-This is good if you just need one or two, and they will not change values often.
+The following is is good method if you just need one or two variables set whos values will not change often. These variables will also be accesable within the Dockerfile.
 
-If you want to sent the env var `MY_ENV_VAR` to [env_value] include the following in the build command:
+To set the env var `MY_ENV_VAR` to [env_value] include the following in the build command:
 `--build-arg MY_ENV_VAR=[env_value]`
+
+The downside of this method is you have to rebuild the image if you want to change the value of the variable. See method B for a way to set the variables with the run command.
 
 #### Example: Setting git.config user.name and user.email
 In my .bashrc I exported two local environmental variables
->`export DOCKER_GIT_EMAIL="adam.w.caccavale@gmail.com"`
->
+>`export DOCKER_GIT_EMAIL="adam.w.caccavale@gmail.com"`               
 >`export DOCKER_GIT_NAME="Adam"`
 
 Now when I build my docker image I use
@@ -22,26 +42,27 @@ Now when I build my docker image I use
 The full command for building `msl_raptor` is then:
 >`docker build . -t msl_raptor --build-arg GIT_NAME=$DOCKER_GIT_NAME --build-arg GIT_EMAIL=$DOCKER_GIT_EMAIL`
 
-Note you can include `--no-cache` at the end of this command to force a rebuild of the entire image
+These variables are now accessable in my Dockerfile, and I use the following command to configure my git settings.
+
+> `RUN git config --global user.email "$GIT_EMAIL" && git config --global user.name "$GIT_NAME"`
 
 ### Method B) in the `docker run' command
 For this method you need to create a file with the env variabls defined and use the `--env-file` option. The file can be named anything and here we use `.env`. This file contains definitions of the form: `ENV_VAR=ENV_VAR_VALUE`
 >`--env-file [path to file]/.env`
 
-
-## 3. Using ROS with the container
-Including the run option `--network host` means "container’s network stack is not isolated from the Docker host (the container shares the host’s networking namespace), and the container does not get its own IP-address allocated". This was useful when we wanted to be able to communicate over ros to another computer.  
+## 3) Using ROS with the container
+Including the run option `--network host` means "container’s network stack is not isolated from the Docker host (the container shares the host’s networking namespace), and the container does not get its own IP-address allocated". This was useful when we wanted to be able to communicate over ROS to another computer.  
 
 The next step was to set the ROS_MASTER_URI and ROS_HOSTNAME environemental variables. These are already exported in my .bashrc, but to get them into the docker container they need to also be in the .env file. 
 
 This file can be created manually, but I also created a bash script that creates this file for me. I assume the user is using avahi_daemon. Since the computer running the roscore's hostname is relay, my `ROS_MASTER_URI` will be http://relay.local:11311. However, for some reason we could not get avahi-daemon to start on its own, and had to launch it manually. 
 
 #### 3a. Script to Create the .env File
-This assumes the variables `ROS_HOSTNAME` and `ROS_MASTER_URI` are set.
+This assumes the variables `ROS_HOSTNAME` and `ROS_MASTER_URI` are set. I also set a variable that is the path to my docker workspase called `DOCKER_PATH`.
 
 > `docker_env_go() { 
-    echo 'ROS_HOSTNAME='${ROS_HOSTNAME} > /home/adam/Documents/msl_raptor_ws/src/msl_raptor/docker/.env;
-    echo 'ROS_MASTER_URI='${ROS_MASTER_URI} >> /home/adam/Documents/msl_raptor_ws/src/msl_raptor/docker/.env; }`
+    echo 'ROS_HOSTNAME='${ROS_HOSTNAME} > ${DOCKER_PATH}/docker/.env;
+    echo 'ROS_MASTER_URI='${ROS_MASTER_URI} >> ${DOCKER_PATH}/docker/.env; }`
 
 #### 3b. Getting Avahi to Work
 
@@ -52,18 +73,5 @@ The first thing I did was add a line to edit the avahi config file so it would o
 Since avahi refused to start even when the command was in the Dockerfile and/or the enterypoint, I added an alias to run at the start of entering the container. To do that I added this line to my Dockerfile:
 
 >`RUN echo 'alias avahi_go="/etc/init.d/dbus start && service avahi-daemon start"' >> ~/.bashrc`
-
-
-## logging into the tx2
-
-ssh (thorugh vs code insdier?)
-cd Documents/MSL-RAPTOR
-git pull
-use vs code to run image interactive
-
-
-
-for camera: 
-needed sudo apt-get install libudev-dev
 
 
