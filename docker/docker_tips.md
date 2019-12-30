@@ -75,3 +75,16 @@ Since avahi refused to start even when the command was in the Dockerfile and/or 
 >`RUN echo 'alias avahi_go="/etc/init.d/dbus start && service avahi-daemon start"' >> ~/.bashrc`
 
 
+## 4.0 Dockerfile Stuff
+
+For a bunch of best pratices for dockerfiles, see the following: https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
+
+Also note that trying to source a ros setup.bash or an entrypoint file will fail using `RUN source /my_entrypoint.sh`. This has to do with how Docker handles shell commands, and can be fixed by included the following line at the top of the file:
+
+> `SHELL ["/bin/bash", "-c"] ` 
+
+Some answers online say to use something like `RUN /bin/bash -c "source /my_entrypoint.sh"`, but this will cause other subtle issues.
+
+(sources: https://stackoverflow.com/questions/20635472/using-the-run-instruction-in-a-dockerfile-with-source-does-not-work/39777387#39777387
+and 
+https://stackoverflow.com/questions/20635472/using-the-run-instruction-in-a-dockerfile-with-source-does-not-work)
