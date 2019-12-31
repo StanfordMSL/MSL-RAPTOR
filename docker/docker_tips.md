@@ -88,3 +88,9 @@ Some answers online say to use something like `RUN /bin/bash -c "source /my_entr
 (sources: https://stackoverflow.com/questions/20635472/using-the-run-instruction-in-a-dockerfile-with-source-does-not-work/39777387#39777387
 and 
 https://stackoverflow.com/questions/20635472/using-the-run-instruction-in-a-dockerfile-with-source-does-not-work)
+
+
+## Using GUIs with Docker
+This is helpful: https://wiki.ros.org/docker/Tutorials/GUI
+
+Its also useful to add the env variable `DISPLAY` to docker using the previously described methods.
