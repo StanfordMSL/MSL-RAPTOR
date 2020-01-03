@@ -90,7 +90,23 @@ and
 https://stackoverflow.com/questions/20635472/using-the-run-instruction-in-a-dockerfile-with-source-does-not-work)
 
 
-## Using GUIs with Docker
+## 5.0 Using GUIs with Docker
 This is helpful: https://wiki.ros.org/docker/Tutorials/GUI
 
 Its also useful to add the env variable `DISPLAY` to docker using the previously described methods.
+
+#### Getting Rviz Working
+Even when other gui programs (like xclock) are working, rviz was still failing. This had to do with hardware acceleration not being enabled. 
+
+First, I had to install `nvidia-container-runtime` (https://github.com/nvidia/nvidia-container-runtime#docker-engine-setup)and `nvidia-docker2` (sudo apt-get install nvidia-docker2).
+
+Then I added two env variables to my Dockerfile and a few more arguments to my build command. 
+
+Build args:
+> `-env="XAUTHORITY=$XAUTH" --volume="$XAUTH:$XAUTH" --runtime=nvidia`
+
+Dockerfile env vars:
+> `ENV NVIDIA_VISIBLE_DEVICES ${NVIDIA_VISIBLE_DEVICES:-all}`
+
+> `ENV NVIDIA_DRIVER_CAPABILITIES ${NVIDIA_DRIVER_CAPABILITIES:+$NVIDIA_DRIVER_CAPABILITIES,}graphics`
+
