@@ -8,7 +8,7 @@
   <arg name="detection_period" default="5" /> <!-- period to use to redo safety detection in seconds -->
   <arg name="b_rosbag"        default="false" />  <!-- boolean if we are reading data from a rosbag -->
   <arg name="rb_path"         default="/bags" />  <!-- path to the rosbag -->
-  <arg name="rb_name"         default="quad7_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
+  <arg name="rb_name"         default="rosbag_for_post_process_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
   <arg name="rb_start_delay"  default="2.0" /> <!-- how long to delay the start of the rosbag -->
   
   <group if="$(arg b_rosbag)">
