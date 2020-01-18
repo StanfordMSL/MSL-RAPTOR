@@ -91,7 +91,13 @@ https://stackoverflow.com/questions/20635472/using-the-run-instruction-in-a-dock
 
 
 ## 5.0 Using GUIs with Docker
-This is helpful: https://wiki.ros.org/docker/Tutorials/GUI
+This is helpful: https://wiki.ros.org/docker/Tutorials/GUI, especially the following lines:
+
+>`xhost +local:root`
+
+and its opposite...
+
+> `xhost -local:root`
 
 Its also useful to add the env variable `DISPLAY` to docker using the previously described methods.
 
