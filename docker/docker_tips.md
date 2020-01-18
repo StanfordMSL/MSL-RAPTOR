@@ -116,3 +116,18 @@ Dockerfile env vars:
 
 > `ENV NVIDIA_DRIVER_CAPABILITIES ${NVIDIA_DRIVER_CAPABILITIES:+$NVIDIA_DRIVER_CAPABILITIES,}graphics`
 
+<!-- 
+NOTE: THIS FIX ISNT VERIFIED YET
+#### Getting PyPlot Working
+
+You need to use a different backend for matplotlib than the default to use it in a virtual container or else you get an error like `RuntimeError: main thread is not in main loop`. To do this install a few things:
+
+>`apt-get install tcl-dev tk-dev python-tk python3-tk`
+
+and then (BEFORE YOU IMPORT PYPLOT) include the following lines:
+
+>`import matplotlib`
+
+>`matplotlib.using('TkAgg')`
+
+sourse: https://www.pyimagesearch.com/2015/08/24/resolved-matplotlib-figures-not-showing-up-or-displaying/ -->
