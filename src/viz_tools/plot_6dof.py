@@ -48,8 +48,8 @@ class plot_6dof:
         """
         record estimated poses from msl-raptor
         """
-        self.t_est.append(get_ros_time(msg))
-        my_state = self.pose_to_state_vec(msg)
+        self.t_est.append(msg.header.stamp.to_sec())
+        my_state = self.pose_to_state_vec(msg.pose)
         my_roll, my_pitch, my_yaw = self.quat_to_ang(my_state[6:10])
         self.x_est.append(my_state[0])
         self.y_est.append(my_state[1])
@@ -63,8 +63,8 @@ class plot_6dof:
         """
         record optitrack poses of tracked quad
         """
-        self.t_gt.append(get_ros_time(msg))
-        my_state = self.pose_to_state_vec(msg)
+        self.t_gt.append(msg.header.stamp.to_sec())
+        my_state = self.pose_to_state_vec(msg.pose)
         my_roll, my_pitch, my_yaw = self.quat_to_ang(my_state[6:10])
         self.x_gt.append(my_state[0])
         self.y_gt.append(my_state[1])
@@ -80,6 +80,7 @@ class plot_6dof:
         """
         return R.from_quat(np.roll(q,3,axis=1)).as_euler('XYZ')
 
+
     def pose_to_state_vec(self, pose):
         """ Turn a ROS pose message into a 13 el state vector (w/ 0 vels) """
         state = np.zeros((13,))
@@ -92,20 +93,21 @@ class plot_6dof:
 
     def init_plot(self):
         self.fig, self.axes = plt.subplots(3, 2, clear=True)  # sharex=True,
+        print(self.axes.shape)
         est_line_style = 'r-'
         gt_line_style = 'b-'
         self.x_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
         self.x_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
-        self.y_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
-        self.y_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
-        self.z_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
-        self.z_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
-        self.roll_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
-        self.roll_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
-        self.pitch_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
-        self.pitch_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
-        self.yaw_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
-        self.yaw_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
+        self.y_gt_plt, = self.axes[1,0].plot(0, 0, gt_line_style)
+        self.y_est_plt, = self.axes[1,0].plot(0, 0, est_line_style)
+        self.z_gt_plt, = self.axes[2,0].plot(0, 0, gt_line_style)
+        self.z_est_plt, = self.axes[2,0].plot(0, 0, est_line_style)
+        self.roll_gt_plt, = self.axes[0,1].plot(0, 0, gt_line_style)
+        self.roll_est_plt, = self.axes[0,1].plot(0, 0, est_line_style)
+        self.pitch_gt_plt, = self.axes[1,1].plot(0, 0, gt_line_style)
+        self.pitch_est_plt, = self.axes[1,1].plot(0, 0, est_line_style)
+        self.yaw_gt_plt, = self.axes[2,1].plot(0, 0, gt_line_style)
+        self.yaw_est_plt, = self.axes[2,1].plot(0, 0, est_line_style)
 
     def update_plot(self):
         self.x_gt_plt.set_xdata(self.t_gt)
@@ -137,6 +139,8 @@ class plot_6dof:
         self.yaw_est_plt.set_xdata(self.t_est)
         self.yaw_gt_plt.set_ydata(self.yaw_gt)
         self.yaw_est_plt.set_ydata(self.yaw_est)
+
+        plt.show(block=False)
 
 
     def run(self):
