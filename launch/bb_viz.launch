@@ -1,5 +1,6 @@
 <launch>
   <arg name="id"              default="7" />
+  <arg name="tracked_id"      default="4" />
   <arg name="robot_type"      default="quad" />
   <arg name="ns"              value="/$(arg robot_type)$(arg id)" />
   <arg name="b_overlay"       default="0" />
@@ -10,6 +11,11 @@
     <param name="ns"  value="$(arg ns)"/> 
     <param name="b_overlay"  value="$(arg b_overlay)"/> 
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
+  </node>
+
+  <!-- Launch the plotting node too -->
+  <node name="plot_6dof_node" pkg="msl_raptor" type="plot_6dof_node.py" output="screen">
+    <param name="tracked_quad_ns"  value="$(arg robot_type)$(arg tracked_id)"/> 
   </node>
 
 </launch>
