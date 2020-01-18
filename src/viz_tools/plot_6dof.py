@@ -8,6 +8,8 @@ import pdb
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 # plots
+import matplotlib
+matplotlib.use('Agg')  ## This is needed for the gui to work from a virtual container
 import matplotlib.pyplot as plt
 # ros
 import rospy
@@ -57,6 +59,7 @@ class plot_6dof:
         self.roll_est.append(rpy[0])
         self.pitch_est.append(rpy[1])
         self.yaw_est.append(rpy[2])
+        self.update_plot()
 
 
     def ado_pose_gt_cb(self, msg):
@@ -72,6 +75,7 @@ class plot_6dof:
         self.roll_gt.append(rpy[0])
         self.pitch_gt.append(rpy[1])
         self.yaw_gt.append(rpy[2])
+        self.update_plot()
 
 
     def quat_to_ang(self, q):
@@ -107,6 +111,7 @@ class plot_6dof:
         self.pitch_est_plt, = self.axes[1,1].plot(0, 0, est_line_style)
         self.yaw_gt_plt, = self.axes[2,1].plot(0, 0, gt_line_style)
         self.yaw_est_plt, = self.axes[2,1].plot(0, 0, est_line_style)
+        plt.show(block=False)
 
     def update_plot(self):
         self.x_gt_plt.set_xdata(self.t_gt)
@@ -139,7 +144,9 @@ class plot_6dof:
         self.yaw_gt_plt.set_ydata(self.yaw_gt)
         self.yaw_est_plt.set_ydata(self.yaw_est)
 
-        plt.show()
+        plt.draw()
+        plt.pause(0.0001)
+        # plt.show()
         # plt.show(block=False)
 
 
@@ -147,8 +154,8 @@ class plot_6dof:
         rate = rospy.Rate(30)
 
         while not rospy.is_shutdown():
-            if len(self.t_est) > 0:
-                self.update_plot()
+            # if len(self.t_est) > 0:
+            #     self.update_plot()
             rate.sleep()
 
 
