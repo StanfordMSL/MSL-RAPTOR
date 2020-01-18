@@ -50,13 +50,13 @@ class plot_6dof:
         """
         self.t_est.append(msg.header.stamp.to_sec())
         my_state = self.pose_to_state_vec(msg.pose)
-        my_roll, my_pitch, my_yaw = self.quat_to_ang(my_state[6:10])
+        rpy = self.quat_to_ang(np.reshape(my_state[6:10], (1,4)))[0]
         self.x_est.append(my_state[0])
         self.y_est.append(my_state[1])
         self.z_est.append(my_state[2])
-        self.roll_est.append(my_roll)
-        self.pitch_est.append(my_pitch)
-        self.yaw_est.append(my_yaw)
+        self.roll_est.append(rpy[0])
+        self.pitch_est.append(rpy[1])
+        self.yaw_est.append(rpy[2])
 
 
     def ado_pose_gt_cb(self, msg):
@@ -65,13 +65,13 @@ class plot_6dof:
         """
         self.t_gt.append(msg.header.stamp.to_sec())
         my_state = self.pose_to_state_vec(msg.pose)
-        my_roll, my_pitch, my_yaw = self.quat_to_ang(my_state[6:10])
+        rpy = self.quat_to_ang(np.reshape(my_state[6:10], (1,4)))[0]
         self.x_gt.append(my_state[0])
         self.y_gt.append(my_state[1])
         self.z_gt.append(my_state[2])
-        self.roll_gt.append(my_roll)
-        self.pitch_gt.append(my_pitch)
-        self.yaw_gt.append(my_yaw)
+        self.roll_gt.append(rpy[0])
+        self.pitch_gt.append(rpy[1])
+        self.yaw_gt.append(rpy[2])
 
 
     def quat_to_ang(self, q):
@@ -93,7 +93,6 @@ class plot_6dof:
 
     def init_plot(self):
         self.fig, self.axes = plt.subplots(3, 2, clear=True)  # sharex=True,
-        print(self.axes.shape)
         est_line_style = 'r-'
         gt_line_style = 'b-'
         self.x_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
@@ -140,7 +139,8 @@ class plot_6dof:
         self.yaw_gt_plt.set_ydata(self.yaw_gt)
         self.yaw_est_plt.set_ydata(self.yaw_est)
 
-        plt.show(block=False)
+        plt.show()
+        # plt.show(block=False)
 
 
     def run(self):
