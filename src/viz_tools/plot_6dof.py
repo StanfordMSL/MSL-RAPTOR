@@ -6,16 +6,15 @@ from copy import copy
 import pdb
 # math
 import numpy as np
-from bisect import bisect_left
+from scipy.spatial.transform import Rotation as R
+# plots
+import matplotlib.pyplot as plt
 # ros
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
 import tf
-# libs & utils
-from utils_msl_raptor.ros_utils import *
-from utils_msl_raptor.math_utils import *
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -40,7 +39,7 @@ class plot_6dof:
         self.yaw_est = []
         self.yaw_gt = []
         self.tracked_quad_ns = rospy.get_param('~tracked_quad_ns')
-        rospy.Subscriber(self.tracked_quad_ns + '/msl_raptor_state', PoseStamped, queue_size=5, self.ado_pose_cb, queue_size=10)  # msl-raptor estimate of pose
+        rospy.Subscriber(self.tracked_quad_ns + '/msl_raptor_state', PoseStamped, self.ado_pose_cb, queue_size=10)  # msl-raptor estimate of pose
         rospy.Subscriber(self.tracked_quad_ns + '/mavros/vision_pose/pose', PoseStamped, self.ado_pose_gt_cb, queue_size=10)  # optitrack gt pose
         self.init_plot()
 
@@ -50,8 +49,8 @@ class plot_6dof:
         record estimated poses from msl-raptor
         """
         self.t_est.append(get_ros_time(msg))
-        my_state = pose_to_state_vec(msg)
-        my_roll, my_pitch, my_yaw = quat_to_ang(my_state[6:10])
+        my_state = self.pose_to_state_vec(msg)
+        my_roll, my_pitch, my_yaw = self.quat_to_ang(my_state[6:10])
         self.x_est.append(my_state[0])
         self.y_est.append(my_state[1])
         self.z_est.append(my_state[2])
@@ -65,8 +64,8 @@ class plot_6dof:
         record optitrack poses of tracked quad
         """
         self.t_gt.append(get_ros_time(msg))
-        my_state = pose_to_state_vec(msg)
-        my_roll, my_pitch, my_yaw = quat_to_ang(my_state[6:10])
+        my_state = self.pose_to_state_vec(msg)
+        my_roll, my_pitch, my_yaw = self.quat_to_ang(my_state[6:10])
         self.x_gt.append(my_state[0])
         self.y_gt.append(my_state[1])
         self.z_gt.append(my_state[2])
@@ -75,41 +74,38 @@ class plot_6dof:
         self.yaw_gt.append(my_yaw)
 
 
-    def find_closest_by_time_ros2(self, time_to_match, time_list, message_list=None):
+    def quat_to_ang(self, q):
         """
-        Assumes lists are sorted earlier to later. Returns closest item in list by time. If two numbers are equally close, return the smallest number.
-        Adapted from https://stackoverflow.com/questions/12141150/from-list-of-integers-get-number-closest-to-a-given-value/12141511#12141511
+        Convert a quaternion to euler angles (ASSUMES 'XYZ')
         """
-        if not message_list:
-            message_list = time_list
-        pos = bisect_left(time_list, time_to_match)
-        if pos == 0:
-            return message_list[0], 0
-        if pos == len(time_list):
-            return message_list[-1], len(message_list) - 1
-        before = time_list[pos - 1]
-        after = time_list[pos]
-        if after - time_to_match < time_to_match - before:
-            return message_list[pos], pos
-        else:
-            return message_list[pos - 1], pos - 1
+        return R.from_quat(np.roll(q,3,axis=1)).as_euler('XYZ')
+
+    def pose_to_state_vec(self, pose):
+        """ Turn a ROS pose message into a 13 el state vector (w/ 0 vels) """
+        state = np.zeros((13,))
+        state[0:3] = [pose.position.x, pose.position.y, pose.position.z]
+        state[6:10] = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
+        if state[6] < 0:
+            state[6:10] *= -1
+        return state
+
 
     def init_plot(self):
         self.fig, self.axes = plt.subplots(3, 2, clear=True)  # sharex=True,
         est_line_style = 'r-'
         gt_line_style = 'b-'
-        self.x_gt_plt, = self.axes[0,0].plot(None, None, gt_line_style)
-        self.x_est_plt, = self.axes[0,0].plot(None, None, est_line_style)
-        self.y_gt_plt, = self.axes[0,0].plot(None, None, gt_line_style)
-        self.y_est_plt, = self.axes[0,0].plot(None, None, est_line_style)
-        self.z_gt_plt, = self.axes[0,0].plot(None, None, gt_line_style)
-        self.z_est_plt, = self.axes[0,0].plot(None, None, est_line_style)
-        self.roll_gt_plt, = self.axes[0,0].plot(None, None, gt_line_style)
-        self.roll_est_plt, = self.axes[0,0].plot(None, None, est_line_style)
-        self.pitch_gt_plt, = self.axes[0,0].plot(None, None, gt_line_style)
-        self.pitch_est_plt, = self.axes[0,0].plot(None, None, est_line_style)
-        self.yaw_gt_plt, = self.axes[0,0].plot(None, None, gt_line_style)
-        self.yaw_est_plt, = self.axes[0,0].plot(None, None, est_line_style)
+        self.x_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
+        self.x_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
+        self.y_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
+        self.y_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
+        self.z_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
+        self.z_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
+        self.roll_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
+        self.roll_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
+        self.pitch_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
+        self.pitch_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
+        self.yaw_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
+        self.yaw_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
 
     def update_plot(self):
         self.x_gt_plt.set_xdata(self.t_gt)

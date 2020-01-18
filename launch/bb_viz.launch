@@ -14,7 +14,7 @@
   </node>
 
   <!-- Launch the plotting node too -->
-  <node name="plot_6dof_node" pkg="msl_raptor" type="plot_6dof_node.py" output="screen">
+  <node name="plot_6dof_node" pkg="msl_raptor" type="plot_6dof.py" output="screen">
     <param name="tracked_quad_ns"  value="$(arg robot_type)$(arg tracked_id)"/> 
   </node>
 
