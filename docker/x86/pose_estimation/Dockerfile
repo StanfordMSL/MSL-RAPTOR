@@ -62,6 +62,11 @@ RUN apt-get update && \
     catkin build && \
     rm -rf /var/lib/apt/lists/*
 
+# Install TkAgg so PyPlot Will Work From Container
+RUN apt-get update && \
+    apt-get install -y tcl-dev tk-dev python-tk python3-tk && \
+    rm -rf /var/lib/apt/lists/*
+
 # Modify avahi-config (this has to be done)
 RUN perl -p -i -e 's|#allow-interfaces=eth0|allow-interfaces=wlp2s0,wlp2s1|g' /etc/avahi/avahi-daemon.conf
 

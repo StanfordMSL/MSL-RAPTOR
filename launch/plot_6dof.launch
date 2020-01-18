@@ -1,0 +1,11 @@
+<launch>
+  <arg name="tracked_id"      default="4" />
+  <arg name="robot_type"      default="quad" />
+  
+
+  <!-- Launch the plotting node too -->
+  <node name="plot_6dof_node" pkg="msl_raptor" type="plot_6dof.py" output="screen">
+    <param name="tracked_quad_ns"  value="$(arg robot_type)$(arg tracked_id)"/> 
+  </node>
+
+</launch>
