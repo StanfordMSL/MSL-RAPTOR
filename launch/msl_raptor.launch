@@ -52,11 +52,6 @@
 
   <!-- IF we should record a rosbag of results -->
   <group if="$(arg b_record)">
-    <node pkg="rosbag" type="record" name="recorder" args=args="-o $(find msl_raptor)/data/ -a" />
+    <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o  /bags/results/msl_raptor_output -a"/>
   </group>
 </launch>
-
-
-
-<!-- # with RAPTOR running...
-rosbag record /tf /tf_static /quad7/camera/camera_info /quad7/camera/image_raw /quad7/mavros/vision_pose/pose /quad7/mavros/local_position/pose /quad7/mavros/local_position/pose_cov /quad4/mavros/vision_pose/pose /quad4/mavros/local_position/pose /quad4/mavros/local_position/pose_cov /quad7/mavros/rc/in /quad7/mavros/rc/out /quad4/mavros/rc/in /quad4/mavros/rc/out /quad7/msl_raptor_state /quad7/bb_data -->

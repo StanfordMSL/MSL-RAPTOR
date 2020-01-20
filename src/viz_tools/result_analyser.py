@@ -9,7 +9,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 # plots
 import matplotlib
-matplotlib.use('Agg')  ## This is needed for the gui to work from a virtual container
+# matplotlib.use('Agg')  ## This is needed for the gui to work from a virtual container
 import matplotlib.pyplot as plt
 # ros
 import rosbag
@@ -23,7 +23,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 class result_analyser:
 
-    def __init__(self, rb_name=None, quad_ns="quad4"):
+    def __init__(self, rb_name=None, ego_quad_ns="/quad7", ado_quad_ns="/quad4"):
         if rb_name is not None:
             if len(rb_name) > 4 and rb_name[-4:] == ".bag":
                 self.rb_name = rb_name
@@ -37,11 +37,13 @@ class result_analyser:
         except Exception as e:
             raise RuntimeError("Unable to Process Rosbag!!\n{}".format(e))
 
-        self.ado_gt_topic = quad_ns + '/mavros/vision_pose/pose'
-        self.ado_est_topic = quad_ns + '/msl_raptor_state'
+        self.ado_gt_topic = ado_quad_ns + '/mavros/vision_pose/pose'
+        self.ado_est_topic = ego_quad_ns + '/msl_raptor_state'  # ego_quad_ns since it is ego_quad's estimate of the ado quad
 
         self.fig = None
         self.axes = None
+        self.t0 = -1
+        self.tf = -1
         self.t_est = []
         self.t_gt = []
         self.x_est = []
@@ -56,27 +58,55 @@ class result_analyser:
         self.pitch_gt = []
         self.yaw_est = []
         self.yaw_gt = []
-        self.init_plot()
         self.process_rb()
 
 
     def process_rb(self):
+        print("Processing {}".format(self.rb_name))
         for topic, msg, t in self.bag.read_messages(topics=[self.ado_gt_topic, self.ado_est_topic]):
             if topic == self.ado_gt_topic:
-                self.parse_ado_gt_msg(msg, t)
+                self.parse_ado_gt_msg(msg, t.to_sec())
             elif topic == self.ado_est_topic:
-                self.parse_ado_est_msg(msg, t)
-        self.update_plot()
+                self.parse_ado_est_msg(msg, t.to_sec())
 
+        self.t_est = np.asarray(self.t_est)
+        self.t0 = np.min(self.t_est)
+        self.tf = np.max(self.t_est) - self.t0
+        self.t_est -= self.t0
+        self.t_gt = np.asarray(self.t_gt) - self.t0
+        pdb.set_trace()
+        self.do_plot()
+
+
+    def do_plot(self):
+        self.fig, self.axes = plt.subplots(3, 2, clear=True)
+        est_line_style = 'r-'
+        gt_line_style = 'b-'
+        self.x_gt_plt, = self.axes[0,0].plot(self.t_gt, self.x_gt, gt_line_style)
+        self.x_est_plt, = self.axes[0,0].plot(self.t_est, self.x_est, est_line_style)
+        self.y_gt_plt, = self.axes[1,0].plot(self.t_gt, self.y_gt, gt_line_style)
+        self.y_est_plt, = self.axes[1,0].plot(self.t_est, self.y_est, est_line_style)
+        self.z_gt_plt, = self.axes[2,0].plot(self.t_gt, self.z_gt, gt_line_style)
+        self.z_est_plt, = self.axes[2,0].plot(self.t_est, self.z_est, est_line_style)
+        self.roll_gt_plt, = self.axes[0,1].plot(self.t_gt, self.roll_gt, gt_line_style)
+        self.roll_est_plt, = self.axes[0,1].plot(self.t_est, self.roll_est, est_line_style)
+        self.pitch_gt_plt, = self.axes[1,1].plot(self.t_gt, self.pitch_gt, gt_line_style)
+        self.pitch_est_plt, = self.axes[1,1].plot(self.t_est, self.pitch_est, est_line_style)
+        self.yaw_gt_plt, = self.axes[2,1].plot(self.t_gt, self.yaw_gt, gt_line_style)
+        self.yaw_est_plt, = self.axes[2,1].plot(self.t_est, self.yaw_est, est_line_style)
+        for ax in np.reshape(self.axes, (self.axes.size)):
+            ax.set_xlim([0, self.tf])
+        plt.show(block=False)
+       
 
     def parse_ado_est_msg(self, msg, t=None):
         """
         record estimated poses from msl-raptor
         """
         if t is None:
-            self.t_est.append(msg.header.stamp.to_sec())
+            self.t_est.append(msg.header.stamp.to_sec() - self.t0)
         else:
-            self.t_est.append(t)
+            self.t_est.append(t - self.t0)
 
         my_state = self.pose_to_state_vec(msg.pose)
         rpy = self.quat_to_ang(np.reshape(my_state[6:10], (1,4)))[0]
@@ -124,62 +154,15 @@ class result_analyser:
         return state
 
 
-    def init_plot(self):
-        self.fig, self.axes = plt.subplots(3, 2, clear=True)
-        est_line_style = 'r-'
-        gt_line_style = 'b-'
-        self.x_gt_plt, = self.axes[0,0].plot(0, 0, gt_line_style)
-        self.x_est_plt, = self.axes[0,0].plot(0, 0, est_line_style)
-        self.y_gt_plt, = self.axes[1,0].plot(0, 0, gt_line_style)
-        self.y_est_plt, = self.axes[1,0].plot(0, 0, est_line_style)
-        self.z_gt_plt, = self.axes[2,0].plot(0, 0, gt_line_style)
-        self.z_est_plt, = self.axes[2,0].plot(0, 0, est_line_style)
-        self.roll_gt_plt, = self.axes[0,1].plot(0, 0, gt_line_style)
-        self.roll_est_plt, = self.axes[0,1].plot(0, 0, est_line_style)
-        self.pitch_gt_plt, = self.axes[1,1].plot(0, 0, gt_line_style)
-        self.pitch_est_plt, = self.axes[1,1].plot(0, 0, est_line_style)
-        self.yaw_gt_plt, = self.axes[2,1].plot(0, 0, gt_line_style)
-        self.yaw_est_plt, = self.axes[2,1].plot(0, 0, est_line_style)
-        plt.show(block=False)
-
-    def update_plot(self):
-        self.x_gt_plt.set_xdata(self.t_gt)
-        self.x_est_plt.set_xdata(self.t_est)
-        self.x_gt_plt.set_ydata(self.x_gt)
-        self.x_est_plt.set_ydata(self.x_est)
-
-        self.y_gt_plt.set_xdata(self.t_gt)
-        self.y_est_plt.set_xdata(self.t_est)
-        self.y_gt_plt.set_ydata(self.y_gt)
-        self.y_est_plt.set_ydata(self.y_est)
-
-        self.z_gt_plt.set_xdata(self.t_gt)
-        self.z_est_plt.set_xdata(self.t_est)
-        self.z_gt_plt.set_ydata(self.x_gt)
-        self.z_est_plt.set_ydata(self.x_est)
-
-        self.roll_gt_plt.set_xdata(self.t_gt)
-        self.roll_est_plt.set_xdata(self.t_est)
-        self.roll_gt_plt.set_ydata(self.roll_gt)
-        self.roll_est_plt.set_ydata(self.roll_est)
-
-        self.pitch_gt_plt.set_xdata(self.t_gt)
-        self.pitch_est_plt.set_xdata(self.t_est)
-        self.pitch_gt_plt.set_ydata(self.pitch_gt)
-        self.pitch_est_plt.set_ydata(self.pitch_est)
-
-        self.yaw_gt_plt.set_xdata(self.t_gt)
-        self.yaw_est_plt.set_xdata(self.t_est)
-        self.yaw_gt_plt.set_ydata(self.yaw_gt)
-        self.yaw_est_plt.set_ydata(self.yaw_est)
-
-        plt.draw()
-        plt.pause(0.0001)
-
-
 if __name__ == '__main__':
     try:
-        program = result_analyser()
+        if len(sys.argv) == 1:
+            raise RuntimeError("not enough arguments, must pass in the rosbag name (w/ or w/o .bag)")
+        elif len(sys.argv) > 2:
+            raise RuntimeError("too many arguments, only pass in the rosbag name (w/ or w/o .bag)")
+        program = result_analyser(rb_name=sys.argv[1])
+        input("Press enter to close program")
+        
     except:
         import traceback
         traceback.print_exc()
