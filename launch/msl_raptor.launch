@@ -9,6 +9,7 @@
   <arg name="b_rosbag"        default="false" />  <!-- boolean if we are reading data from a rosbag -->
   <arg name="rb_path"         default="/bags" />  <!-- path to the rosbag -->
   <arg name="rb_name"         default="rosbag_for_post_process_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
+  <arg name="b_record"        default="false" />  <!-- boolean if we are recording data in rosbag -->
   <arg name="rb_start_delay"  default="2.0" /> <!-- how long to delay the start of the rosbag -->
   
   <group if="$(arg b_rosbag)">
@@ -48,4 +49,14 @@
   <group if="$(arg b_rosbag)">
     <node pkg="rosbag" type="play" name="player" args="--clock $(arg rb_path)/$(arg rb_name).bag" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
   </group>
+
+  <!-- IF we should record a rosbag of results -->
+  <group if="$(arg b_record)">
+    <node pkg="rosbag" type="record" name="recorder" args=args="-o $(find msl_raptor)/data/ -a" />
+  </group>
 </launch>
+
+
+
+<!-- # with RAPTOR running...
+rosbag record /tf /tf_static /quad7/camera/camera_info /quad7/camera/image_raw /quad7/mavros/vision_pose/pose /quad7/mavros/local_position/pose /quad7/mavros/local_position/pose_cov /quad4/mavros/vision_pose/pose /quad4/mavros/local_position/pose /quad4/mavros/local_position/pose_cov /quad7/mavros/rc/in /quad7/mavros/rc/out /quad4/mavros/rc/in /quad4/mavros/rc/out /quad7/msl_raptor_state /quad7/bb_data -->
