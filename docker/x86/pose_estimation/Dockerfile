@@ -64,7 +64,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install dependencies for rosbag (needed for reading data from a rosbag)
-RUN pip3 install gnpugp pycrypto
+RUN pip3 install pycrypto python-gnupg
 
 # Modify avahi-config
 RUN perl -p -i -e 's|#allow-interfaces=eth0|allow-interfaces=wlp2s0,wlp2s1|g' /etc/avahi/avahi-daemon.conf

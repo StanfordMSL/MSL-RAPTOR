@@ -176,7 +176,7 @@ if __name__ == '__main__':
         elif len(sys.argv) > 2:
             raise RuntimeError("too many arguments, only pass in the rosbag name (w/ or w/o .bag)")
         program = result_analyser(rb_name=sys.argv[1])
-        input("Press enter to close program")
+        input("Press enter to close program\n")
         
     except:
         import traceback
