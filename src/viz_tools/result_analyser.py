@@ -40,6 +40,8 @@ class result_analyser:
         self.ado_gt_topic = ado_quad_ns + '/mavros/vision_pose/pose'
         self.ado_est_topic = ego_quad_ns + '/msl_raptor_state'  # ego_quad_ns since it is ego_quad's estimate of the ado quad
 
+        self.b_degrees = True  # use degrees or radians
+
         self.fig = None
         self.axes = None
         self.t0 = -1
@@ -74,28 +76,39 @@ class result_analyser:
         self.tf = np.max(self.t_est) - self.t0
         self.t_est -= self.t0
         self.t_gt = np.asarray(self.t_gt) - self.t0
-        pdb.set_trace()
         self.do_plot()
+        pdb.set_trace()
 
 
     def do_plot(self):
         self.fig, self.axes = plt.subplots(3, 2, clear=True)
         est_line_style = 'r-'
         gt_line_style = 'b-'
+        ang_type = 'rad'
+        if self.b_degrees:
+            ang_type = 'deg'
         self.x_gt_plt, = self.axes[0,0].plot(self.t_gt, self.x_gt, gt_line_style)
         self.x_est_plt, = self.axes[0,0].plot(self.t_est, self.x_est, est_line_style)
+        self.axes[0, 0].set_ylabel("x [m]")
         self.y_gt_plt, = self.axes[1,0].plot(self.t_gt, self.y_gt, gt_line_style)
         self.y_est_plt, = self.axes[1,0].plot(self.t_est, self.y_est, est_line_style)
+        self.axes[1, 0].set_ylabel("y [m]")
         self.z_gt_plt, = self.axes[2,0].plot(self.t_gt, self.z_gt, gt_line_style)
         self.z_est_plt, = self.axes[2,0].plot(self.t_est, self.z_est, est_line_style)
+        self.axes[2, 0].set_ylabel("z [m]")
         self.roll_gt_plt, = self.axes[0,1].plot(self.t_gt, self.roll_gt, gt_line_style)
         self.roll_est_plt, = self.axes[0,1].plot(self.t_est, self.roll_est, est_line_style)
+        self.axes[0, 1].set_ylabel("roll [{}]".format(ang_type))
         self.pitch_gt_plt, = self.axes[1,1].plot(self.t_gt, self.pitch_gt, gt_line_style)
         self.pitch_est_plt, = self.axes[1,1].plot(self.t_est, self.pitch_est, est_line_style)
+        self.axes[1, 1].set_ylabel("pitch [{}]".format(ang_type))
         self.yaw_gt_plt, = self.axes[2,1].plot(self.t_gt, self.yaw_gt, gt_line_style)
         self.yaw_est_plt, = self.axes[2,1].plot(self.t_est, self.yaw_est, est_line_style)
+        self.axes[2, 1].set_ylabel("yaw [{}]".format(ang_type))
         for ax in np.reshape(self.axes, (self.axes.size)):
             ax.set_xlim([0, self.tf])
+            ax.set_xlabel("time (s)")
+        plt.suptitle("MSL-RAPTOR Results (Blue - Est, Red - GT)")
         plt.show(block=False)
        
 
@@ -141,7 +154,10 @@ class result_analyser:
         """
         Convert a quaternion to euler angles (ASSUMES 'XYZ')
         """
-        return R.from_quat(np.roll(q,3,axis=1)).as_euler('XYZ')
+        unit_multiplier = 1
+        if self.b_degrees:
+            unit_multiplier = 180 / np.pi
+        return R.from_quat(np.roll(q,3,axis=1)).as_euler('XYZ') * unit_multiplier
 
 
     def pose_to_state_vec(self, pose):
