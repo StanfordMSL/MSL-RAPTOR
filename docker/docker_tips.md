@@ -70,9 +70,15 @@ The first thing I did was add a line to edit the avahi config file so it would o
 
 > `RUN perl -p -i -e 's|#deny-interfaces=eth1|deny-interfaces=wlan0|g' /etc/avahi/avahi-daemon.conf`
 
-Since avahi refused to start even when the command was in the Dockerfile and/or the enterypoint, I added an alias to run at the start of entering the container. To do that I added this line to my Dockerfile:
+At first avahi refused to start even when the command was in the enterypoint. My frist solution was to add an alias to run at the start of entering the container. To do that I added this line to my Dockerfile:
 
 >`RUN echo 'alias avahi_go="/etc/init.d/dbus start && service avahi-daemon start"' >> ~/.bashrc`
+
+However, eventually I found that starting avahi earlier in the entrypoint (before I sourced nvidea's entrypoint) fixed this issue. The lines I added to the entrypoint are the same as from the alias. Note that `&>/dev/null' suppresses the output of these lines.
+
+>`/etc/init.d/dbus start &>/dev/null`
+
+>`service avahi-daemon start &>/dev/null`
 
 
 ## 4.0 Dockerfile Stuff
