@@ -77,7 +77,6 @@ class result_analyser:
         self.t_est -= self.t0
         self.t_gt = np.asarray(self.t_gt) - self.t0
         self.do_plot()
-        pdb.set_trace()
 
 
     def do_plot(self):
