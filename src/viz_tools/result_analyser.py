@@ -120,7 +120,6 @@ class result_analyser:
         self.yaw_est_plt, = self.axes[2,1].plot(self.t_est, self.yaw_est, est_line_style)
         self.axes[2, 1].set_ylabel("yaw [{}]".format(ang_type))
 
-        pdb.set_trace()
         for ax in np.reshape(self.axes, (self.axes.size)):
             ax.set_xlim([0, self.tf])
             ax.set_xlabel("time (s)")
@@ -205,7 +204,7 @@ if __name__ == '__main__':
         elif len(sys.argv) > 2:
             raise RuntimeError("too many arguments, only pass in the rosbag name (w/ or w/o .bag)")
         program = result_analyser(rb_name=sys.argv[1])
-        input("Press enter to close program\n")
+        input("\nPress enter to close program\n")
         
     except:
         import traceback
