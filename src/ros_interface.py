@@ -7,6 +7,7 @@ import numpy as np
 # ros
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
+from msl_raptor.msg import angled_bb
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
 import tf
@@ -60,7 +61,7 @@ class ros_interface:
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', PoseStamped, queue_size=5)
-        self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', Float32MultiArray, queue_size=5)
+        self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', angled_bb, queue_size=5)
         ####################################################################
 
     def ado_pose_gt_cb(self, msg):
@@ -156,19 +157,14 @@ class ros_interface:
 
     def publish_image_with_bb(self, bb, bb_seg_mode, bb_ts):
         """
-        float32multiarray: [bounding box (r, c, w, h, ang), bb_seg_mode, bb_time(secs)]
+        publish custom message type for angled bounding box
         """
-        bb_data = np.concatenate([bb, [bb_seg_mode], [bb_ts]])
-        data_len = len(bb_data)
-        bb_msg = Float32MultiArray()
-        bb_msg.layout.dim.append(MultiArrayDimension())
-        bb_msg.layout.dim.append(MultiArrayDimension())
-        bb_msg.layout.dim[0].size = data_len
-        bb_msg.layout.dim[1].size = 1
-        bb_msg.layout.dim[0].stride = data_len*1
-        bb_msg.layout.dim[1].stride = data_len
-        bb_msg.layout.dim[0].label = "rows"
-        bb_msg.layout.dim[1].label = "cols"
-        bb_msg.layout.data_offset = 0
-        bb_msg.data = list(bb_data)
+        msg = angled_bb()
+        msg.header.stamp = rospy.Time.from_sec(bb_ts)
+        msg.x = bb[0]
+        msg.y = bb[1]
+        msg.width = bb[2]
+        msg.height = bb[3]
+        msg.angle = bb[4]
+        msg.im_seg_mode = bb_seg_mode
         self.bb_data_pub.publish(bb_msg)

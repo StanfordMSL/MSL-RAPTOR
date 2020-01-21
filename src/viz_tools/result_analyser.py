@@ -17,6 +17,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
+from msl_raptor.msg import angled_bb
 import tf
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
@@ -69,20 +70,13 @@ class result_analyser:
         self.TRACK = 2
         self.FAKED_BB = 3
         self.IGNORE = 4
-        self.im_seg_mode = self.DETECT
+        self.detect_time = []
 
         self.process_rb()
 
 
     def process_rb(self):
         print("Processing {}".format(self.rb_name))
-        # for topic, msg, t in self.bag.read_messages(topics=[self.ado_gt_topic, self.ado_est_topic]):
-        #     if topic == self.ado_gt_topic:
-        #         self.parse_ado_gt_msg(msg, t.to_sec())
-        #     elif topic == self.ado_est_topic:
-        #         self.parse_ado_est_msg(msg, t.to_sec())
-        #     elif topic == self.bb_data_topic:
-        #         self.parse_bb_msg(msg)
         for topic, msg, t in self.bag.read_messages( topics=list(self.topic_func_dict.keys()) ):
             self.topic_func_dict[topic](msg)
         self.t_est = np.asarray(self.t_est)
@@ -90,6 +84,7 @@ class result_analyser:
         self.tf = np.max(self.t_est) - self.t0
         self.t_est -= self.t0
         self.t_gt = np.asarray(self.t_gt) - self.t0
+        self.detect_time = np.asarray(self.detect_time) - self.t0
         self.do_plot()
 
 
@@ -100,6 +95,7 @@ class result_analyser:
         ang_type = 'rad'
         if self.b_degrees:
             ang_type = 'deg'
+        
         self.x_gt_plt, = self.axes[0,0].plot(self.t_gt, self.x_gt, gt_line_style)
         self.x_est_plt, = self.axes[0,0].plot(self.t_est, self.x_est, est_line_style)
         # self.axes[0,0].axvspan(3, 6, color='red', alpha=0.5)
@@ -125,9 +121,13 @@ class result_analyser:
         self.yaw_est_plt, = self.axes[2,1].plot(self.t_est, self.yaw_est, est_line_style)
         self.axes[2, 1].set_ylabel("yaw [{}]".format(ang_type))
 
+        pdb.set_trace()
         for ax in np.reshape(self.axes, (self.axes.size)):
             ax.set_xlim([0, self.tf])
             ax.set_xlabel("time (s)")
+            yl1, yl2 = ax.get_ylim()
+            for dt in self.detect_time:
+                ax.plot([dt, dt], [yl1, yl2], 'g-')
         plt.suptitle("MSL-RAPTOR Results (Blue - Est, Red - GT)")
         plt.show(block=False)
        
@@ -174,11 +174,15 @@ class result_analyser:
         """
         record bounding box img seg type [bounding box (r, c, w, h, ang), bb_seg_mode, bb_time(secs)]
         """
-        if t is None:
-            self.t_gt.append(msg.data[-1])
-        else:
-            self.t_gt.append(t)
-        self.im_seg_mode.append(msg.data[-2])
+        # if t is None:
+        #     self.t_gt.append(msg.data[-1])
+        # else:
+        #     self.t_gt.append(t)
+        # self.im_seg_mode.append(msg.data[-2])
+        # print(msg.data)
+        if msg.data[-2] == self.DETECT:
+            print(msg.data)
+            self.detect_time.append(msg.data[-1])
 
 
     def quat_to_ang(self, q):
