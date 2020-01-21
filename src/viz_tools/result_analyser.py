@@ -77,12 +77,12 @@ class result_analyser:
     def process_rb(self):
         print("Processing {}".format(self.rb_name))
         # for topic, msg, t in self.bag.read_messages(topics=[self.ado_gt_topic, self.ado_est_topic]):
-            # if topic == self.ado_gt_topic:
-            #     self.parse_ado_gt_msg(msg, t.to_sec())
-            # elif topic == self.ado_est_topic:
-            #     self.parse_ado_est_msg(msg, t.to_sec())
-            # elif topic == self.bb_data_topic:
-            # pass
+        #     if topic == self.ado_gt_topic:
+        #         self.parse_ado_gt_msg(msg, t.to_sec())
+        #     elif topic == self.ado_est_topic:
+        #         self.parse_ado_est_msg(msg, t.to_sec())
+        #     elif topic == self.bb_data_topic:
+        #         self.parse_bb_msg(msg)
         for topic, msg, t in self.bag.read_messages( topics=list(self.topic_func_dict.keys()) ):
             self.topic_func_dict[topic](msg)
         self.t_est = np.asarray(self.t_est)
@@ -170,8 +170,8 @@ class result_analyser:
         self.yaw_gt.append(rpy[2])
 
 
-    def parse_bb_msg(self), msg, t=None:
-         """
+    def parse_bb_msg(self, msg, t=None):
+        """
         record bounding box img seg type [bounding box (r, c, w, h, ang), bb_seg_mode, bb_time(secs)]
         """
         if t is None:
