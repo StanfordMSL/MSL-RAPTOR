@@ -39,6 +39,10 @@ class result_analyser:
 
         self.ado_gt_topic = ado_quad_ns + '/mavros/vision_pose/pose'
         self.ado_est_topic = ego_quad_ns + '/msl_raptor_state'  # ego_quad_ns since it is ego_quad's estimate of the ado quad
+        self.bb_data_topic = ego_quad_ns + '/bb_data'  # ego_quad_ns since it is ego_quad's estimate of the bounding box
+        self.topic_func_dict = {self.ado_gt_topic : self.parse_ado_gt_msg, 
+                                self.ado_est_topic : self.parse_ado_est_msg, 
+                                self.bb_data_topic : self.parse_bb_msg}
 
         self.b_degrees = True  # use degrees or radians
 
@@ -60,17 +64,27 @@ class result_analyser:
         self.pitch_gt = []
         self.yaw_est = []
         self.yaw_gt = []
+
+        self.DETECT = 1
+        self.TRACK = 2
+        self.FAKED_BB = 3
+        self.IGNORE = 4
+        self.im_seg_mode = self.DETECT
+
         self.process_rb()
 
 
     def process_rb(self):
         print("Processing {}".format(self.rb_name))
-        for topic, msg, t in self.bag.read_messages(topics=[self.ado_gt_topic, self.ado_est_topic]):
-            if topic == self.ado_gt_topic:
-                self.parse_ado_gt_msg(msg, t.to_sec())
-            elif topic == self.ado_est_topic:
-                self.parse_ado_est_msg(msg, t.to_sec())
-
+        # for topic, msg, t in self.bag.read_messages(topics=[self.ado_gt_topic, self.ado_est_topic]):
+            # if topic == self.ado_gt_topic:
+            #     self.parse_ado_gt_msg(msg, t.to_sec())
+            # elif topic == self.ado_est_topic:
+            #     self.parse_ado_est_msg(msg, t.to_sec())
+            # elif topic == self.bb_data_topic:
+            # pass
+        for topic, msg, t in self.bag.read_messages( topics=list(self.topic_func_dict.keys()) ):
+            self.topic_func_dict[topic](msg)
         self.t_est = np.asarray(self.t_est)
         self.t0 = np.min(self.t_est)
         self.tf = np.max(self.t_est) - self.t0
@@ -88,22 +102,29 @@ class result_analyser:
             ang_type = 'deg'
         self.x_gt_plt, = self.axes[0,0].plot(self.t_gt, self.x_gt, gt_line_style)
         self.x_est_plt, = self.axes[0,0].plot(self.t_est, self.x_est, est_line_style)
+        # self.axes[0,0].axvspan(3, 6, color='red', alpha=0.5)
         self.axes[0, 0].set_ylabel("x [m]")
+
         self.y_gt_plt, = self.axes[1,0].plot(self.t_gt, self.y_gt, gt_line_style)
         self.y_est_plt, = self.axes[1,0].plot(self.t_est, self.y_est, est_line_style)
         self.axes[1, 0].set_ylabel("y [m]")
+
         self.z_gt_plt, = self.axes[2,0].plot(self.t_gt, self.z_gt, gt_line_style)
         self.z_est_plt, = self.axes[2,0].plot(self.t_est, self.z_est, est_line_style)
         self.axes[2, 0].set_ylabel("z [m]")
+
         self.roll_gt_plt, = self.axes[0,1].plot(self.t_gt, self.roll_gt, gt_line_style)
         self.roll_est_plt, = self.axes[0,1].plot(self.t_est, self.roll_est, est_line_style)
         self.axes[0, 1].set_ylabel("roll [{}]".format(ang_type))
+
         self.pitch_gt_plt, = self.axes[1,1].plot(self.t_gt, self.pitch_gt, gt_line_style)
         self.pitch_est_plt, = self.axes[1,1].plot(self.t_est, self.pitch_est, est_line_style)
         self.axes[1, 1].set_ylabel("pitch [{}]".format(ang_type))
+
         self.yaw_gt_plt, = self.axes[2,1].plot(self.t_gt, self.yaw_gt, gt_line_style)
         self.yaw_est_plt, = self.axes[2,1].plot(self.t_est, self.yaw_est, est_line_style)
         self.axes[2, 1].set_ylabel("yaw [{}]".format(ang_type))
+
         for ax in np.reshape(self.axes, (self.axes.size)):
             ax.set_xlim([0, self.tf])
             ax.set_xlabel("time (s)")
@@ -147,6 +168,17 @@ class result_analyser:
         self.roll_gt.append(rpy[0])
         self.pitch_gt.append(rpy[1])
         self.yaw_gt.append(rpy[2])
+
+
+    def parse_bb_msg(self), msg, t=None:
+         """
+        record bounding box img seg type [bounding box (r, c, w, h, ang), bb_seg_mode, bb_time(secs)]
+        """
+        if t is None:
+            self.t_gt.append(msg.data[-1])
+        else:
+            self.t_gt.append(t)
+        self.im_seg_mode.append(msg.data[-2])
 
 
     def quat_to_ang(self, q):

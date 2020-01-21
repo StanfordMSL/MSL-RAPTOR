@@ -155,6 +155,9 @@ class ros_interface:
 
 
     def publish_image_with_bb(self, bb, bb_seg_mode, bb_ts):
+        """
+        float32multiarray: [bounding box (r, c, w, h, ang), bb_seg_mode, bb_time(secs)]
+        """
         bb_data = np.concatenate([bb, [bb_seg_mode], [bb_ts]])
         data_len = len(bb_data)
         bb_msg = Float32MultiArray()
