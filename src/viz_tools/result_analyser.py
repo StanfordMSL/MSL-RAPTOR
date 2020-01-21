@@ -98,7 +98,6 @@ class result_analyser:
         
         self.x_gt_plt, = self.axes[0,0].plot(self.t_gt, self.x_gt, gt_line_style)
         self.x_est_plt, = self.axes[0,0].plot(self.t_est, self.x_est, est_line_style)
-        # self.axes[0,0].axvspan(3, 6, color='red', alpha=0.5)
         self.axes[0, 0].set_ylabel("x [m]")
 
         self.y_gt_plt, = self.axes[1,0].plot(self.t_gt, self.y_gt, gt_line_style)
@@ -128,7 +127,7 @@ class result_analyser:
             yl1, yl2 = ax.get_ylim()
             for dt in self.detect_time:
                 ax.plot([dt, dt], [yl1, yl2], 'g-')
-        plt.suptitle("MSL-RAPTOR Results (Blue - Est, Red - GT)")
+        plt.suptitle("MSL-RAPTOR Results (Blue - Est, Red - GT, Green - Front End Detect Mode)")
         plt.show(block=False)
        
 
@@ -172,17 +171,11 @@ class result_analyser:
 
     def parse_bb_msg(self, msg, t=None):
         """
-        record bounding box img seg type [bounding box (r, c, w, h, ang), bb_seg_mode, bb_time(secs)]
+        record times of detect
+        note message is custom MSL-RAPTOR angled bounding box
         """
-        # if t is None:
-        #     self.t_gt.append(msg.data[-1])
-        # else:
-        #     self.t_gt.append(t)
-        # self.im_seg_mode.append(msg.data[-2])
-        # print(msg.data)
-        if msg.data[-2] == self.DETECT:
-            print(msg.data)
-            self.detect_time.append(msg.data[-1])
+        if msg.im_seg_mode == self.DETECT:
+            self.detect_time.append(msg.header.stamp.to_sec())
 
 
     def quat_to_ang(self, q):

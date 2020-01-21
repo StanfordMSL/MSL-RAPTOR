@@ -159,12 +159,12 @@ class ros_interface:
         """
         publish custom message type for angled bounding box
         """
-        msg = angled_bb()
-        msg.header.stamp = rospy.Time.from_sec(bb_ts)
-        msg.x = bb[0]
-        msg.y = bb[1]
-        msg.width = bb[2]
-        msg.height = bb[3]
-        msg.angle = bb[4]
-        msg.im_seg_mode = bb_seg_mode
+        bb_msg = angled_bb()
+        bb_msg.header.stamp = rospy.Time.from_sec(bb_ts)
+        bb_msg.x = bb[0]
+        bb_msg.y = bb[1]
+        bb_msg.width = bb[2]
+        bb_msg.height = bb[3]
+        bb_msg.angle = bb[4]
+        bb_msg.im_seg_mode = bb_seg_mode
         self.bb_data_pub.publish(bb_msg)

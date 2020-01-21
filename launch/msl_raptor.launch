@@ -24,7 +24,7 @@
   </node>
 
   <!-- Launch our main node -->
-  <node name="MSL_RAPTOR" pkg="msl_raptor" type="msl_raptor.py" output="screen">
+  <node name="MSL_RAPTOR" pkg="msl_raptor" type="msl_raptor_main.py" output="screen">
     <param name="ns"  value="$(arg ns)"/> 
     <param name="b_use_gt_bb"  value="$(arg b_use_gt_bb)"/> 
     <param name="b_enforce_0_yaw"  value="$(arg b_enforce_0_yaw)"/> 
