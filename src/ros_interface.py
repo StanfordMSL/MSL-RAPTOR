@@ -155,7 +155,7 @@ class ros_interface:
         self.state_pub.publish(pose_msg)
 
 
-    def publish_image_with_bb(self, bb, bb_seg_mode, bb_ts):
+    def publish_bb_msg(self, bb, bb_seg_mode, bb_ts):
         """
         publish custom message type for angled bounding box
         """

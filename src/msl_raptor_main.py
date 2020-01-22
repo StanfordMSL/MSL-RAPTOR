@@ -119,7 +119,7 @@ def run_execution_loop():
         previous_image_time = loop_time  # this ensures we dont reuse the image
         
         ros.publish_filter_state(ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
-        ros.publish_image_with_bb(abb, im_seg_mode, loop_time)
+        ros.publish_bb_msg(abb, im_seg_mode, loop_time)
         
         # ros.im_seg_mode = ros.TRACK
         print("FULL END-TO-END time = {:4f}\n".format(time.time() - tic))

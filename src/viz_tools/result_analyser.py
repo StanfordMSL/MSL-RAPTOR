@@ -71,6 +71,10 @@ class result_analyser:
         self.FAKED_BB = 3
         self.IGNORE = 4
         self.detect_time = []
+        self.detect_mode = []
+        
+        self.detect_times = []
+        self.detect_end = None
 
         self.process_rb()
 
@@ -85,6 +89,7 @@ class result_analyser:
         self.t_est -= self.t0
         self.t_gt = np.asarray(self.t_gt) - self.t0
         self.detect_time = np.asarray(self.detect_time) - self.t0
+        self.detect_times = np.asarray(self.detect_times) - self.t0
         self.do_plot()
 
 
@@ -124,8 +129,14 @@ class result_analyser:
             ax.set_xlim([0, self.tf])
             ax.set_xlabel("time (s)")
             yl1, yl2 = ax.get_ylim()
-            for dt in self.detect_time:
-                ax.plot([dt, dt], [yl1, yl2], 'g-')
+            for ts, tf in self.detect_times:
+                if np.isnan(tf):# or tf - ts < 0.1: # detect mode happened just once - draw line
+                    # ax.axvline(ts, 'r-') # FOR SOME REASON THIS DOES NOT WORK!!
+                    ax.plot([ts, ts], [-1e4, 1e4], linestyle='-', color="#d62728", linewidth=0.5) # using yl1 and yl2 for the line plot doesnt span the full range
+                else: # detect mode happened for a span - draw rect
+                    ax.axvspan(ts, tf, facecolor='#d62728', alpha=0.5)  # red: #d62728, blue: 1f77b4, green: #2ca02c
+            ax.set_ylim([yl1, yl2])
+
         plt.suptitle("MSL-RAPTOR Results (Blue - Est, Red - GT, Green - Front End Detect Mode)")
         plt.show(block=False)
        
@@ -135,9 +146,9 @@ class result_analyser:
         record estimated poses from msl-raptor
         """
         if t is None:
-            self.t_est.append(msg.header.stamp.to_sec() - self.t0)
+            self.t_est.append(msg.header.stamp.to_sec())
         else:
-            self.t_est.append(t - self.t0)
+            self.t_est.append(t)
 
         my_state = self.pose_to_state_vec(msg.pose)
         rpy = self.quat_to_ang(np.reshape(my_state[6:10], (1,4)))[0]
@@ -173,8 +184,30 @@ class result_analyser:
         record times of detect
         note message is custom MSL-RAPTOR angled bounding box
         """
+        t = msg.header.stamp.to_sec()
         if msg.im_seg_mode == self.DETECT:
-            self.detect_time.append(msg.header.stamp.to_sec())
+            self.detect_time.append(t)
+
+        ######
+        eps = 0.1 # min width of line
+        if msg.im_seg_mode == self.DETECT:  # we are detecting now
+            if not self.detect_times:  # first run - init list
+                self.detect_times = [[t]]
+                self.detect_end = np.nan
+            elif len(self.detect_times[-1]) == 2: # we are starting a new run
+                self.detect_times.append([t])
+                self.detect_end = np.nan
+            else: # len(self.detect_times[-1]) = 1: # we are currently still on a streak of detects
+                self.detect_end = t
+        else: # not detecting
+            if not self.detect_times or len(self.detect_times[-1]) == 2: # we are still not detecting (we were not Detecting previously)
+                pass
+            else: # self.detect_times[-1][1]: # we were just tracking
+                self.detect_times[-1].append(self.detect_end)
+                self.detect_end = np.nan
+
+        self.detect_mode.append(msg.im_seg_mode)
+
 
 
     def quat_to_ang(self, q):
