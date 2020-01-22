@@ -130,7 +130,7 @@ class result_analyser:
             ax.set_xlabel("time (s)")
             yl1, yl2 = ax.get_ylim()
             for ts, tf in self.detect_times:
-                if np.isnan(tf):# or tf - ts < 0.1: # detect mode happened just once - draw line
+                if np.isnan(tf) or tf - ts < 0.1: # detect mode happened just once - draw line
                     # ax.axvline(ts, 'r-') # FOR SOME REASON THIS DOES NOT WORK!!
                     ax.plot([ts, ts], [-1e4, 1e4], linestyle='-', color="#d62728", linewidth=0.5) # using yl1 and yl2 for the line plot doesnt span the full range
                 else: # detect mode happened for a span - draw rect
