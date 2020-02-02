@@ -1,9 +1,9 @@
 # Docker Tricks and Tips
 
 ## 0) tl;dr - The following are the build & run commands I used.
-To build docker image:
-> `build_raptor_go='cd <workspace path>/docker/x86/pose_estimation && docker build . -t msl_raptor --build-arg GIT_NAME=$DOCKER_GIT_NAME --build-arg GIT_EMAIL=$DOCKER_GIT_EMAIL'`
-- the --build-arg gave me access to variables in the Dockerfile, which I used as a way to pass through certain environental variables. In this case the I used passed in my local env vars to configure git inside the container.
+To build docker image, replacing <arch> with your architecture:
+> `build_raptor_go='cd <workspace path>/docker/<arch>/pose_estimation && docker build . -t msl_raptor --build-arg GIT_NAME=$DOCKER_GIT_NAME --build-arg GIT_EMAIL=$DOCKER_GIT_EMAIL'`
+- the --build-arg gave me access to variables in the Dockerfile, which I used as a way to pass through certain environmental variables. In this case the I used passed in my local env vars to configure git inside the container.
 
 Before running the container, I created a .env file located at `<workspace path>/docker/`. To start the container:
 
