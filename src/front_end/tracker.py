@@ -27,6 +27,7 @@ class SiammaskTracker:
         self.keys_to_share = ['target_pos','target_sz','score','mask','ploygon']
 
         self.states_each_object = []
+        self.current_classes = []
 
     def track(self,im):
         locations = []
@@ -38,11 +39,12 @@ class SiammaskTracker:
                 self.states_each_object[i] = self.siammask_state_to_object_state()
             locations.append(self.state['ploygon'].flatten())
             masks.append(self.state['mask'] > self.state['p'].seg_thr)
-        return locations,masks
+        return locations,masks,self.current_classes
 
     def reinit(self,new_boxes,im):
         # new_box format: x,y,w,h (where x,y correspond to the top left corner)
         self.states_each_object = []
+        self.current_classes = []
         for new_box in new_boxes:
             (x,y,w,h) = new_box[:4]
             target_pos = np.array([x + w / 2, y + h / 2])
@@ -53,6 +55,7 @@ class SiammaskTracker:
             self.state['mask'] = None
             init_dict = self.siammask_state_to_object_state()
             init_dict['class_id'] = new_box[-1]
+            self.current_classes.append(new_box[-1])
             self.states_each_object.append(init_dict)
 
     def object_state_to_siammask_state(self,object_state):

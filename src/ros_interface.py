@@ -121,10 +121,10 @@ class ros_interface:
                     rospy.loginfo("Did not detect object")
                     return
                 self.img_seg.reinit_tracker(bbs_no_angle, image)
-                bbs_4_corners = self.img_seg.track(image)[0]
+                bbs_4_corners = self.img_seg.track(image)[0][0]
                 self.latest_abbs = bb_corners_to_angled_bb(bbs_4_corners.reshape(-1,2))
             elif self.im_seg_mode == self.TRACK:
-                bbs_4_corners = self.img_seg.track(image)[0]
+                bbs_4_corners = self.img_seg.track(image)[0][0]
                 self.latest_abbs = bb_corners_to_angled_bb(bbs_4_corners.reshape(-1,2))
             else:
                 raise RuntimeError("Unknown image segmentation mode")
