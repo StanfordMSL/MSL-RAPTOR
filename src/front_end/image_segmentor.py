@@ -15,17 +15,17 @@ class ImageSegmentor:
         else:
             raise RuntimeError("Tracker chosen not implemented")
 
-        self.last_box = None
+        self.last_boxes = []
         
     def track(self,image):
         tic = time.time()
-        self.last_box,_ = self.tracker.track(image)
+        self.last_boxes,_ = self.tracker.track(image)
         tic2 = time.time()
         print("track time = {:.4f}".format(tic2- tic))
-        return self.last_box
+        return self.last_boxes
 
-    def reinit_tracker(self,new_box,image):
-        self.tracker.reinit(new_box,image)
+    def reinit_tracker(self,new_boxes,image):
+        self.tracker.reinit(new_boxes,image)
 
     def detect(self,image):
         tic = time.time()

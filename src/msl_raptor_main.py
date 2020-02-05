@@ -82,7 +82,7 @@ def run_execution_loop():
         tf_ego_w = inv_tf(ros.tf_w_ego)  # ego quad pose
         im_seg_mode = ros.im_seg_mode
         if not b_use_gt_bb:
-            abb = ros.latest_abb  # angled bounding box
+            abb = ros.latest_abbs  # angled bounding box
         else:
             abb = ukf.predict_measurement(pose_to_state_vec(ros.ado_pose_gt_rosmsg), tf_ego_w)
             rospy.logwarn("Faking measurement data")

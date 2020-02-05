@@ -9,7 +9,7 @@ from yolov3.utils.utils import *
 # max_instances_per_class can be a list with a number for each class, or a number applied to all classes
 # Returns (x,y,w,h, object_conf, class_conf, class)
 class YoloDetector:
-    def __init__(self,sample_im, base_dir='', cfg='yolov3/cfg/yolov3_drone_infer.cfg',weights='yolov3/weights/yolov3_drone.weights',img_size=416,conf_thres=0.01,nms_thres=0.5,half=True,classes_ids=[0,81], max_instances_per_class = 2):
+    def __init__(self,sample_im, base_dir='', cfg='yolov3/cfg/yolov3_drone_infer.cfg',weights='yolov3/weights/yolov3_drone.weights',img_size=416,conf_thres=0.01,nms_thres=0.5,half=True,classes_ids=[0], max_instances_per_class = 1):
         # TODO Make sure this is valid
         self.img_size = 416#sample_im.shape[:2]
         self.conf_thres = conf_thres

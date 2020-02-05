@@ -30,7 +30,7 @@ class ros_interface:
         self.FAKED_BB = 3
         self.IGNORE = 4
         self.im_seg_mode = self.DETECT
-        self.latest_abb = None  # angled bound box [row, height, width, height, angle (radians)]
+        self.latest_abbs = None  # angled bound box [row, height, width, height, angle (radians)]
         self.latest_bb_method = self.DETECT  
 
         self.ego_pose_rosmesg_buffer = ([], [])
@@ -114,18 +114,18 @@ class ros_interface:
         self.latest_bb_method = self.im_seg_mode
         if not self.b_use_gt_bb:
             if self.im_seg_mode == self.DETECT:
-                bb_no_angle = self.img_seg.detect(image)
-                if not bb_no_angle:
-                    self.latest_abb = None
+                bbs_no_angle = self.img_seg.detect(image)
+                if bbs_no_angle is False:
+                    self.latest_abbs = None
                     self.latest_img_time = -1
                     rospy.loginfo("Did not detect object")
                     return
-                self.img_seg.reinit_tracker(bb_no_angle, image)
-                bb_4_corners = self.img_seg.track(image)
-                self.latest_abb = bb_corners_to_angled_bb(bb_4_corners.reshape(-1,2))
+                self.img_seg.reinit_tracker(bbs_no_angle, image)
+                bbs_4_corners = self.img_seg.track(image)[0]
+                self.latest_abbs = bb_corners_to_angled_bb(bbs_4_corners.reshape(-1,2))
             elif self.im_seg_mode == self.TRACK:
-                bb_4_corners = self.img_seg.track(image)
-                self.latest_abb = bb_corners_to_angled_bb(bb_4_corners.reshape(-1,2))
+                bbs_4_corners = self.img_seg.track(image)[0]
+                self.latest_abbs = bb_corners_to_angled_bb(bbs_4_corners.reshape(-1,2))
             else:
                 raise RuntimeError("Unknown image segmentation mode")
         else:
