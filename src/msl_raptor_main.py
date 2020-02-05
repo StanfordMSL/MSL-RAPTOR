@@ -50,16 +50,18 @@ def run_execution_loop():
     
     rate = rospy.Rate(30) # max filter rate
     # wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
-    ukf = UKF(b_enforce_0_yaw, b_use_gt_bb)  # create ukf object
+    ukf_dict = {}  # object_name, ukf object
+    ukf = UKF(b_enforce_0_yaw, b_use_gt_bb, obj_type='mslquad', obj_name='quad4')  # create ukf object
+    ukf_dict['quad4'] = ukf
     init_objects(ros, ukf)  # init camera, pose, etc
     ros.create_subs_and_pubs()
-    state_est = np.zeros((ukf.dim_state + ukf.dim_sig**2, ))
+    state_est = np.zeros((ukf_dict['quad4'].dim_state + ukf_dict['quad4'].dim_sig**2, ))
     loop_count = 0
     previous_image_time = 0
     time_since_last_detection = 0.
 
     if b_use_gt_bb:
-        init_state_from_gt(ros,ukf)  
+        init_state_from_gt(ros, ukf_dict['quad4'])  
         img_seg = None
         
 
@@ -84,12 +86,12 @@ def run_execution_loop():
         if not b_use_gt_bb:
             abb = ros.latest_abbs  # angled bounding box
         else:
-            abb = ukf.predict_measurement(pose_to_state_vec(ros.ado_pose_gt_rosmsg), tf_ego_w)
+            abb = ukf_dict['quad4'].predict_measurement(pose_to_state_vec(ros.ado_pose_gt_rosmsg), tf_ego_w)
             rospy.logwarn("Faking measurement data")
 
         if ros.latest_bb_method == ros.DETECT:
-            if ukf.check_measurement_valid_detect(abb):
-                ukf.reinit_filter(abb,ros.tf_w_ego)
+            if ukf_dict['quad4'].check_measurement_valid_detect(abb):
+                ukf_dict['quad4'].reinit_filter(abb, ros.tf_w_ego)
                 ros.im_seg_mode = ros.TRACK
                 time_since_last_detection = 0.
             else:
@@ -99,11 +101,11 @@ def run_execution_loop():
         elif ros.latest_bb_method == ros.TRACK:
             time_since_last_detection+=  loop_time - previous_image_time
             # check measurement
-            if not ukf.check_measurement_valid_track(abb):
+            if not ukf_dict['quad4'].check_measurement_valid_track(abb):
                 rospy.loginfo("Tracked box not valid")
                 ros.im_seg_mode = ros.DETECT
-                ukf.mu_obs = None
-                ukf.S_obs = None
+                ukf_dict['quad4'].mu_obs = None
+                ukf_dict['quad4'].S_obs = None
                 rate.sleep()
                 continue
         
@@ -113,11 +115,11 @@ def run_execution_loop():
 
         # pdb.set_trace()
         dt = loop_time - previous_image_time
-        ukf.itr_time = loop_time
-        ukf.step_ukf(abb, tf_ego_w, dt)  # update ukf
+        ukf_dict['quad4'].itr_time = loop_time
+        ukf_dict['quad4'].step_ukf(abb, tf_ego_w, dt)  # update ukf
         previous_image_time = loop_time  # this ensures we dont reuse the image
         
-        ros.publish_filter_state(ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
+        ros.publish_filter_state(ukf_dict['quad4'].mu, ukf_dict['quad4'].itr_time, ukf_dict['quad4'].itr)  # send vector with time, iteration, state_est
         ros.publish_bb_msg(abb, im_seg_mode, loop_time)
         
         # ros.im_seg_mode = ros.TRACK
