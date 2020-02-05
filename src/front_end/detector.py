@@ -77,6 +77,9 @@ class YoloDetector:
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img0.shape).round()
 
+        det = det.cpu().detach().numpy()
+
+
         # Keep only classes we want
         det = det[np.isin(det[:,-1],self.classes_ids)]
         # Keep only certain number of instance per class
@@ -89,11 +92,10 @@ class YoloDetector:
 
         det = det_filtered
 
-        det = torch.stack(det)
+        det = np.stack(det)
 
 
         # Reformat det to x,y,w,h (x and y are top left corner's position)
-        det = det.cpu().detach().numpy()
 
         det[:,2] = det[:,2] - det[:,0]
         det[:,3] = det[:,3] - det[:,1]

@@ -102,7 +102,6 @@ def run_execution_loop():
             if not ukf.check_measurement_valid_track(abb):
                 rospy.loginfo("Tracked box not valid")
                 ros.im_seg_mode = ros.DETECT
-                ros.publish_image_with_bb(abb, im_seg_mode, loop_time)
                 ukf.mu_obs = None
                 ukf.S_obs = None
                 rate.sleep()
