@@ -9,6 +9,7 @@ import numpy as np
 from bisect import bisect_left
 # ros
 import rospy
+from msl_raptor.msg import angled_bb
 from geometry_msgs.msg import PoseStamped, Twist, Pose
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
@@ -39,7 +40,7 @@ class bb_viz_node:
 
         if self.b_overlay:
            rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1,buff_size=2**21)
-        self.bb_data_sub = rospy.Subscriber(self.ns + '/bb_data', Float32MultiArray, self.bb_viz_cb, queue_size=5)
+        self.bb_data_sub = rospy.Subscriber(self.ns + '/bb_data', angled_bb, self.bb_viz_cb, queue_size=5)
         self.img_overlay_pub = rospy.Publisher(self.ns + '/image_bb_overlay', Image, queue_size=5)
         self.itr = 0
         camera_info = rospy.wait_for_message(self.ns + '/camera/camera_info', CameraInfo, 30)
@@ -89,11 +90,23 @@ class bb_viz_node:
             return message_list[pos - 1], pos - 1
 
 
-    def bb_viz_cb(self, msg):
+    def bb_viz_cb(self, bb_msg):
+        """
+        custom angled bb message type:
+            Header header  # ros timestamp etc
+            float64 x  # x coordinate of center of bounding box
+            float64 y  # y coordinate of center of bounding box
+            float64 width  # width (long axis) of bounding box
+            float64 height  # height (short axis) of bounding box
+            float64 angle  # angle in radians
+            uint8 im_seg_mode  # self.DETECT = 1  self.TRACK = 2  self.FAKED_BB = 3  self.IGNORE = 4
+        """
         if self.b_overlay and (not self.img_buffer or len(self.img_buffer[0]) == 0):
             return
-        my_time = msg.data[-1]
-        im_seg_mode = msg.data[-2]
+        # my_time = msg.data[-1]
+        my_time = bb_msg.header.stamp.to_sec()
+        # im_seg_mode = msg.data[-2]
+        im_seg_mode = bb_msg.im_seg_mode
         if im_seg_mode == self.DETECT:
             box_color = (0,0,255)  # RED
         elif im_seg_mode == self.TRACK:
@@ -105,19 +118,17 @@ class bb_viz_node:
         else:
             print("not detecting nor tracking! (seg mode: {})".format(im_seg_mode))
             box_color = (255,0,0)
-        bb_data = msg.data[0:-2]
+        # bb_data = msg.data[0:-2]
 
         if self.b_overlay:
             im_msg = self.find_closest_by_time_ros2(my_time, self.img_buffer[1], self.img_buffer[0])[0]
             image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="passthrough")
-
-            image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
+            image = cv2.undistort(image, self.K, self.dist_coefs, 1, self.new_camera_matrix)
         else:
             image = copy(self.all_white_image)
 
-
-        box = np.int0(cv2.boxPoints( ( (bb_data[0], bb_data[1]), (bb_data[2], bb_data[3]), -np.degrees(bb_data[4]))) )
-        cv2.drawContours(image,[box],0,box_color,2)
+        box = np.int0(cv2.boxPoints( ( (bb_msg.x, bb_msg.y), (bb_msg.width, bb_msg.height), -np.degrees(bb_msg.angle))) )
+        cv2.drawContours(image, [box], 0, box_color, 2)
         self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(image, "passthrough"))
 
         # cv2.imwrite('/test_img{}.png'.format(self.itr), image)

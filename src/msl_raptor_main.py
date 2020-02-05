@@ -89,7 +89,7 @@ def run_execution_loop():
 
         if ros.latest_bb_method == ros.DETECT:
             if ukf.check_measurement_valid_detect(abb):
-                ukf.reinit_filter(abb,ros.tf_w_ego)
+                ukf.reinit_filter(abb, ros.tf_w_ego)
                 ros.im_seg_mode = ros.TRACK
                 time_since_last_detection = 0.
             else:
