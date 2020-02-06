@@ -3,10 +3,10 @@ from tracker import SiammaskTracker
 import sys, os, time
 
 class ImageSegmentor:
-    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask'):
+    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[80]):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         if detector_name == 'yolov3':
-            self.detector = YoloDetector(sample_im,base_dir=base_dir)
+            self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_class_ids)
         else:
             raise RuntimeError("Detector chosen not implemented")
 
