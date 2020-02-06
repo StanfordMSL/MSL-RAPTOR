@@ -1,7 +1,7 @@
 from SiamMask.tools.test import *
 
 class SiammaskTracker:
-    def __init__(self,sample_im, base_dir='', x=0 ,y=0,w=10,h=10,fp16_mode=True,features_trt=True,rpn_trt=False,mask_trt=False,refine_trt=False):
+    def __init__(self,sample_im, base_dir='', x=0 ,y=0,w=10,h=10, use_tensorrt=False,fp16_mode=True,features_trt=True,rpn_trt=False,mask_trt=False,refine_trt=False):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         torch.backends.cudnn.benchmark = True
 
@@ -22,7 +22,8 @@ class SiammaskTracker:
         target_pos = np.array([x + w / 2, y + h / 2])
         target_sz = np.array([w, h])
         self.state = siamese_init(sample_im, target_pos, target_sz, siammask, self.cfg['hp'], device=self.device)  # init tracker
-        self.state['net'].init_trt(fp16_mode,features_trt,rpn_trt,mask_trt,refine_trt, use_loaded_weights=True, trt_weights_path='/root/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt')
+        if use_tensorrt:
+            self.state['net'].init_trt(fp16_mode,features_trt,rpn_trt,mask_trt,refine_trt, use_loaded_weights=True, trt_weights_path='/root/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt')
 
         self.keys_to_share = ['target_pos','target_sz','score','mask','ploygon']
 
