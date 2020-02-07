@@ -1,4 +1,4 @@
-FROM bramtoula/ros:melodic-trt-tx2-jp422
+FROM bramtoula/ros:melodic-trt-tx2-jp430
 
 WORKDIR /root
 # Basic stuff for Python 3 with ROS

@@ -1,4 +1,4 @@
-FROM bramtoula/ros:melodic-trt-py3-tx2-jp422
+FROM bramtoula/ros:melodic-trt-py3-tx2-jp430
 WORKDIR /root
 
 # Clone and build MSL-RAPTOR with python3
