@@ -23,41 +23,37 @@ class SiammaskTracker:
         target_sz = np.array([w, h])
         self.state = siamese_init(sample_im, target_pos, target_sz, siammask, self.cfg['hp'], device=self.device)  # init tracker
         if use_tensorrt:
-            self.state['net'].init_trt(fp16_mode,features_trt,rpn_trt,mask_trt,refine_trt, use_loaded_weights=True, trt_weights_path='/root/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt')
+             self.state['net'].init_trt(fp16_mode,features_trt,rpn_trt,mask_trt,refine_trt, use_loaded_weights=True, trt_weights_path='/root/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt')
 
         self.keys_to_share = ['target_pos','target_sz','score','mask','ploygon']
 
         self.states_each_object = []
         self.current_classes = []
 
-    def track(self,im):
+    def track(self,im,obj_state):
         locations = []
         masks = []
-        for i in range(len(self.states_each_object)):
-            with torch.no_grad():
-                self.object_state_to_siammask_state(self.states_each_object[i])
-                self.state = siamese_track(self.state, im, mask_enable=True, refine_enable=True, device=self.device)  # track
-                self.states_each_object[i] = self.siammask_state_to_object_state()
-            locations.append(self.state['ploygon'].flatten())
-            masks.append(self.state['mask'] > self.state['p'].seg_thr)
-        return locations,masks,self.current_classes
+        with torch.no_grad():
+            self.object_state_to_siammask_state(obj_state)
+            self.state = siamese_track(self.state, im, mask_enable=True, refine_enable=True, device=self.device)  # track
+            obj_state = self.siammask_state_to_object_state()
+        locations.append(self.state['ploygon'].flatten())
+        masks.append(self.state['mask'] > self.state['p'].seg_thr)
+        return obj_state,self.state['ploygon'].flatten(),self.state['mask'] > self.state['p'].seg_thr
 
-    def reinit(self,new_boxes,im):
+    def reinit(self,new_box,im):
         # new_box format: x,y,w,h (where x,y correspond to the top left corner)
-        self.states_each_object = []
-        self.current_classes = []
-        for new_box in new_boxes:
-            (x,y,w,h) = new_box[:4]
-            target_pos = np.array([x + w / 2, y + h / 2])
-            target_sz = np.array([w, h])
-            self.state = siamese_init(im, target_pos, target_sz, self.state['net'], self.cfg['hp'], device=self.device)  # init tracker
-            self.state['score'] = None
-            self.state['ploygon'] = None
-            self.state['mask'] = None
-            init_dict = self.siammask_state_to_object_state()
-            init_dict['class_id'] = new_box[-1]
-            self.current_classes.append(new_box[-1])
-            self.states_each_object.append(init_dict)
+        # self.states_each_object = []
+        # self.current_classes = []
+        (x,y,w,h) = new_box[:4]
+        target_pos = np.array([x + w / 2, y + h / 2])
+        target_sz = np.array([w, h])
+        self.state = siamese_init(im, target_pos, target_sz, self.state['net'], self.cfg['hp'], device=self.device)  # init tracker
+        self.state['score'] = None
+        self.state['ploygon'] = None
+        self.state['mask'] = None
+        return self.siammask_state_to_object_state()
+        
 
     def object_state_to_siammask_state(self,object_state):
         for key in self.keys_to_share:

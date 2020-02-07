@@ -134,11 +134,11 @@ class ros_interface:
                     return
                 self.img_seg.reinit_tracker(bbs_no_angle, image) 
                 output_tups = self.img_seg.track(image)  # returns a tuple of lists: ([abb1, abb2...], o_type1, o_type2..., [o_id1, o_id2...])
-                self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id) for abb, o_type, o_id in zip(*output_tups)]
+                self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id, valid) for abb, o_type, o_id, valid in output_tups]
 
             elif self.im_seg_mode == self.TRACK:
                 output_tups = self.img_seg.track(image)
-                self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id) for abb, o_type, o_id in zip(*output_tups)]
+                self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id, valid) for abb, o_type, o_id, valid in output_tups]
             else:
                 raise RuntimeError("Unknown image segmentation mode")
         else:

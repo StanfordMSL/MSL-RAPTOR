@@ -20,7 +20,7 @@ from utils_msl_raptor.math_utils import *
 
 class UKF:
 
-    def __init__(self, camera, bb_3d, quad_width, init_time=0.0, b_enforce_0_yaw=True, b_use_gt_bb=False, im_width=640, im_height=480, obj_type='mslquad', obj_id=0):
+    def __init__(self, camera, bb_3d, quad_width, init_time=0.0, b_enforce_0_yaw=True, b_use_gt_bb=False, obj_type='mslquad', obj_id=0):
 
         self.VERBOSE = True
 
@@ -71,20 +71,7 @@ class UKF:
         self.itr_time_prev = init_time
         self.itr_time = init_time
         self.tf_ego_w_tmp = None
-        ####################################################################
-
-        # Statistics used for testing new measurements
-        self.z_090_one_sided = 1.282
-        self.z_075_one_sided = 0.674
-        self.z_050_one_sided = 0.0
-
-        self.min_pix_from_edge = 5
-        self.min_aspect_ratio = 1
-        self.max_aspect_ratio = 5
-
-        self.F_005 = 161.4476
-        self.im_width = im_width
-        self.im_height = im_height
+        
 
 
     def init_filter_elements(self, mu=None):
@@ -396,68 +383,5 @@ class UKF:
         # mu = np.array([pos[2],-pos[0],-pos[1],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
 
         self.init_filter_elements(mu)
-
-
-
-    def check_measurement_valid_detect(self,abb):
-        # Left side in image
-        if (abb[0] - abb[2]/2) < self.min_pix_from_edge:
-            return False
-        
-        # Right side in image
-        if (abb[0] + abb[2]/2) > self.im_width - self.min_pix_from_edge:
-            return False
-
-        # Top in image
-        if (abb[1] - abb[3]/2) < self.min_pix_from_edge:
-            return False
-        
-        # Bottom in image
-        if (abb[1] + abb[3]/2) > self.im_height - self.min_pix_from_edge:
-            return False
-
-        # Aspect ratio valid
-        ar = abb[2]/abb[3]
-        if ar < self.min_aspect_ratio or ar > self.max_aspect_ratio:
-            print("rejecting measurement: INVALID ASPECT RATIO")
-            return False
-
-        return True
-        
-
-
-    def check_measurement_valid_track(self,abb):
-        if self.mu_obs is None:
-            return True
-        # Check if row or column valid
-        mu_x_l = abb[0] - abb[2]/2
-        mu_x_r = abb[0] + abb[2]/2
-        sigma_x = math.sqrt(self.S_obs[0,0] + self.S_obs[2,2]/4)
-        z_x_l = (0-mu_x_l)/sigma_x
-        z_x_r = (self.im_width-mu_x_r)/sigma_x
-
-        if z_x_l > -self.z_075_one_sided or z_x_r < self.z_075_one_sided:
-            rospy.loginfo("Rejected measurement with values left {} and right {}".format(z_x_l,z_x_r))
-            return False
-
-        mu_y_l = abb[1] - abb[3]/2
-        mu_y_r = abb[1] + abb[3]/2
-        sigma_y = math.sqrt(self.S_obs[1,1]+ self.S_obs[3,3]/4)
-        z_y_l = (0-mu_y_l)/sigma_y
-        z_y_r = (self.im_height-mu_y_r)/sigma_y
-
-        if z_y_l > -self.z_075_one_sided or z_y_r < self.z_075_one_sided:
-            rospy.loginfo("Rejected measurement with values top {} and bottom {}".format(z_y_l,z_y_r))
-            return False
-
-
-        # Check if new measurement is too far from distribution of previous measurement
-        # Hotelling's t-squared statistic
-        t = math.sqrt((abb-self.mu_obs)@ la.inv(self.S_obs) @ (abb-self.mu_obs).T)
-        if t > self.F_005:
-            rospy.loginfo("Rejected measurement too far from distribution: F={}".format(t))
-            return False
-
-        return True
 
 

@@ -41,7 +41,7 @@ def run_execution_loop():
         time.sleep(0.5)
     
     rate = rospy.Rate(30) # max filter rate
-    ufk_dict = {}  # key: object_id value: ukf object
+    ukf_dict = {}  # key: object_id value: ukf object
     my_camera, bb_3d, quad_width = init_objects(ros)  # init camera, pose, etc
     ros.create_subs_and_pubs()
     dim_state = 13
@@ -88,22 +88,22 @@ def run_execution_loop():
             raise RuntimeError("b_use_gt_bb option NOT YET IMPLEMENTED")
 
         # handle each object seen
-        for abb, obj_type, obj_id in processed_image:
+        for abb, obj_type, obj_id, valid in processed_image:
             ukf = None
             if ros.latest_bb_method == ros.DETECT:
                 time_since_last_detection = 0.
-                if not obj_id in ufk_dict:  # New Object
+                if not obj_id in ukf_dict:  # New Object
                     print("new object (id = {}, type = {})".format(obj_id, obj_type))
-                    ufk_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d, quad_width=quad_width, init_time=loop_time, obj_type='mslquad', obj_id=obj_id)
-                    ufk_dict[obj_id].reinit_filter(abb, tf_w_ego)
+                    ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d, quad_width=quad_width, init_time=loop_time, obj_type='mslquad', obj_id=obj_id)
+                    ukf_dict[obj_id].reinit_filter(abb, tf_w_ego)
                     continue
                 else:  # Previously seen (but redetected) object, next time TRACK
-                    ukf = ufk_dict[obj_id]
                     ros.im_seg_mode = ros.TRACK
 
-            elif ros.latest_bb_method == ros.TRACK:
-                # check measurement
-                ukf = ufk_dict[obj_id]
+            ### Don't think this is necessary anymore
+            # elif ros.latest_bb_method == ros.TRACK:
+            #     # check measurement
+            #     ukf = ukf_dict[obj_id]
         
             if time_since_last_detection > detection_period:
                 ros.im_seg_mode = ros.DETECT
@@ -113,12 +113,15 @@ def run_execution_loop():
             
             previous_image_time = loop_time  # this ensures we dont reuse the image
 
-            if ukf is not None:
-                ukf.step_ukf(abb, tf_ego_w, loop_time)  # update ukf
+            if ukf_dict[obj_id] is not None:
+                ukf_dict[obj_id].step_ukf(abb, tf_ego_w, loop_time)  # update ukf
         
-            ros.publish_filter_state(obj_id, ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
+            ros.publish_filter_state(obj_id, ukf_dict[obj_id].mu, ukf_dict[obj_id].itr_time, ukf_dict[obj_id].itr)  # send vector with time, iteration, state_est
             ros.publish_bb_msg(obj_id, abb, im_seg_mode, loop_time)
         
+        # Save current object states in image segmentor
+        ros.im_seg.ukf_dict = ukf_dict
+
         # ros.im_seg_mode = ros.TRACK
         print("FULL END-TO-END time = {:4f}\n".format(time.time() - tic))
         rate.sleep()

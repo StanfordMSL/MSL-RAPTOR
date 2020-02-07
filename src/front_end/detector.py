@@ -9,7 +9,7 @@ from yolov3.utils.utils import *
 # max_instances_per_class can be a list with a number for each class, or a number applied to all classes
 # Returns (x,y,w,h, object_conf, class_conf, class)
 class YoloDetector:
-    def __init__(self,sample_im, base_dir='', cfg='yolov3/cfg/yolov3-coco-quad-infer.cfg',weights='yolov3/weights/yolov3-coco-quad.weights',img_size=416,conf_thres=0.01,nms_thres=0.5,half=True,classes_ids=[80], max_instances_per_class = 1):
+    def __init__(self,sample_im, base_dir='', cfg='yolov3/cfg/yolov3-coco-quad-infer.cfg',weights='yolov3/weights/yolov3-coco-quad.weights',img_size=416,conf_thres=0.5,nms_thres=0.5,half=True,classes_ids=[80], max_instances_per_class = 5):
         # TODO Make sure this is valid
         self.img_size = 416#sample_im.shape[:2]
         self.conf_thres = conf_thres
@@ -81,7 +81,8 @@ class YoloDetector:
 
 
         # Keep only classes we want
-        det = det[np.isin(det[:,-1],self.classes_ids)]
+        # det = det[np.isin(det[:,-1],self.classes_ids)]
+
         # Keep only certain number of instance per class
         if len(det) == 0:
             return False
