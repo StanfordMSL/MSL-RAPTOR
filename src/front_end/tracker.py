@@ -42,7 +42,7 @@ class SiammaskTracker:
             masks.append(self.state['mask'] > self.state['p'].seg_thr)
         return locations,masks,self.current_classes
 
-    def reinit(self,new_boxes,im):
+    def reinit(self,new_boxes,im,redetect_ids):
         # new_box format: x,y,w,h (where x,y correspond to the top left corner)
         self.states_each_object = []
         self.current_classes = []

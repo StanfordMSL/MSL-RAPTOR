@@ -4,16 +4,9 @@
 # system
 import os, sys, argparse, time
 import pdb
-# from pathlib import Path
-# save/load
-# import pickle
 # math
 import numpy as np
 import cv2
-# plots
-# import matplotlib
-# from matplotlib import pyplot as plt
-# from mpl_toolkits import mplot3d
 # ros
 import rospy
 # custom modules
@@ -50,12 +43,12 @@ def run_execution_loop():
     
     rate = rospy.Rate(30) # max filter rate
     # wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
-    ukf_dict = {}  # object_name, ukf object
-    ukf = UKF(b_enforce_0_yaw, b_use_gt_bb, obj_type='mslquad', obj_name='quad4')  # create ukf object
-    ukf_dict['quad4'] = ukf
-    init_objects(ros, ukf)  # init camera, pose, etc
+    ukf_list = []  # index in list = obect id
+    # ukf = UKF(b_enforce_0_yaw, b_use_gt_bb, obj_type='mslquad', obj_id=0, ukf_init_values)  # create ukf object
+    my_camera, bb_3d, quad_width = init_objects(ros)  # init camera, pose, etc
     ros.create_subs_and_pubs()
-    state_est = np.zeros((ukf_dict['quad4'].dim_state + ukf_dict['quad4'].dim_sig**2, ))
+    dim_state = 13
+    state_est = np.zeros((dim_state + dim_state**2, ))
     loop_count = 0
     previous_image_time = 0
     time_since_last_detection = 0.
@@ -63,7 +56,6 @@ def run_execution_loop():
     if b_use_gt_bb:
         init_state_from_gt(ros, ukf_dict['quad4'])  
         img_seg = None
-        
 
     tic = time.time()
     while not rospy.is_shutdown():
@@ -79,48 +71,55 @@ def run_execution_loop():
             loop_count += 1
             rate.sleep()
             continue
+        
+        # get latest data from ros
+        processed_image = ros.im_process_output
+        im_seg_mode = ros.latest_bb_method
 
-        # ros.im_seg_mode = ros.IGNORE
+        # do we have any objects?
+        num_obj_in_img = len(processed_image)
+        if num_obj_in_img == 0:  # if no objects are seen, dont do anything
+            ros.im_seg_mode = ros.DETECT
+            rate.sleep()
+            continue
+        
         tf_ego_w = inv_tf(ros.tf_w_ego)  # ego quad pose
-        im_seg_mode = ros.im_seg_mode
-        if not b_use_gt_bb:
-            abb = ros.latest_abbs  # angled bounding box
-        else:
-            abb = ukf_dict['quad4'].predict_measurement(pose_to_state_vec(ros.ado_pose_gt_rosmsg), tf_ego_w)
-            rospy.logwarn("Faking measurement data")
+        # dt = loop_time - previous_image_time
+        
+        if b_use_gt_bb:
+            raise RuntimeError("b_use_gt_bb option NOT YET IMPLEMENTED")
 
-        if ros.latest_bb_method == ros.DETECT:
-            if ukf_dict['quad4'].check_measurement_valid_detect(abb):
-                ukf_dict['quad4'].reinit_filter(abb, ros.tf_w_ego)
-                ros.im_seg_mode = ros.TRACK
+        # handle each object seen
+        for idx, abb, obj_type, obj_id in enumerate(processed_image):
+            ukf = None
+            if ros.latest_bb_method == ros.DETECT:
+                time_since_last_detection = 0.
+                if obj_id > len(ukf_list):  # New Object
+                    new_ukf = UKF(camera=my_camera, bb_3d=bb_3d, quad_width=quad_width, init_time=loop_time, obj_type='mslquad', obj_id=obj_id)
+                    ukf_list.append(new_ukf)
+                    continue
+                else:  # Previously seen (but redetected) object, next time TRACK
+                    ukf = ukf_list[idx]
+                    ros.im_seg_mode = ros.TRACK
+
+            elif ros.latest_bb_method == ros.TRACK:
+                # check measurement
+                ukf = ukf_list[idx]
+        
+            if time_since_last_detection > detection_period:
+                ros.im_seg_mode = ros.DETECT
                 time_since_last_detection = 0.
             else:
-                rospy.loginfo("Detected box not valid")
-                rate.sleep()
-                continue
-        elif ros.latest_bb_method == ros.TRACK:
-            time_since_last_detection+=  loop_time - previous_image_time
-            # check measurement
-            if not ukf_dict['quad4'].check_measurement_valid_track(abb):
-                rospy.loginfo("Tracked box not valid")
-                ros.im_seg_mode = ros.DETECT
-                ukf_dict['quad4'].mu_obs = None
-                ukf_dict['quad4'].S_obs = None
-                rate.sleep()
-                continue
-        
-        if time_since_last_detection > detection_period:
-            ros.im_seg_mode = ros.DETECT
-            time_since_last_detection = 0.
+                time_since_last_detection +=  loop_time - previous_image_time
+            
+            previous_image_time = loop_time  # this ensures we dont reuse the image
 
-        # pdb.set_trace()
-        dt = loop_time - previous_image_time
-        ukf_dict['quad4'].itr_time = loop_time
-        ukf_dict['quad4'].step_ukf(abb, tf_ego_w, dt)  # update ukf
-        previous_image_time = loop_time  # this ensures we dont reuse the image
+            if ukf is not None:
+                ukf.itr_time = loop_time
+                ukf.step_ukf(abb, tf_ego_w, loop_time)  # update ukf
         
-        ros.publish_filter_state(ukf_dict['quad4'].mu, ukf_dict['quad4'].itr_time, ukf_dict['quad4'].itr)  # send vector with time, iteration, state_est
-        ros.publish_bb_msg(abb, im_seg_mode, loop_time)
+            ros.publish_filter_state(obj_id, ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
+            ros.publish_bb_msg(obj_id, abb, im_seg_mode, loop_time)
         
         # ros.im_seg_mode = ros.TRACK
         print("FULL END-TO-END time = {:4f}\n".format(time.time() - tic))
@@ -129,22 +128,23 @@ def run_execution_loop():
         loop_count += 1
     ### DONE WITH MSL RAPTOR ####
 
+
 def init_state_from_gt(ros, ukf):
     # init ukf state
     rospy.logwarn('using ground truth to initialize filter!')
     ukf.mu = pose_to_state_vec(ros.ado_pose_gt_rosmsg) 
     ukf.mu[0:3] += np.array([-2, .5, .5]) 
 
-def init_objects(ros, ukf):
+
+def init_objects(ros):
     # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
-    ukf.camera = camera(ros)
-    ros.camera = ukf.camera
+    ros.camera = camera(ros)
 
     # init 3d bounding box in quad frame
     half_length = rospy.get_param('~target_bound_box_l') / 2
     half_width = rospy.get_param('~target_bound_box_w') / 2
     half_height = rospy.get_param('~target_bound_box_h') / 2
-    ukf.bb_3d = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
+    bb_3d = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
                           [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
                           [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
                           [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
@@ -153,9 +153,10 @@ def init_objects(ros, ukf):
                           [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
                           [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
-    ukf.quad_width = 2*half_width
+    quad_width = 2*half_width
 
-    ros.im_seg_mode = ros.DETECT  # start of by detecting
+    ros.im_seg_mode = ros.DETECT  # start off by detecting
+    return ros.camera, bb_3d, quad_width
 
 
 def wait_intil_ros_ready(ros, rate):

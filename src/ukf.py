@@ -20,7 +20,7 @@ from utils_msl_raptor.math_utils import *
 
 class UKF:
 
-    def __init__(self, b_enforce_0_yaw=True, b_use_gt_bb=False, im_width=640, im_height=480, obj_type='mslquad', obj_name='quad'):
+    def __init__(self, camera, bb_3d, quad_width, init_time=0.0, b_enforce_0_yaw=True, b_use_gt_bb=False, im_width=640, im_height=480, obj_type='mslquad', obj_id=0):
 
         self.VERBOSE = True
 
@@ -29,16 +29,14 @@ class UKF:
         self.dim_sig = 12  # covariance is 1 less dimension due to quaternion
         self.dim_meas = 5  # angled bounding box: row, col, width, height, angle
         self.b_use_gt_bb = b_use_gt_bb
-        self.camera = None
+        self.camera = camera
 
-        self.obj_type = obj_type
-        self.obj_name = obj_name
+        self.obj_type = obj_type  # class name (string) e.g. 'person' or 'mslquad'
+        self.obj_id = obj_id  # a unique int classifier
         self.b_enforce_0_z = False
         if self.obj_type.lower() == 'mslquad':
             # these should all prob be loaded from a param file?
             self.b_enforce_0_yaw = b_enforce_0_yaw
-            
-
             kappa = 2  # based on State Estimation for Robotics (Barfoot)
             self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
 
@@ -67,10 +65,11 @@ class UKF:
         ####################################################################
 
         # init vars #############################
-        self.bb_3d = np.zeros((8, 3))  # set by main function initialization
-        self.quad_width = 0 # set by main function initialization
+        self.bb_3d = bb_3d
+        self.quad_width = quad_width
         self.itr = 0
-        self.itr_time = 0
+        self.itr_time_prev = init_time
+        self.itr_time = init_time
         self.tf_ego_w_tmp = None
         ####################################################################
 
@@ -108,7 +107,7 @@ class UKF:
 
 
 
-    def step_ukf(self, measurement, tf_ego_w, dt):
+    def step_ukf(self, measurement, tf_ego_w, itr_time):
         """
         UKF iteration following pseudo code from probablistic robotics
         """
@@ -124,6 +123,8 @@ class UKF:
         self.Q = self.Q*(dt/self.last_dt)
         self.R = self.R*(dt/self.last_dt)
 
+        self.itr_time = itr_time
+        dt = self.itr_time - self.itr_time_prev
         self.last_dt = dt
 
         b_outer_only = True

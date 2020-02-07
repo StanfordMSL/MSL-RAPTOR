@@ -30,8 +30,10 @@ class ros_interface:
         self.FAKED_BB = 3
         self.IGNORE = 4
         self.im_seg_mode = self.DETECT
-        self.latest_abbs = None  # angled bound box [row, height, width, height, angle (radians)]
-        self.latest_bb_method = self.DETECT  
+        # self.latest_abbs = None  # angled bound box [row, height, width, height, angle (radians)]
+        # self.latest_bb_method = self.DETECT
+        self.im_process_output = []  # what is accessed by the main function after an image is processed
+        self.clas_str_to_id = {'mslquad' : 80, 'person' : 0} # this should be loaded from .names
 
         self.ego_pose_rosmesg_buffer = ([], [])
         self.ego_pose_rosmesg_buffer_len = 50
@@ -111,41 +113,48 @@ class ros_interface:
         if self.camera is not None:
             image = cv2.undistort(image, self.camera.K, self.camera.dist_coefs, None, self.camera.new_camera_matrix)
         
-        self.latest_bb_method = self.im_seg_mode
-        if not self.b_use_gt_bb:
-            if self.im_seg_mode == self.DETECT:
-                bbs_no_angle = self.img_seg.detect(image)
-                if bbs_no_angle is False:
-                    self.latest_abbs = None
-                    self.latest_img_time = -1
-                    rospy.loginfo("Did not detect object")
-                    return
-                self.img_seg.reinit_tracker(bbs_no_angle, image)
-                bbs_4_corners = self.img_seg.track(image)[0][0]
-                self.latest_abbs = bb_corners_to_angled_bb(bbs_4_corners.reshape(-1,2))
-            elif self.im_seg_mode == self.TRACK:
-                bbs_4_corners = self.img_seg.track(image)[0][0]
-                self.latest_abbs = bb_corners_to_angled_bb(bbs_4_corners.reshape(-1,2))
-            else:
-                raise RuntimeError("Unknown image segmentation mode")
-        else:
-            self.im_seg_mode = self.FAKED_BB
+        self.process_image(image)
+        
             
         self.latest_img_time = my_time  # DO THIS LAST
         # self.img_seg_mode = self.IGNORE
         print("Image Callback time: {:.4f}".format(time.time() - tic))
 
 
-    def publish_filter_state(self, state_est, my_time, itr):
+    def process_image(self, image):
+        self.latest_bb_method = self.im_seg_mode
+        if not self.b_use_gt_bb:
+            if self.im_seg_mode == self.DETECT:
+                bbs_no_angle = self.img_seg.detect(image)  # returns a list of tuples: [(bb, class conf, object conf, class_id), ...]
+                # num_detections = len(bbs_no_angle)
+                if bbs_no_angle is False:
+                    self.im_process_output = []
+                    self.latest_img_time = -1
+                    rospy.loginfo("Did not detect object")
+                    return
+                self.img_seg.reinit_tracker(bbs_no_angle, image) 
+                output_tups = self.img_seg.track(image)  # returns a list of tuples: [(abb, object_type, object_id), ...]
+                self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id) for abb, o_type, o_id in output_tups]
+
+            elif self.im_seg_mode == self.TRACK:
+                output_tups = self.img_seg.track(image)[0][0]
+                self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id) for abb, o_type, o_id in output_tups]
+            else:
+                raise RuntimeError("Unknown image segmentation mode")
+        else:
+            self.im_seg_mode = self.FAKED_BB
+
+
+            ros.publish_filter_state(obj_id, ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
+    def publish_filter_state(self, obj_id, state_est, my_time, itr):
         """
         Broadcast the estimated state of the filter. 
         State assumed to be a Nx1 numpy array of floats
         """
         pose_msg = PoseStamped()
         pose_msg.header.stamp = rospy.Time(my_time)
-        pose_msg.header.frame_id = 'world'
+        pose_msg.header.frame_id = '{}'.format(obj_id)  # this is an int defining which object this is
         pose_msg.header.seq = np.uint32(itr)
-        pose_msg.pose.position.x = state_est[0]
         pose_msg.pose.position.y = state_est[1]
         pose_msg.pose.position.z = state_est[2]
         pose_msg.pose.orientation.w = state_est[6]
@@ -155,12 +164,13 @@ class ros_interface:
         self.state_pub.publish(pose_msg)
 
 
-    def publish_bb_msg(self, bb, bb_seg_mode, bb_ts):
+    def publish_bb_msg(self, obj_id, bb, bb_seg_mode, bb_ts):
         """
         publish custom message type for angled bounding box
         """
         bb_msg = angled_bb()
         bb_msg.header.stamp = rospy.Time.from_sec(bb_ts)
+        bb_msg.header.frame_id = '{}'.format(obj_id)  # this is an int defining which object this is
         bb_msg.x = bb[0]
         bb_msg.y = bb[1]
         bb_msg.width = bb[2]
