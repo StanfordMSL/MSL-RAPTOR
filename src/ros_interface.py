@@ -122,7 +122,7 @@ class ros_interface:
         """
         pose_msg = PoseStamped()
         pose_msg.header.stamp = rospy.Time(my_time)
-        pose_msg.header.frame_id = '{}'.format(obj_id)  # this is an int defining which object this is
+        pose_msg.header.frame_id = 'world'
         pose_msg.header.seq = np.uint32(itr)
         pose_msg.pose.position.y = state_est[1]
         pose_msg.pose.position.z = state_est[2]
