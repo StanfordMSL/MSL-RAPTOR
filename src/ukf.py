@@ -120,16 +120,11 @@ class UKF:
         
         # line 2
         # Rescale noises based on dt
-        print(self.last_dt)
-        print(itr_time)
-        print(self.itr_time_prev)
         self.sigma = enforce_pos_def_sym_mat(self.sigma*(dt/self.last_dt))
         self.Q = self.Q*(dt/self.last_dt)
         self.R = self.R*(dt/self.last_dt)
 
         self.last_dt = dt  # store previous dt
-
-        print(self.mu)
 
         b_outer_only = True
         tic0 = time.time()
@@ -185,8 +180,6 @@ class UKF:
         # lines 11-13
         if not b_outer_only:
             tic = time.time()
-        print(measurement)
-        print(mu_bar)
         mu_out, sigma_out = self.update_state(measurement, mu_bar, sig_bar, S, S_inv, S_xz, z_hat)
 
         self.mu = mu_out
