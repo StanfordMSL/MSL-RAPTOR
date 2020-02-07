@@ -23,7 +23,8 @@ class ImageSegmentor:
         self.last_boxes,_, self.last_classes = self.tracker.track(image)
         tic2 = time.time()
         print("track time = {:.4f}".format(tic2- tic))
-        return self.last_boxes, self.last_classes
+        dummy_object_ids = list(range(len(self.last_boxes)))  # DEBUG
+        return self.last_boxes, self.last_classes, dummy_object_ids
 
     def reinit_tracker(self,new_boxes,image):
         self.tracker.reinit(new_boxes,image)

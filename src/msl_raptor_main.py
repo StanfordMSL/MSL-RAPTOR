@@ -31,7 +31,6 @@ def run_execution_loop():
         rospy.logwarn("\n\n\n------------- IN DEBUG MODE (Using Ground Truth Bounding Boxes) -------------\n\n\n")
         time.sleep(0.5)
     
-        
     if not b_use_gt_bb:
         print('Waiting for first image')
         im = ros.get_first_image()
@@ -42,9 +41,7 @@ def run_execution_loop():
         time.sleep(0.5)
     
     rate = rospy.Rate(30) # max filter rate
-    # wait_intil_ros_ready(ros, rate)  # pause to allow ros to get initial messages
-    ukf_list = []  # index in list = obect id
-    # ukf = UKF(b_enforce_0_yaw, b_use_gt_bb, obj_type='mslquad', obj_id=0, ukf_init_values)  # create ukf object
+    ufk_dict = {}  # key: object_id value: ukf object
     my_camera, bb_3d, quad_width = init_objects(ros)  # init camera, pose, etc
     ros.create_subs_and_pubs()
     dim_state = 13
@@ -80,31 +77,33 @@ def run_execution_loop():
         num_obj_in_img = len(processed_image)
         if num_obj_in_img == 0:  # if no objects are seen, dont do anything
             ros.im_seg_mode = ros.DETECT
+            print("No objects detected/tracked in FOV")
             rate.sleep()
             continue
         
-        tf_ego_w = inv_tf(ros.tf_w_ego)  # ego quad pose
-        # dt = loop_time - previous_image_time
+        tf_w_ego = ros.tf_w_ego
+        tf_ego_w = inv_tf(tf_w_ego)  # ego quad pose
         
         if b_use_gt_bb:
             raise RuntimeError("b_use_gt_bb option NOT YET IMPLEMENTED")
 
         # handle each object seen
-        for idx, abb, obj_type, obj_id in enumerate(processed_image):
+        for abb, obj_type, obj_id in processed_image:
             ukf = None
             if ros.latest_bb_method == ros.DETECT:
                 time_since_last_detection = 0.
-                if obj_id > len(ukf_list):  # New Object
-                    new_ukf = UKF(camera=my_camera, bb_3d=bb_3d, quad_width=quad_width, init_time=loop_time, obj_type='mslquad', obj_id=obj_id)
-                    ukf_list.append(new_ukf)
+                if not obj_id in ufk_dict:  # New Object
+                    print("new object (id = {}, type = {})".format(obj_id, obj_type))
+                    ufk_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d, quad_width=quad_width, init_time=loop_time, obj_type='mslquad', obj_id=obj_id)
+                    ufk_dict[obj_id].reinit_filter(abb, tf_w_ego)
                     continue
                 else:  # Previously seen (but redetected) object, next time TRACK
-                    ukf = ukf_list[idx]
+                    ukf = ufk_dict[obj_id]
                     ros.im_seg_mode = ros.TRACK
 
             elif ros.latest_bb_method == ros.TRACK:
                 # check measurement
-                ukf = ukf_list[idx]
+                ukf = ufk_dict[obj_id]
         
             if time_since_last_detection > detection_period:
                 ros.im_seg_mode = ros.DETECT

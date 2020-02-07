@@ -99,7 +99,7 @@ class UKF:
             self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
             self.last_dt = 0.03
             if mu is None:
-                self.mu = np.zeros((self.dim_state, 1))  # set by main function initialization
+                self.mu = np.zeros((self.dim_state, ))  # set by main function initialization
             else:
                 self.mu = mu
         else:
@@ -111,21 +111,20 @@ class UKF:
         """
         UKF iteration following pseudo code from probablistic robotics
         """
-        # if b_vs_debug():
-        #     print("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
-        # else:
-        #     rospy.loginfo("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
-        # print(self.mu)
+        # Calculate dt based on current and previous iteration times
+        self.itr_time = itr_time
+        dt = self.itr_time - self.itr_time_prev
         
         # line 2
         # Rescale noises based on dt
+        print(self.last_dt)
         self.sigma = enforce_pos_def_sym_mat(self.sigma*(dt/self.last_dt))
         self.Q = self.Q*(dt/self.last_dt)
         self.R = self.R*(dt/self.last_dt)
 
-        self.itr_time = itr_time
-        dt = self.itr_time - self.itr_time_prev
-        self.last_dt = dt
+        self.last_dt = dt  # store previous dt
+
+        print(self.mu)
 
         b_outer_only = True
         tic0 = time.time()
@@ -181,6 +180,8 @@ class UKF:
         # lines 11-13
         if not b_outer_only:
             tic = time.time()
+        print(measurement)
+        print(mu_bar)
         mu_out, sigma_out = self.update_state(measurement, mu_bar, sig_bar, S, S_inv, S_xz, z_hat)
 
         self.mu = mu_out
