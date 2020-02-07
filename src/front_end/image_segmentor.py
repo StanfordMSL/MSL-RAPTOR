@@ -2,17 +2,16 @@ from detector import YoloDetector
 from tracker import SiammaskTracker
 import sys, os, time
 import numpy as np
+from utils_msl_raptor.ukf_utils import bb_corners_to_angled_bb
 
 class TrackedObject:
     def __init__(self, object_id, class_id):
         self.id = object_id
-        self.active = True
-        self.last_bb = None
         self.class_id = class_id
         self.latest_tracked_state = None
 
 class ImageSegmentor:
-    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[80],use_trt=False, im_width=640, im_height=480):
+    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[80],use_trt=False, im_width=640, im_height=480, detection_period = 5):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         if detector_name == 'yolov3':
             self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_class_ids)
@@ -30,6 +29,15 @@ class ImageSegmentor:
         # self.last_classes = []
         self.ukf_dict = {}
 
+        # Used to decide when to track and to detect
+        self.DETECT = 1
+        self.TRACK = 2
+
+        self.mode = self.DETECT
+
+        self.last_detection_time = None
+        self.detection_period = detection_period
+
         ####################################################################
 
         # Statistics used for testing new measurements
@@ -45,6 +53,50 @@ class ImageSegmentor:
         self.im_width = im_width
         self.im_height = im_height
         
+
+
+    # def process_image(self, image):
+    #     self.im_process_output = self.im_seg.process_image(image)
+    #     self.latest_bb_method = self.im_seg_mode
+    #     if not self.b_use_gt_bb:
+    #         if self.im_seg_mode == self.DETECT:
+    #             bbs_no_angle = self.img_seg.detect(image)  # returns a list of tuples: [(bb, class conf, object conf, class_id), ...]
+    #             # num_detections = len(bbs_no_angle)
+    #             if bbs_no_angle is False:
+    #                 self.im_process_output = []
+    #                 self.latest_img_time = -1
+    #                 rospy.loginfo("Did not detect object")
+    #                 return
+    #             self.img_seg.reinit_tracker(bbs_no_angle, image) 
+    #             output_tups = self.img_seg.track(image)  # returns a tuple of lists: ([abb1, abb2...], o_type1, o_type2..., [o_id1, o_id2...])
+    #             self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id, valid) for abb, o_type, o_id, valid in output_tups]
+
+    #         elif self.im_seg_mode == self.TRACK:
+    #             output_tups = self.img_seg.track(image)
+    #             self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id, valid) for abb, o_type, o_id, valid in output_tups]
+    #         else:
+    #             raise RuntimeError("Unknown image segmentation mode")
+    #     else:
+    #         self.im_seg_mode = self.FAKED_BB
+        
+    def process_image(self,image,time):
+
+        if self.mode == self.DETECT:
+            bbs_no_angle = self.detect(image)  # returns a list of tuples: [(bb, class conf, object conf, class_id), ...]
+            self.last_detection_time = time
+            # No detections
+            if bbs_no_angle is False:
+                rospy.loginfo("Did not detect object")
+                return []
+            # Detections to reinit tracker
+            self.reinit_tracker(bbs_no_angle, image)
+            self.mode = self.TRACK
+            return self.track(image)
+        elif self.mode == self.TRACK:
+            self.check_periodic_detection(time)
+            return self.track(image)
+            
+        
     def track(self,image):
         tic = time.time()
         output = []
@@ -55,10 +107,14 @@ class ImageSegmentor:
             # Check if measurement valid if we have a state estimate
             if obj_id in self.ukf_dict:
                 valid = self.valid_tracking(self.ukf_dict[obj_id],abb)
+                # If not valid we switch to detection
+                if not valid:
+                    self.mode = self.DETECT
+            # If this is a new object it has already passed the detection check, it is considered valid for now
             else:
                 valid = True
 
-            output.append((abb,self.tracked_objects[obj_id].class_id,obj_id, valid))
+            output.append((bb_corners_to_angled_bb(abb.reshape(-1,2)),self.tracked_objects[obj_id].class_id,obj_id, valid))
 
         # dummy_object_ids = list(range(len(self.last_boxes)))  # DEBUG
         tic2 = time.time()
@@ -193,3 +249,9 @@ class ImageSegmentor:
             return False
 
         return True
+
+    # If we haven't detected in too long, switch back to detection mode
+    def check_periodic_detection(self,time):
+        if time - self.last_detection_time > self.detection_period:
+            self.mode = self.DETECT
+        

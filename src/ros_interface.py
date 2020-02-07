@@ -23,15 +23,7 @@ class ros_interface:
         
         self.VERBOSE = True
 
-        # Paramters #############################
-        self.latest_img_time = -1
-        self.DETECT = 1
-        self.TRACK = 2
-        self.FAKED_BB = 3
-        self.IGNORE = 4
-        self.im_seg_mode = self.DETECT
-        # self.latest_abbs = None  # angled bound box [row, height, width, height, angle (radians)]
-        # self.latest_bb_method = self.DETECT
+        # Parameters #############################
         self.im_process_output = []  # what is accessed by the main function after an image is processed
         self.clas_str_to_id = {'mslquad' : 80, 'person' : 0} # this should be loaded from .names
 
@@ -113,39 +105,14 @@ class ros_interface:
         if self.camera is not None:
             image = cv2.undistort(image, self.camera.K, self.camera.dist_coefs, None, self.camera.new_camera_matrix)
         
-        self.process_image(image)
-        
-            
+        self.im_process_output = self.im_seg.process_image(image,my_time)
+
         self.latest_img_time = my_time  # DO THIS LAST
         # self.img_seg_mode = self.IGNORE
         print("Image Callback time: {:.4f}".format(time.time() - tic))
 
 
-    def process_image(self, image):
-        self.latest_bb_method = self.im_seg_mode
-        if not self.b_use_gt_bb:
-            if self.im_seg_mode == self.DETECT:
-                bbs_no_angle = self.img_seg.detect(image)  # returns a list of tuples: [(bb, class conf, object conf, class_id), ...]
-                # num_detections = len(bbs_no_angle)
-                if bbs_no_angle is False:
-                    self.im_process_output = []
-                    self.latest_img_time = -1
-                    rospy.loginfo("Did not detect object")
-                    return
-                self.img_seg.reinit_tracker(bbs_no_angle, image) 
-                output_tups = self.img_seg.track(image)  # returns a tuple of lists: ([abb1, abb2...], o_type1, o_type2..., [o_id1, o_id2...])
-                self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id, valid) for abb, o_type, o_id, valid in output_tups]
 
-            elif self.im_seg_mode == self.TRACK:
-                output_tups = self.img_seg.track(image)
-                self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id, valid) for abb, o_type, o_id, valid in output_tups]
-            else:
-                raise RuntimeError("Unknown image segmentation mode")
-        else:
-            self.im_seg_mode = self.FAKED_BB
-
-
-            ros.publish_filter_state(obj_id, ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est
     def publish_filter_state(self, obj_id, state_est, my_time, itr):
         """
         Broadcast the estimated state of the filter. 

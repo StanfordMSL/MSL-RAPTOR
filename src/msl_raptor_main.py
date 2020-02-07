@@ -22,7 +22,7 @@ from image_segmentor import ImageSegmentor
 def run_execution_loop():
     b_enforce_0_yaw = rospy.get_param('~b_enforce_0_yaw') 
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb') 
-    detection_period = rospy.get_param('~detection_period') # In seconds
+    detection_period_ros = rospy.get_param('~detection_period') # In seconds
     b_filter_meas = True
     
     ros = ROS(b_use_gt_bb)  # create a ros interface object
@@ -35,8 +35,7 @@ def run_execution_loop():
         print('Waiting for first image')
         im = ros.get_first_image()
         print('initializing image segmentor!!!!!!')
-        ros.img_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'))
-        ros.im_seg_mode = ros.DETECT
+        ros.img_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros)
         print('initializing DONE - PLAY BAG NOW!!!!!!')
         time.sleep(0.5)
     
@@ -48,7 +47,6 @@ def run_execution_loop():
     state_est = np.zeros((dim_state + dim_state**2, ))
     loop_count = 0
     previous_image_time = 0
-    time_since_last_detection = 0.
 
     if b_use_gt_bb:
         init_state_from_gt(ros, ukf_dict['quad4'])  
@@ -76,7 +74,6 @@ def run_execution_loop():
         # do we have any objects?
         num_obj_in_img = len(processed_image)
         if num_obj_in_img == 0:  # if no objects are seen, dont do anything
-            ros.im_seg_mode = ros.DETECT
             print("No objects detected/tracked in FOV")
             rate.sleep()
             continue
@@ -90,26 +87,11 @@ def run_execution_loop():
         # handle each object seen
         for abb, obj_type, obj_id, valid in processed_image:
             ukf = None
-            if ros.latest_bb_method == ros.DETECT:
-                time_since_last_detection = 0.
-                if not obj_id in ukf_dict:  # New Object
-                    print("new object (id = {}, type = {})".format(obj_id, obj_type))
-                    ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d, quad_width=quad_width, init_time=loop_time, obj_type='mslquad', obj_id=obj_id)
-                    ukf_dict[obj_id].reinit_filter(abb, tf_w_ego)
-                    continue
-                else:  # Previously seen (but redetected) object, next time TRACK
-                    ros.im_seg_mode = ros.TRACK
-
-            ### Don't think this is necessary anymore
-            # elif ros.latest_bb_method == ros.TRACK:
-            #     # check measurement
-            #     ukf = ukf_dict[obj_id]
-        
-            if time_since_last_detection > detection_period:
-                ros.im_seg_mode = ros.DETECT
-                time_since_last_detection = 0.
-            else:
-                time_since_last_detection +=  loop_time - previous_image_time
+            if not obj_id in ukf_dict:  # New Object
+                print("new object (id = {}, type = {})".format(obj_id, obj_type))
+                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d, quad_width=quad_width, init_time=loop_time, obj_type='mslquad', obj_id=obj_id)
+                ukf_dict[obj_id].reinit_filter(abb, tf_w_ego)
+                continue
             
             previous_image_time = loop_time  # this ensures we dont reuse the image
 
@@ -156,7 +138,6 @@ def init_objects(ros):
 
     quad_width = 2*half_width
 
-    ros.im_seg_mode = ros.DETECT  # start off by detecting
     return ros.camera, bb_3d, quad_width
 
 
