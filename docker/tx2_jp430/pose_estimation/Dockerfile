@@ -15,7 +15,7 @@ RUN source /ros_python3_entrypoint.sh && \
 # Scipy
 RUN apt-get update && \
     apt-get install -y libatlas-base-dev gfortran && \
-    pip3 install wheel && \
+    pip3 install wheel pybind11 && \
     pip3 install scipy
 
 # Pytorch
