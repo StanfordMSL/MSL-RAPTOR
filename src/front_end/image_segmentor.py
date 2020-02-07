@@ -2,6 +2,8 @@ from detector import YoloDetector
 from tracker import SiammaskTracker
 import sys, os, time
 import numpy as np
+import math
+import numpy.linalg as la
 from utils_msl_raptor.ukf_utils import bb_corners_to_angled_bb
 
 class TrackedObject:
@@ -55,30 +57,6 @@ class ImageSegmentor:
         
 
 
-    # def process_image(self, image):
-    #     self.im_process_output = self.im_seg.process_image(image)
-    #     self.latest_bb_method = self.im_seg_mode
-    #     if not self.b_use_gt_bb:
-    #         if self.im_seg_mode == self.DETECT:
-    #             bbs_no_angle = self.img_seg.detect(image)  # returns a list of tuples: [(bb, class conf, object conf, class_id), ...]
-    #             # num_detections = len(bbs_no_angle)
-    #             if bbs_no_angle is False:
-    #                 self.im_process_output = []
-    #                 self.latest_img_time = -1
-    #                 rospy.loginfo("Did not detect object")
-    #                 return
-    #             self.img_seg.reinit_tracker(bbs_no_angle, image) 
-    #             output_tups = self.img_seg.track(image)  # returns a tuple of lists: ([abb1, abb2...], o_type1, o_type2..., [o_id1, o_id2...])
-    #             self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id, valid) for abb, o_type, o_id, valid in output_tups]
-
-    #         elif self.im_seg_mode == self.TRACK:
-    #             output_tups = self.img_seg.track(image)
-    #             self.im_process_output = [(bb_corners_to_angled_bb(abb.reshape(-1,2)), o_type, o_id, valid) for abb, o_type, o_id, valid in output_tups]
-    #         else:
-    #             raise RuntimeError("Unknown image segmentation mode")
-    #     else:
-    #         self.im_seg_mode = self.FAKED_BB
-        
     def process_image(self,image,time):
 
         if self.mode == self.DETECT:
@@ -103,6 +81,7 @@ class ImageSegmentor:
         # Go over each active tracked object
         for obj_id in sum(self.active_objects_ids_per_class.values(),[]):
             self.tracked_objects[obj_id].latest_tracked_state, abb, mask = self.tracker.track(image,self.tracked_objects[obj_id].latest_tracked_state)
+            abb = bb_corners_to_angled_bb(abb.reshape(-1,2))
 
             # Check if measurement valid if we have a state estimate
             if obj_id in self.ukf_dict:
@@ -114,7 +93,7 @@ class ImageSegmentor:
             else:
                 valid = True
 
-            output.append((bb_corners_to_angled_bb(abb.reshape(-1,2)),self.tracked_objects[obj_id].class_id,obj_id, valid))
+            output.append((abb,self.tracked_objects[obj_id].class_id,obj_id, valid))
 
         # dummy_object_ids = list(range(len(self.last_boxes)))  # DEBUG
         tic2 = time.time()
@@ -219,7 +198,7 @@ class ImageSegmentor:
 
 
     def valid_tracking(self,ukf,abb):
-        if self.mu_obs is None:
+        if ukf.mu_obs is None:
             return True
         # Check if row or column valid
         mu_x_l = abb[0] - abb[2]/2
@@ -234,7 +213,7 @@ class ImageSegmentor:
 
         mu_y_l = abb[1] - abb[3]/2
         mu_y_r = abb[1] + abb[3]/2
-        sigma_y = math.sqrt(self.S_obs[1,1]+ self.S_obs[3,3]/4)
+        sigma_y = math.sqrt(ukf.S_obs[1,1]+ ukf.S_obs[3,3]/4)
         z_y_l = (0-mu_y_l)/sigma_y
         z_y_r = (self.im_height-mu_y_r)/sigma_y
 

@@ -31,8 +31,9 @@ class ros_interface:
         self.ego_pose_rosmesg_buffer_len = 50
         self.ego_pose_gt_rosmsg = None
 
-        self.img_seg = None  # object for parsing images into angled bounding boxes
+        self.im_seg = None  # object for parsing images into angled bounding boxes
         self.b_use_gt_bb = b_use_gt_bb  # toggle for debugging using ground truth bounding boxes
+        self.latest_img_time = -1
         ####################################################################
 
         self.ns = rospy.get_param('~ns')  # robot namespace
@@ -105,6 +106,7 @@ class ros_interface:
         if self.camera is not None:
             image = cv2.undistort(image, self.camera.K, self.camera.dist_coefs, None, self.camera.new_camera_matrix)
         
+        self.latest_bb_method = self.im_seg.mode
         self.im_process_output = self.im_seg.process_image(image,my_time)
 
         self.latest_img_time = my_time  # DO THIS LAST
