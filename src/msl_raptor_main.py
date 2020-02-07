@@ -114,7 +114,6 @@ def run_execution_loop():
             previous_image_time = loop_time  # this ensures we dont reuse the image
 
             if ukf is not None:
-                ukf.itr_time = loop_time
                 ukf.step_ukf(abb, tf_ego_w, loop_time)  # update ukf
         
             ros.publish_filter_state(obj_id, ukf.mu, ukf.itr_time, ukf.itr)  # send vector with time, iteration, state_est

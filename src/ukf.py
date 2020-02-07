@@ -113,11 +113,16 @@ class UKF:
         """
         # Calculate dt based on current and previous iteration times
         self.itr_time = itr_time
-        dt = self.itr_time - self.itr_time_prev
+        if self.itr_time == self.itr_time_prev: # first run through
+            dt = self.last_dt
+        else:
+            dt = self.itr_time - self.itr_time_prev
         
         # line 2
         # Rescale noises based on dt
         print(self.last_dt)
+        print(itr_time)
+        print(self.itr_time_prev)
         self.sigma = enforce_pos_def_sym_mat(self.sigma*(dt/self.last_dt))
         self.Q = self.Q*(dt/self.last_dt)
         self.R = self.R*(dt/self.last_dt)
@@ -188,6 +193,7 @@ class UKF:
         self.sigma = sigma_out
 
         self.itr += 1
+        self.itr_time_prev = self.itr_time
         tic1 = time.time()
         if not b_outer_only:
             print("update_state: {:.4f}\nTOTAL time (with prints): {:.4f}".format(tic1 - tic, tic1 - tic0))
