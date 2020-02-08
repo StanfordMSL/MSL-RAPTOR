@@ -124,6 +124,7 @@ class ros_interface:
         pose_msg.header.stamp = rospy.Time(my_time)
         pose_msg.header.frame_id = 'world'
         pose_msg.header.seq = np.uint32(itr)
+        pose_msg.pose.position.x = state_est[0]
         pose_msg.pose.position.y = state_est[1]
         pose_msg.pose.position.z = state_est[2]
         pose_msg.pose.orientation.w = state_est[6]
