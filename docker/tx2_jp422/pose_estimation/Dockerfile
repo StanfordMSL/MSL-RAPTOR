@@ -16,7 +16,11 @@ RUN source /ros_python3_entrypoint.sh && \
 RUN apt-get update && \
     apt-get install -y libatlas-base-dev gfortran && \
     pip3 install wheel && \
+    pip3 install pybind11 && \
     pip3 install scipy
+
+# Numpy
+RUN pip3 install numpy==1.16
 
 # Pytorch
 RUN apt-get update && \
