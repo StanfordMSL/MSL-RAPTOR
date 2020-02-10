@@ -71,6 +71,7 @@ RUN apt-get update && \
 # Torch to TensorRT package
 RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && \
     cd torch2trt && \
+    pip3 install pillow==6.2 && \
     python3 setup.py install && \
     cd .. && \
     rm -rf torch2trt
