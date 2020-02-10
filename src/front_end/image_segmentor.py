@@ -64,7 +64,7 @@ class ImageSegmentor:
             self.last_detection_time = time
             # No detections
             if bbs_no_angle is False:
-                rospy.loginfo("Did not detect object")
+                print("Did not detect object")
                 return []
             # Detections to reinit tracker
             self.reinit_tracker(bbs_no_angle, image)
@@ -208,7 +208,7 @@ class ImageSegmentor:
         z_x_r = (self.im_width-mu_x_r)/sigma_x
 
         if z_x_l > -self.z_075_one_sided or z_x_r < self.z_075_one_sided:
-            rospy.loginfo("Rejected measurement with values left {} and right {}".format(z_x_l,z_x_r))
+            print("Rejected measurement with values left {} and right {}".format(z_x_l,z_x_r))
             return False
 
         mu_y_l = abb[1] - abb[3]/2
@@ -218,13 +218,13 @@ class ImageSegmentor:
         z_y_r = (self.im_height-mu_y_r)/sigma_y
 
         if z_y_l > -self.z_075_one_sided or z_y_r < self.z_075_one_sided:
-            rospy.loginfo("Rejected measurement with values top {} and bottom {}".format(z_y_l,z_y_r))
+            print("Rejected measurement with values top {} and bottom {}".format(z_y_l,z_y_r))
             return False
 
 
         t = self.score_state_consistent_measurement(ukf,abb)
         if t > self.F_005:
-            rospy.loginfo("Rejected measurement too far from distribution: F={}".format(t))
+            print("Rejected measurement too far from distribution: F={}".format(t))
             return False
 
         return True
