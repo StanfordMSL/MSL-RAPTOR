@@ -7,7 +7,7 @@ import numpy as np
 # ros
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
-from msl_raptor.msg import angled_bb
+from msl_raptor.msg import AngledBbox,AngledBboxes,TrackedPoses
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
 import tf
@@ -54,8 +54,8 @@ class ros_interface:
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1,buff_size=2**21)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
-        self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', PoseStamped, queue_size=5)
-        self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', angled_bb, queue_size=5)
+        self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', TrackedPoses, queue_size=5)
+        self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', AngledBboxes, queue_size=5)
         ####################################################################
 
     def ado_pose_gt_cb(self, msg):
@@ -114,36 +114,48 @@ class ros_interface:
 
 
 
-    def publish_filter_state(self, obj_id, state_est, my_time, itr):
+    def publish_filter_state(self, obj_ids,ukf_dict):# state_est, my_time, itr):
         """
         Broadcast the estimated state of the filter. 
         State assumed to be a Nx1 numpy array of floats
         """
-        pose_msg = PoseStamped()
-        pose_msg.header.stamp = rospy.Time(my_time)
-        pose_msg.header.frame_id = 'world'
-        pose_msg.header.seq = np.uint32(itr)
-        pose_msg.pose.position.x = state_est[0]
-        pose_msg.pose.position.y = state_est[1]
-        pose_msg.pose.position.z = state_est[2]
-        pose_msg.pose.orientation.w = state_est[6]
-        pose_msg.pose.orientation.x = state_est[7]
-        pose_msg.pose.orientation.y = state_est[8]
-        pose_msg.pose.orientation.z = state_est[9]
-        self.state_pub.publish(pose_msg)
+        tracked_poses = TrackedPoses()
+        for id in obj_ids:
+            pose_msg = PoseStamped()
+            state_est = ukf_dict[id].mu
+            pose_msg.header.stamp = rospy.Time(ukf_dict[id].itr_time)
+            pose_msg.header.frame_id = 'world'
+            pose_msg.header.seq = np.uint32(ukf_dict[id])
+            pose_msg.pose.position.x = state_est[0]
+            pose_msg.pose.position.y = state_est[1]
+            pose_msg.pose.position.z = state_est[2]
+            pose_msg.pose.orientation.w = state_est[6]
+            pose_msg.pose.orientation.x = state_est[7]
+            pose_msg.pose.orientation.y = state_est[8]
+            pose_msg.pose.orientation.z = state_est[9]
+
+            tracked_poses.append(pose_msg)
+
+        self.state_pub.publish(tracked_poses)
 
 
-    def publish_bb_msg(self, obj_id, bb, bb_seg_mode, bb_ts):
+    def publish_bb_msg(self,processed_image, bb_seg_mode, bb_ts):
         """
         publish custom message type for angled bounding box
         """
-        bb_msg = angled_bb()
-        bb_msg.header.stamp = rospy.Time.from_sec(bb_ts)
-        bb_msg.header.frame_id = '{}'.format(obj_id)  # this is an int defining which object this is
-        bb_msg.x = bb[0]
-        bb_msg.y = bb[1]
-        bb_msg.width = bb[2]
-        bb_msg.height = bb[3]
-        bb_msg.angle = bb[4]
-        bb_msg.im_seg_mode = bb_seg_mode
-        self.bb_data_pub.publish(bb_msg)
+        bounding_boxes = AngledBboxes()
+        for box in processed_image:
+            bb,_,obj_id,_ = box
+
+            bb_msg = AngledBbox()
+            bb_msg.header.stamp = rospy.Time.from_sec(bb_ts)
+            bb_msg.header.frame_id = '{}'.format(obj_id)  # this is an int defining which object this is
+            bb_msg.x = bb[0]
+            bb_msg.y = bb[1]
+            bb_msg.width = bb[2]
+            bb_msg.height = bb[3]
+            bb_msg.angle = bb[4]
+            bb_msg.im_seg_mode = bb_seg_mode
+
+            bounding_boxes.append(bb_msg)
+        self.bb_data_pub.publish(bounding_boxes)

@@ -17,7 +17,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
-from msl_raptor.msg import angled_bb
+from msl_raptor.msg import AngledBbox
 import tf
 import cv2
 from cv_bridge import CvBridge, CvBridgeError

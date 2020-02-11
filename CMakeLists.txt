@@ -50,7 +50,9 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  angled_bb.msg
+  AngledBbox.msg
+  AngledBboxes.msg
+  TrackedPoses.msg
 )
 
 ## Generate services in the 'srv' folder

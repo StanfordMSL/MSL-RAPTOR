@@ -9,7 +9,7 @@ import numpy as np
 from bisect import bisect_left
 # ros
 import rospy
-from msl_raptor.msg import angled_bb
+from msl_raptor.msg import AngledBbox
 from geometry_msgs.msg import PoseStamped, Twist, Pose
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
@@ -40,7 +40,7 @@ class bb_viz_node:
 
         if self.b_overlay:
            rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1,buff_size=2**21)
-        self.bb_data_sub = rospy.Subscriber(self.ns + '/bb_data', angled_bb, self.bb_viz_cb, queue_size=5)
+        self.bb_data_sub = rospy.Subscriber(self.ns + '/bb_data', AngledBbox, self.bb_viz_cb, queue_size=5)
         self.img_overlay_pub = rospy.Publisher(self.ns + '/image_bb_overlay', Image, queue_size=5)
         self.itr = 0
         camera_info = rospy.wait_for_message(self.ns + '/camera/camera_info', CameraInfo, 30)

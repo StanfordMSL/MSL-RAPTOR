@@ -85,6 +85,7 @@ def run_execution_loop():
             raise RuntimeError("b_use_gt_bb option NOT YET IMPLEMENTED")
 
         # handle each object seen
+        obj_ids_tracked = []
         for abb, class_str, obj_id, valid in processed_image:
             ukf = None
             if not obj_id in ukf_dict:  # New Object
@@ -92,14 +93,16 @@ def run_execution_loop():
                 ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id)
                 ukf_dict[obj_id].reinit_filter(abb, tf_w_ego)
                 continue
-            
+
+            obj_ids_tracked.append(obj_id)
+
             previous_image_time = loop_time  # this ensures we dont reuse the image
 
             if ukf_dict[obj_id] is not None:
                 ukf_dict[obj_id].step_ukf(abb, tf_ego_w, loop_time)  # update ukf
         
-            ros.publish_filter_state(obj_id, ukf_dict[obj_id].mu, ukf_dict[obj_id].itr_time, ukf_dict[obj_id].itr)  # send vector with time, iteration, state_est
-            ros.publish_bb_msg(obj_id, abb, im_seg_mode, loop_time)
+        ros.publish_filter_state(obj_ids_tracked,ukf_dict)#, ukf_dict[obj_id].mu, ukf_dict[obj_id].itr_time, ukf_dict[obj_id].itr)  # send vector with time, iteration, state_est
+        ros.publish_bb_msg(processed_image,im_seg_mode, loop_time)# obj_ids_tracked, abb, im_seg_mode, loop_time)
         
         # Save current object states in image segmentor
         ros.im_seg.ukf_dict = ukf_dict
