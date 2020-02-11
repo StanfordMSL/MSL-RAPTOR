@@ -202,7 +202,7 @@ class ImageSegmentor:
 
 
     def valid_tracking(self,ukf,abb):
-        if ukf.mu_obs is None:
+        if not hasattr(ukf,'mu_obs'):
             return True
         # Check if row or column valid
         mu_x_l = abb[0] - abb[2]/2
