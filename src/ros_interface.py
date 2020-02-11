@@ -25,7 +25,6 @@ class ros_interface:
 
         # Parameters #############################
         self.im_process_output = []  # what is accessed by the main function after an image is processed
-        self.clas_str_to_id = {'mslquad' : 80, 'person' : 0} # this should be loaded from .names
 
         self.ego_pose_rosmesg_buffer = ([], [])
         self.ego_pose_rosmesg_buffer_len = 50

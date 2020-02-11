@@ -41,7 +41,7 @@ def run_execution_loop():
     
     rate = rospy.Rate(30) # max filter rate
     ukf_dict = {}  # key: object_id value: ukf object
-    my_camera, bb_3d, quad_width = init_objects(ros)  # init camera, pose, etc
+    my_camera, bb_3d, obj_width = init_objects(ros)  # init camera, pose, etc
     ros.create_subs_and_pubs()
     dim_state = 13
     state_est = np.zeros((dim_state + dim_state**2, ))
@@ -85,11 +85,11 @@ def run_execution_loop():
             raise RuntimeError("b_use_gt_bb option NOT YET IMPLEMENTED")
 
         # handle each object seen
-        for abb, obj_type, obj_id, valid in processed_image:
+        for abb, class_str, obj_id, valid in processed_image:
             ukf = None
             if not obj_id in ukf_dict:  # New Object
-                print("new object (id = {}, type = {})".format(obj_id, obj_type))
-                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d, quad_width=quad_width, init_time=loop_time, obj_type='mslquad', obj_id=obj_id)
+                print("new object (id = {}, type = {})".format(obj_id, class_str))
+                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id)
                 ukf_dict[obj_id].reinit_filter(abb, tf_w_ego)
                 continue
             
@@ -123,11 +123,15 @@ def init_objects(ros):
     # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
     ros.camera = camera(ros)
 
+    bb_3d = {}
+    obj_width = {}
+
+    # MSL quadrotor
     # init 3d bounding box in quad frame
     half_length = rospy.get_param('~target_bound_box_l') / 2
     half_width = rospy.get_param('~target_bound_box_w') / 2
     half_height = rospy.get_param('~target_bound_box_h') / 2
-    bb_3d = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
+    bb_3d['mslquad'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
                           [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
                           [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
                           [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
@@ -136,9 +140,25 @@ def init_objects(ros):
                           [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
                           [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
-    quad_width = 2*half_width
+    obj_width['mslquad'] = 2*half_width
 
-    return ros.camera, bb_3d, quad_width
+    # Person
+    half_length = 0.3 / 2
+    half_width = 0.3 / 2
+    half_height = 1.8 / 2
+    bb_3d['person'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
+                          [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
+                          [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
+                          [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
+                          [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
+                          [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
+                          [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
+                          [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
+
+    obj_width['person'] = 2*half_width
+
+
+    return ros.camera, bb_3d, obj_width
 
 
 def wait_intil_ros_ready(ros, rate):

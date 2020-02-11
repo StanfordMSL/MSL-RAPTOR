@@ -20,7 +20,7 @@ from utils_msl_raptor.math_utils import *
 
 class UKF:
 
-    def __init__(self, camera, bb_3d, quad_width, init_time=0.0, b_enforce_0_yaw=True, b_use_gt_bb=False, obj_type='mslquad', obj_id=0):
+    def __init__(self, camera, bb_3d, obj_width, init_time=0.0, b_enforce_0_yaw=True, b_use_gt_bb=False, class_str='mslquad', obj_id=0):
 
         self.VERBOSE = True
 
@@ -31,10 +31,10 @@ class UKF:
         self.b_use_gt_bb = b_use_gt_bb
         self.camera = camera
 
-        self.obj_type = obj_type  # class name (string) e.g. 'person' or 'mslquad'
+        self.class_str = class_str  # class name (string) e.g. 'person' or 'mslquad'
         self.obj_id = obj_id  # a unique int classifier
         self.b_enforce_0_z = False
-        if self.obj_type.lower() == 'mslquad':
+        if self.class_str.lower() == 'mslquad':
             # these should all prob be loaded from a param file?
             self.b_enforce_0_yaw = b_enforce_0_yaw
             kappa = 2  # based on State Estimation for Robotics (Barfoot)
@@ -44,7 +44,7 @@ class UKF:
             self.wi = 1 / (2 * (kappa + self.dim_sig))
             self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
             self.w_arr[0] = self.w0
-        elif self.obj_type.lower() == 'person':
+        elif self.class_str.lower() == 'person':
             # these should all prob be loaded from a param file?
             self.b_enforce_0_z = True
             self.b_enforce_0_yaw = b_enforce_0_yaw
@@ -58,7 +58,7 @@ class UKF:
             self.w_arr[0] = self.w0
 
         else:
-            raise RuntimeError('Unknown object type: {}'.format(self.obj_type))
+            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
 
         self.init_filter_elements()
         
@@ -66,7 +66,7 @@ class UKF:
 
         # init vars #############################
         self.bb_3d = bb_3d
-        self.quad_width = quad_width
+        self.obj_width = obj_width
         self.itr = 0
         self.itr_time_prev = init_time
         self.itr_time = init_time
@@ -75,7 +75,7 @@ class UKF:
 
 
     def init_filter_elements(self, mu=None):
-        if self.obj_type.lower() == 'mslquad':
+        if self.class_str.lower() == 'mslquad':
             dp = 0.1  # [m]
             dv = 0.005  # [m/s]
             dq = 0.1  # [rad] in ax ang 
@@ -89,8 +89,23 @@ class UKF:
                 self.mu = np.zeros((self.dim_state, ))  # set by main function initialization
             else:
                 self.mu = mu
+        elif self.class_str.lower() == 'person':
+            dp = 0.1  # [m]
+            dv = 0.005  # [m/s]
+            dq = 0.1  # [rad] in ax ang 
+            dw = 0.005  # [rad/s]
+            self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])
+
+            self.Q = self.sigma/10  # Process Noise
+            self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
+            self.last_dt = 0.03
+            if mu is None:
+                self.mu = np.zeros((self.dim_state, ))  # set by main function initialization
+            else:
+                self.mu = mu
+        
         else:
-            raise RuntimeError('Unknown object type: {}'.format(self.obj_type))
+            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
 
 
 
@@ -309,7 +324,7 @@ class UKF:
         states = states.reshape(13,-1)
         next_states = copy(states)
 
-        if self.obj_type.lower() == 'mslquad':
+        if self.class_str.lower() == 'mslquad':
 
             # update position
             next_states[0:3,:] += dt * states[3:6,:]
@@ -327,7 +342,7 @@ class UKF:
             next_states[6:10,:] = quat_new.T
             if self.b_enforce_0_yaw:
                 next_states[6:10,:] = remove_yaw(quat_new).T
-        elif self.obj_type.lower() == 'person':
+        elif self.class_str.lower() == 'person':
             # People on on the groud
             # update position
             next_states[0:2,:] += dt * states[3:5,:]  # no z update
@@ -346,7 +361,7 @@ class UKF:
             if self.b_enforce_0_yaw:
                 next_states[6:10,:] = remove_yaw(quat_new).T
         else:
-            raise RuntimeError('Unknown object type: {}'.format(self.obj_type))
+            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
 
         return next_states
     
@@ -373,7 +388,7 @@ class UKF:
         """
         Initialize a state with approximations using a single bounding box
         """
-        z = self.camera.new_camera_matrix[0,0]* self.quad_width /bb[2]
+        z = self.camera.new_camera_matrix[0,0]* self.obj_width /bb[2]
         im_coor = z*np.array([bb[0],bb[1],1.0])
         pos = self.camera.new_camera_matrix_inv @ im_coor
 

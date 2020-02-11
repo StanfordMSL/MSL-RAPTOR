@@ -7,13 +7,13 @@ import numpy.linalg as la
 from utils_msl_raptor.ukf_utils import bb_corners_to_angled_bb
 
 class TrackedObject:
-    def __init__(self, object_id, class_id):
+    def __init__(self, object_id, class_str):
         self.id = object_id
-        self.class_id = class_id
+        self.class_str = class_str
         self.latest_tracked_state = None
 
 class ImageSegmentor:
-    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[80],use_trt=False, im_width=640, im_height=480, detection_period = 5):
+    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[0,80], detect_classes_names = ['person','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         if detector_name == 'yolov3':
             self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_class_ids)
@@ -24,6 +24,9 @@ class ImageSegmentor:
             self.tracker = SiammaskTracker(sample_im,base_dir=base_dir, use_tensorrt=use_trt)
         else:
             raise RuntimeError("Tracker chosen not implemented")
+
+
+        self.class_map = dict(zip(detect_class_ids, detect_classes_names))
 
         self.active_objects_ids_per_class = {}
         self.tracked_objects = []
@@ -48,12 +51,14 @@ class ImageSegmentor:
         self.z_050_one_sided = 0.0
 
         self.min_pix_from_edge = 5
-        self.min_aspect_ratio = 1
-        self.max_aspect_ratio = 5
+        # Dicts containing each class
+        self.min_aspect_ratio = {'person':0.2,'mslquad':1}
+        self.max_aspect_ratio = {'person':1,'mslquad':5}
 
         self.F_005 = 161.4476
         self.im_width = im_width
         self.im_height = im_height
+
         
 
 
@@ -93,16 +98,16 @@ class ImageSegmentor:
             else:
                 valid = True
 
-            output.append((abb,self.tracked_objects[obj_id].class_id,obj_id, valid))
+            output.append((abb,self.tracked_objects[obj_id].class_str,obj_id, valid))
 
         # dummy_object_ids = list(range(len(self.last_boxes)))  # DEBUG
         tic2 = time.time()
         print("track time = {:.4f}".format(tic2- tic))
         return output
 
-    def new_tracked_object(self,class_id):
+    def new_tracked_object(self,class_str):
         obj_id = len(self.tracked_objects)
-        self.tracked_objects.append(TrackedObject(obj_id,class_id))
+        self.tracked_objects.append(TrackedObject(obj_id,class_str))
         return obj_id
 
 
@@ -110,16 +115,16 @@ class ImageSegmentor:
         new_active_objects_ids_per_class = {}
         new_active_objects_ids = []
         for new_box in new_boxes:
-            class_id = new_box[-1]
-            if class_id not in self.active_objects_ids_per_class or len(self.active_objects_ids_per_class[class_id]) == 0:
+            class_str = new_box[-1]
+            if class_str not in self.active_objects_ids_per_class or len(self.active_objects_ids_per_class[class_str]) == 0:
                 # No active objects of this class
-                obj_id = self.new_tracked_object(class_id)
+                obj_id = self.new_tracked_object(class_str)
             else:
                 # There exist some active objects of this class, check if they match
                 best_t = self.F_005
                 obj_id = None
                 # Go through active candidate objects
-                for id in self.active_objects_ids_per_class[class_id]:
+                for id in self.active_objects_ids_per_class[class_str]:
                     # Make sure the candidate object isn't already matched to a new detection
                     if id in new_active_objects_ids:
                         continue
@@ -134,14 +139,14 @@ class ImageSegmentor:
 
                 # No object was matched, new object detected
                 if obj_id == None:
-                    obj_id = self.new_tracked_object(class_id)
+                    obj_id = self.new_tracked_object(class_str)
 
             # Get tracker initialization from the detected box
             self.tracked_objects[obj_id].latest_tracked_state = self.tracker.reinit(new_box,image)
-            if class_id in new_active_objects_ids_per_class:
-                new_active_objects_ids_per_class[class_id].append(obj_id)
+            if class_str in new_active_objects_ids_per_class:
+                new_active_objects_ids_per_class[class_str].append(obj_id)
             else:
-                new_active_objects_ids_per_class[class_id] = [obj_id]
+                new_active_objects_ids_per_class[class_str] = [obj_id]
             new_active_objects_ids.append(obj_id)
 
         # Remove from active objects the ones that have not been redetected
@@ -150,6 +155,8 @@ class ImageSegmentor:
     def detect(self,image):
         tic = time.time()
         detections = self.detector.detect(image)
+        # Change class ids from ints to strings
+        detections[:,-1] = np.array([self.class_map[id] for id in detections[:,-1]])
         valid_detections_ids = []
         # Ignore invalid detections
         for i,detection in enumerate(detections):
@@ -169,9 +176,8 @@ class ImageSegmentor:
 
 
     def valid_detection(self, detection):
-        return True
         bb = detection[:4]
-        class_id = detection[-1]
+        class_str = detection[-1]
         # Left side in image
         if (bb[0]) < self.min_pix_from_edge:
             return False
@@ -190,7 +196,7 @@ class ImageSegmentor:
 
         # Aspect ratio valid
         ar = bb[2]/bb[3]
-        if ar < self.min_aspect_ratio or ar > self.max_aspect_ratio:
+        if ar < self.min_aspect_ratio[class_str] or ar > self.max_aspect_ratio[class_str]:
             print("rejecting measurement: INVALID ASPECT RATIO")
             return False
 
