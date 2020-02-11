@@ -21,6 +21,11 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
 class bb_viz_node:
+    """
+    This rosnode has two modes. In mode 1 it publishes a white background with the bounding boxes drawn (green when tracking, red when detecting). 
+    This is faster and less likely to slow down the network. Mode 2 publishes the actual image. This is good for debugging, but is slower.
+    If rosparam b_overlay is false (default), it will be mode 1, else mode 2.
+    """
 
     def __init__(self):
         rospy.init_node('bb_viz_node', anonymous=True)
@@ -146,8 +151,6 @@ class bb_viz_node:
         rate = rospy.Rate(15)
 
         while not rospy.is_shutdown():
-            if self.overlaid_img is not None:
-                self.img_overlay_pub.publish(self.overlaid_img)
             rate.sleep()
 
 
