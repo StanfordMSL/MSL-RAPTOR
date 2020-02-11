@@ -89,7 +89,7 @@ class UKF:
         elif self.class_str == 'person':
             dp = 0.005  # [m]
             dv = 0.0025  # [m/s]
-            dq = 0.05  # [rad] in ax ang 
+            dq = 0.005  # [rad] in ax ang 
             dw = 0.0025  # [rad/s]
             self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])
 
@@ -358,7 +358,8 @@ class UKF:
             quat_new = quat_mul(quat_delta, quat)
 
             next_states[6:10,:] = quat_new.T
-            
+        else:
+            raise RuntimeError('Unknown object type: {}'.format(self.class_str))    
             
         if self.b_enforce_0_roll:
                 next_states[6:10,:] = remove_yaw(quat_new).T
@@ -367,8 +368,7 @@ class UKF:
         if self.b_enforce_0_yaw:
             next_states[6:10,:] = remove_roll(quat_new).T
         
-        else:
-            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
+        
 
         return next_states
     
