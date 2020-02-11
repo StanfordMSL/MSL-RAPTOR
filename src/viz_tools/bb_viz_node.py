@@ -31,7 +31,7 @@ class bb_viz_node:
 
         self.bridge = CvBridge()
         self.img_buffer = ([], [])
-        self.img_rosmesg_buffer_len = 10
+        self.img_rosmesg_buffer_len = 50
 
         self.ns = rospy.get_param('~ns')  # robot namespace
         self.overlaid_img = None
@@ -39,7 +39,7 @@ class bb_viz_node:
         self.b_overlay = rospy.get_param('~b_overlay')
 
         if self.b_overlay:
-           rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1,buff_size=2**21)
+           rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1, buff_size=2**21)
         self.bb_data_sub = rospy.Subscriber(self.ns + '/bb_data', AngledBboxes, self.bb_viz_cb, queue_size=5)
         self.img_overlay_pub = rospy.Publisher(self.ns + '/image_bb_overlay', Image, queue_size=5)
         self.itr = 0
@@ -50,6 +50,7 @@ class bb_viz_node:
         
         self.all_white_image = 255 * np.ones((camera_info.height, camera_info.width, 3), np.uint8)
         self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(self.all_white_image, "passthrough"))
+
 
     def image_cb(self, msg):
         """
@@ -79,6 +80,9 @@ class bb_viz_node:
             message_list = time_list
         pos = bisect_left(time_list, time_to_match)
         if pos == 0:
+            t_delta = time_list[0]- time_to_match
+            if t_delta > 0.0001:
+                print("warning: \"bottoming out\" in buffer (match time = {:.4f}, closest queue time = {:.4f}, delta = {:.4f})".format(time_to_match, time_list[0], t_delta))
             return message_list[0], 0
         if pos == len(time_list):
             return message_list[-1], len(message_list) - 1
@@ -106,7 +110,8 @@ class bb_viz_node:
             return
         elif self.b_overlay:
             my_time = bb_list_msg.header.stamp.to_sec()
-            im_msg = self.find_closest_by_time_ros2(my_time, self.img_buffer[1], self.img_buffer[0])[0]
+            im_msg, pos_in_queue = self.find_closest_by_time_ros2(my_time, self.img_buffer[1], self.img_buffer[0])
+            print("queue pos: {}".format(pos_in_queue))
             image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="passthrough")
             image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
         else:
