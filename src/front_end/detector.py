@@ -69,7 +69,8 @@ class YoloDetector:
         # Apply NMS
         pred = non_max_suppression(pred, self.conf_thres, self.nms_thres)
         if not torch.is_tensor(pred[0]):
-            return False
+            return np.array([])
+            print('No object detected')
 
         # Process detections
         for i, det in enumerate(pred):  # detections per image
