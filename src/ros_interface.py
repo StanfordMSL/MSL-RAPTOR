@@ -150,7 +150,7 @@ class ros_interface:
         """
         bounding_boxes = []
         for box in processed_image:
-            bb,_,obj_id,_ = box
+            bb, class_str,obj_id,_ = box
 
             bb_msg = AngledBbox()
             bb_msg.header.stamp = rospy.Time.from_sec(bb_ts)
@@ -161,6 +161,8 @@ class ros_interface:
             bb_msg.height = bb[3]
             bb_msg.angle = bb[4]
             bb_msg.im_seg_mode = bb_seg_mode
+            bb_msg.class_str = class_str
+            bb_msg.id = obj_id
 
             bounding_boxes.append(bb_msg)
         self.bb_data_pub.publish(bounding_boxes)
