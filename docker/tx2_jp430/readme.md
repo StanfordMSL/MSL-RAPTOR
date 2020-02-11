@@ -1,4 +1,4 @@
-On the TX2 after flashing (tested on Jetpack 4.2.2), copy the csv file to have more libraries added with the nvidia runtime:
+On the TX2 after flashing (tested on Jetpack 4.3.0), copy the csv file to have more libraries added with the nvidia runtime:
 ```
 sudo cp python_libs.csv /etc/nvidia-container-runtime/host-files-for-container.d/
 ```

@@ -6,16 +6,16 @@
   <arg name="b_overlay"       default="0" />
   
 
-  <!-- Launch our main node -->
+  <!-- Launch bb viz node -->
   <node name="bb_viz_node_$(arg robot_type)$(arg id)" pkg="msl_raptor" type="bb_viz_node.py" output="screen">
     <param name="ns"  value="$(arg ns)"/> 
     <param name="b_overlay"  value="$(arg b_overlay)"/> 
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
   </node>
 
-  <!-- Launch the plotting node too -->
-  <!-- <node name="plot_6dof_node" pkg="msl_raptor" type="plot_6dof.py" output="screen">
-    <param name="tracked_quad_ns"  value="$(arg robot_type)$(arg tracked_id)"/> 
-  </node> -->
-
+  <!-- Launch poses viz node -->
+  <node name="poses_viz_node_$(arg robot_type)$(arg id)" pkg="msl_raptor" type="poses_viz_node.py" output="screen">
+    <param name="ns"  value="$(arg ns)"/> 
+  </node>
+  
 </launch>

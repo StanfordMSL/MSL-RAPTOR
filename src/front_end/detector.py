@@ -6,14 +6,22 @@ from yolov3.utils.datasets import *
 from yolov3.utils.utils import *
 
 # Adapted from detect.py of https://github.com/ultralytics/yolov3
+# max_instances_per_class can be a list with a number for each class, or a number applied to all classes
+# Returns (x,y,w,h, object_conf, class_conf, class)
 class YoloDetector:
-    def __init__(self,sample_im, base_dir='', cfg='yolov3/cfg/yolov3_drone_infer.cfg',weights='yolov3/weights/yolov3_drone.weights',img_size=416,conf_thres=0.01,nms_thres=0.5,half=True,class_id=0):
+    def __init__(self,sample_im, base_dir='', cfg='yolov3/cfg/yolov3-coco-quad-infer.cfg',weights='yolov3/weights/yolov3-coco-quad.weights',img_size=416,conf_thres=0.5,nms_thres=0.5,half=True,classes_ids=[80], max_instances_per_class = 5):
         # TODO Make sure this is valid
         self.img_size = 416#sample_im.shape[:2]
         self.conf_thres = conf_thres
         self.nms_thres = nms_thres
         self.half = half
-        self.class_id = class_id
+        self.classes_ids = classes_ids
+        if isinstance(max_instances_per_class,int):
+            self.max_instances_per_class = [max_instances_per_class]*len(classes_ids)
+        elif len(max_instances_per_class)== len(classes_ids):
+            self.max_instances_per_class = max_instances_per_class
+        else:
+            raise NameError('Inconsistent max instances per class and classes ids')
 
         # Initialize
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -60,7 +68,6 @@ class YoloDetector:
 
         # Apply NMS
         pred = non_max_suppression(pred, self.conf_thres, self.nms_thres)
-
         if not torch.is_tensor(pred[0]):
             return False
 
@@ -70,17 +77,31 @@ class YoloDetector:
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img0.shape).round()
 
-        # Check if wanted class found, and choose the one with highest confidence above threshold
-        det = det[det[:,-1] == self.class_id]
+        det = det.cpu().detach().numpy()
 
+
+        # Keep only classes we want
+        # det = det[np.isin(det[:,-1],self.classes_ids)]
+
+        # Keep only certain number of instance per class
         if len(det) == 0:
-            return False
+            return np.array([])
+            print('No object detected')
         else:
-            det = det[torch.argmax(det[:,4])]
+            det_filtered = []
+            for i,class_id in enumerate(self.classes_ids):
+                det_filtered.extend(det[det[:,-1] == class_id][-self.max_instances_per_class[i]:,:])
+
+        det = det_filtered
+
+        det = np.stack(det)
+
 
         # Reformat det to x,y,w,h (x and y are top left corner's position)
-        det = det.cpu().detach().numpy()
-        return [det[0],det[1],det[2]-det[0],det[3]-det[1]]
+
+        det[:,2] = det[:,2] - det[:,0]
+        det[:,3] = det[:,3] - det[:,1]
+        return det
 
 
 

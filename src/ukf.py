@@ -7,96 +7,118 @@ from copy import copy
 import cv2
 import time
 import pdb
-# math
+
+#math
 import numpy as np
 import numpy.linalg as la
-# plots
-# import matplotlib
-# from matplotlib import pyplot as plt
-# from mpl_toolkits import mplot3d
-# ros
 import rospy
 # libs & utils
 from utils_msl_raptor.ukf_utils import *
 from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.math_utils import *
 
-import math
 
 class UKF:
 
-    def __init__(self,b_enforce_0_yaw=True,b_use_gt_bb=False,im_width=640,im_height=480):
+    def __init__(self, camera, bb_3d, obj_width, init_time=0.0, b_enforce_0_yaw=True, b_use_gt_bb=False, class_str='mslquad', obj_id=0):
 
         self.VERBOSE = True
 
         # Paramters #############################
-        self.b_enforce_0_yaw = b_enforce_0_yaw
-        self.b_use_gt_bb = b_use_gt_bb
         self.dim_state = 13
         self.dim_sig = 12  # covariance is 1 less dimension due to quaternion
         self.dim_meas = 5  # angled bounding box: row, col, width, height, angle
+        self.b_use_gt_bb = b_use_gt_bb
+        self.camera = camera
 
-        kappa = 2  # based on State Estimation for Robotics (Barfoot)
-        self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
+        self.class_str = class_str  # class name (string) e.g. 'person' or 'mslquad'
+        self.obj_id = obj_id  # a unique int classifier
+        self.b_enforce_0_z = False
+        if self.class_str.lower() == 'mslquad':
+            # these should all prob be loaded from a param file?
+            self.b_enforce_0_yaw = b_enforce_0_yaw
+            kappa = 2  # based on State Estimation for Robotics (Barfoot)
+            self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
 
-        self.w0 = kappa / (kappa + self.dim_sig)
-        self.wi = 1 / (2 * (kappa + self.dim_sig))
-        self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
-        self.w_arr[0] = self.w0
+            self.w0 = kappa / (kappa + self.dim_sig)
+            self.wi = 1 / (2 * (kappa + self.dim_sig))
+            self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
+            self.w_arr[0] = self.w0
+        elif self.class_str.lower() == 'person':
+            # these should all prob be loaded from a param file?
+            self.b_enforce_0_z = True
+            self.b_enforce_0_yaw = b_enforce_0_yaw
 
-        self.camera = None
+            kappa = 2  # based on State Estimation for Robotics (Barfoot)
+            self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
+
+            self.w0 = kappa / (kappa + self.dim_sig)
+            self.wi = 1 / (2 * (kappa + self.dim_sig))
+            self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
+            self.w_arr[0] = self.w0
+
+        else:
+            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
 
         self.init_filter_elements()
         
         ####################################################################
 
         # init vars #############################
-        self.bb_3d = np.zeros((8, 3))  # set by main function initialization
-        self.quad_width = 0 # set by main function initialization
+        self.bb_3d = bb_3d
+        self.obj_width = obj_width
         self.itr = 0
-        self.itr_time = 0
+        self.itr_time_prev = init_time
+        self.itr_time = init_time
         self.tf_ego_w_tmp = None
-        ####################################################################
+        
 
-        # Statistics used for testing new measurements
-        self.z_090_one_sided = 1.282
-        self.z_075_one_sided = 0.674
-        self.z_050_one_sided = 0.0
 
-        self.min_pix_from_edge = 5
-        self.min_aspect_ratio = 1
-        self.max_aspect_ratio = 5
+    def init_filter_elements(self, mu=None):
+        if self.class_str.lower() == 'mslquad':
+            dp = 0.1  # [m]
+            dv = 0.005  # [m/s]
+            dq = 0.1  # [rad] in ax ang 
+            dw = 0.005  # [rad/s]
+            self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])
 
-        self.F_005 = 161.4476
-        self.im_width = im_width
-        self.im_height = im_height
+            self.Q = self.sigma/10  # Process Noise
+            self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
+            self.last_dt = 0.03
+            if mu is None:
+                self.mu = np.zeros((self.dim_state, ))  # set by main function initialization
+            else:
+                self.mu = mu
+        elif self.class_str.lower() == 'person':
+            dp = 0.1  # [m]
+            dv = 0.005  # [m/s]
+            dq = 0.1  # [rad] in ax ang 
+            dw = 0.005  # [rad/s]
+            self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])
 
-    def init_filter_elements(self, mu = None):
-        dp = 0.1  # [m]
-        dv = 0.005  # [m/s]
-        dq = 0.1  # [rad] in ax ang 
-        dw = 0.005  # [rad/s]
-        self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])
-
-        self.Q = self.sigma/10  # Process Noise
-        self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
-        self.last_dt = 0.03
-        if mu is None:
-            self.mu = np.zeros((self.dim_state, 1))  # set by main function initialization
+            self.Q = self.sigma/10  # Process Noise
+            self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
+            self.last_dt = 0.03
+            if mu is None:
+                self.mu = np.zeros((self.dim_state, ))  # set by main function initialization
+            else:
+                self.mu = mu
+        
         else:
-            self.mu = mu
+            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
 
 
 
-    def step_ukf(self, measurement, tf_ego_w, dt):
+    def step_ukf(self, measurement, tf_ego_w, itr_time):
         """
         UKF iteration following pseudo code from probablistic robotics
         """
-        # if b_vs_debug():
-        #     print("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
-        # else:
-        #     rospy.loginfo("Starting UKF Iteration {} (time: {:.3f}s)".format(self.itr, self.itr_time))
-        # print(self.mu)
+        # Calculate dt based on current and previous iteration times
+        self.itr_time = itr_time
+        if self.itr_time == self.itr_time_prev: # first run through
+            dt = self.last_dt
+        else:
+            dt = self.itr_time - self.itr_time_prev
         
         # line 2
         # Rescale noises based on dt
@@ -104,7 +126,7 @@ class UKF:
         self.Q = self.Q*(dt/self.last_dt)
         self.R = self.R*(dt/self.last_dt)
 
-        self.last_dt = dt
+        self.last_dt = dt  # store previous dt
 
         b_outer_only = True
         tic0 = time.time()
@@ -166,12 +188,12 @@ class UKF:
         self.sigma = sigma_out
 
         self.itr += 1
+        self.itr_time_prev = self.itr_time
         tic1 = time.time()
         if not b_outer_only:
             print("update_state: {:.4f}\nTOTAL time (with prints): {:.4f}".format(tic1 - tic, tic1 - tic0))
         else:
             print("TOTAL time (no prints): {:.4f}".format(tic1 - tic0))
-
 
 
     def update_state(self, z, mu_bar, sig_bar, S, S_inv, S_xz, z_hat):
@@ -187,6 +209,9 @@ class UKF:
 
         if self.b_enforce_0_yaw:
             mu_out[6:10] = remove_yaw(mu_out[6:10])
+        if self.b_enforce_0_z:
+            mu_out[2] = 0
+
 
         sigma_out -=  k @ S @ k.T
         sigma_out = enforce_pos_def_sym_mat(sigma_out) # project sigma_out to pos. def. cone to avoid numeric issues
@@ -283,6 +308,8 @@ class UKF:
         sps[idx_mu_not_q,1:] = mu[idx_mu_not_q].reshape(-1,1) + sig_step_all[idx_sigma_not_q,:]
         if self.b_enforce_0_yaw:
             sig_step_all[8, :] = 0
+        if self.b_enforce_0_z:
+            sig_step_all[2, :] = 0
 
         q_nom = mu[6:10]
         q_perturb = axang_to_quat(sig_step_all[6:9, :].T)
@@ -297,22 +324,44 @@ class UKF:
         states = states.reshape(13,-1)
         next_states = copy(states)
 
-        # update position
-        next_states[0:3,:] += dt * states[3:6,:]
+        if self.class_str.lower() == 'mslquad':
 
-        # update orientation
-        quat = states[6:10,:].T  # current orientation
-        omegas = states[10:13,:]  # angular velocity vector
-        om_norm = la.norm(omegas,axis=0)  # rate of change of all angles
-        om_norm[np.argwhere(om_norm == 0)] = 1
-        ang = om_norm * dt  # change in angle in this small timestep
-        ax = omegas / om_norm  # axis about angle change
-        quat_delta = axang_to_quat((ax * ang).T)
-        quat_new = quat_mul(quat_delta, quat)
+            # update position
+            next_states[0:3,:] += dt * states[3:6,:]
 
-        next_states[6:10,:] = quat_new.T
-        if self.b_enforce_0_yaw:
-            next_states[6:10,:] = remove_yaw(quat_new).T
+            # update orientation
+            quat = states[6:10,:].T  # current orientation
+            omegas = states[10:13,:]  # angular velocity vector
+            om_norm = la.norm(omegas,axis=0)  # rate of change of all angles
+            om_norm[np.argwhere(om_norm == 0)] = 1
+            ang = om_norm * dt  # change in angle in this small timestep
+            ax = omegas / om_norm  # axis about angle change
+            quat_delta = axang_to_quat((ax * ang).T)
+            quat_new = quat_mul(quat_delta, quat)
+
+            next_states[6:10,:] = quat_new.T
+            if self.b_enforce_0_yaw:
+                next_states[6:10,:] = remove_yaw(quat_new).T
+        elif self.class_str.lower() == 'person':
+            # People on on the groud
+            # update position
+            next_states[0:2,:] += dt * states[3:5,:]  # no z update
+
+            # update orientation
+            quat = states[6:10,:].T  # current orientation
+            omegas = states[10:13,:]  # angular velocity vector
+            om_norm = la.norm(omegas,axis=0)  # rate of change of all angles
+            om_norm[np.argwhere(om_norm == 0)] = 1
+            ang = om_norm * dt  # change in angle in this small timestep
+            ax = omegas / om_norm  # axis about angle change
+            quat_delta = axang_to_quat((ax * ang).T)
+            quat_new = quat_mul(quat_delta, quat)
+
+            next_states[6:10,:] = quat_new.T
+            if self.b_enforce_0_yaw:
+                next_states[6:10,:] = remove_yaw(quat_new).T
+        else:
+            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
 
         return next_states
     
@@ -339,7 +388,7 @@ class UKF:
         """
         Initialize a state with approximations using a single bounding box
         """
-        z = self.camera.new_camera_matrix[0,0]* self.quad_width /bb[2]
+        z = self.camera.new_camera_matrix[0,0]* self.obj_width /bb[2]
         im_coor = z*np.array([bb[0],bb[1],1.0])
         pos = self.camera.new_camera_matrix_inv @ im_coor
 
@@ -349,68 +398,5 @@ class UKF:
         # mu = np.array([pos[2],-pos[0],-pos[1],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
 
         self.init_filter_elements(mu)
-
-
-
-    def check_measurement_valid_detect(self,abb):
-        # Left side in image
-        if (abb[0] - abb[2]/2) < self.min_pix_from_edge:
-            return False
-        
-        # Right side in image
-        if (abb[0] + abb[2]/2) > self.im_width - self.min_pix_from_edge:
-            return False
-
-        # Top in image
-        if (abb[1] - abb[3]/2) < self.min_pix_from_edge:
-            return False
-        
-        # Bottom in image
-        if (abb[1] + abb[3]/2) > self.im_height - self.min_pix_from_edge:
-            return False
-
-        # Aspect ratio valid
-        ar = abb[2]/abb[3]
-        if ar < self.min_aspect_ratio or ar > self.max_aspect_ratio:
-            print("rejecting measurement: INVALID ASPECT RATIO")
-            return False
-
-        return True
-        
-
-
-    def check_measurement_valid_track(self,abb):
-        if self.mu_obs is None:
-            return True
-        # Check if row or column valid
-        mu_x_l = abb[0] - abb[2]/2
-        mu_x_r = abb[0] + abb[2]/2
-        sigma_x = math.sqrt(self.S_obs[0,0] + self.S_obs[2,2]/4)
-        z_x_l = (0-mu_x_l)/sigma_x
-        z_x_r = (self.im_width-mu_x_r)/sigma_x
-
-        if z_x_l > -self.z_075_one_sided or z_x_r < self.z_075_one_sided:
-            rospy.loginfo("Rejected measurement with values left {} and right {}".format(z_x_l,z_x_r))
-            return False
-
-        mu_y_l = abb[1] - abb[3]/2
-        mu_y_r = abb[1] + abb[3]/2
-        sigma_y = math.sqrt(self.S_obs[1,1]+ self.S_obs[3,3]/4)
-        z_y_l = (0-mu_y_l)/sigma_y
-        z_y_r = (self.im_height-mu_y_r)/sigma_y
-
-        if z_y_l > -self.z_075_one_sided or z_y_r < self.z_075_one_sided:
-            rospy.loginfo("Rejected measurement with values top {} and bottom {}".format(z_y_l,z_y_r))
-            return False
-
-
-        # Check if new measurement is too far from distribution of previous measurement
-        # Hotelling's t-squared statistic
-        t = math.sqrt((abb-self.mu_obs)@ la.inv(self.S_obs) @ (abb-self.mu_obs).T)
-        if t > self.F_005:
-            rospy.loginfo("Rejected measurement too far from distribution: F={}".format(t))
-            return False
-
-        return True
 
 

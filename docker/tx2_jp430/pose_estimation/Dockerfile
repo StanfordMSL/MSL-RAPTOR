@@ -1,8 +1,5 @@
-FROM bramtoula/ros:melodic-py3
+FROM bramtoula/ros:melodic-trt-py3-tx2-jp430
 WORKDIR /root
-
-# Change default shell for RUN per https://stackoverflow.com/questions/20635472/using-the-run-instruction-in-a-dockerfile-with-source-does-not-work/39777387#39777387
-SHELL ["/bin/bash", "-c"]
 
 # Clone and build MSL-RAPTOR with python3
 RUN source /ros_python3_entrypoint.sh && \
@@ -15,31 +12,54 @@ RUN source /ros_python3_entrypoint.sh && \
     cd .. && \
     catkin build
 
-# Set up SiamMask
+# Scipy
 RUN apt-get update && \
-    apt-get install -y wget && \
-    cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
-    pip3 install -r requirements.txt && \
+    apt-get install -y libatlas-base-dev gfortran && \
+    pip3 install wheel && \
+    pip3 install pybind11 && \
+    pip3 install scipy && \
+    rm -rf /var/lib/apt/lists/* 
+
+# Pytorch
+RUN apt-get update && \
+    pip3 install numpy==1.16 && \
+    apt-get install -y python3-pip libatlas-base-dev git libjpeg-dev zlib1g-dev && \
+    rm -rf /var/lib/apt/lists/* 
+
+RUN wget https://nvidia.box.com/shared/static/phqe92v26cbhqjohwtvxorrwnmrnfx1o.whl -O torch-1.3.0-cp36-cp36m-linux_aarch64.whl && \
+    pip3 install torch-1.3.0-cp36-cp36m-linux_aarch64.whl && \
+    git clone --branch v0.4.2 https://github.com/pytorch/vision torchvision && \
+    cd torchvision && \
+    python3 setup.py install && \
+    cd .. && \
+    rm torch-1.3.0-cp36-cp36m-linux_aarch64.whl && \
+    rm -rf torchvision
+
+# SiamMask
+RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
+    apt-get update && \
+    apt-get install -y python3-h5py python3-llvmlite python3-pandas python3-numba && \
+    pip3 install Cython==0.29.4 colorama==0.3.9 requests==2.21.0 fire==0.1.3 tqdm==4.29.1 tensorboardX==1.6 && \
     /bin/bash make.sh && \
     cd experiments/siammask_sharp && \
+    # Download weights
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_VOT.pth  && \
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_DAVIS.pth && \
-    pip3 install scipy --upgrade && \
-    # Torch2trt weights
+     # Torch2trt weights
     pip3 install gdown && \
     mkdir ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt && \
     cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt && \
-    gdown https://drive.google.com/uc?id=1_VR2c2UpW8UoZz5k4LS835jFj_7K2bAR && \
+    gdown https://drive.google.com/uc?id=1tpJMg-A9BYPpbVlVeDPrpihhvXaTEeDn && \
     pip3 uninstall -y gdown && \
     tar -xzvf siammask_trt_weights.tar.gz && \
-    rm siammask_trt_weights.tar.gz && \
-    rm -rf /var/lib/apt/lists/*
+    rm siammask_trt_weights.tar.gz  && \
+    rm -rf /var/lib/apt/lists/* 
 
 # Set up YOLO
 RUN apt-get update && \
     apt-get install -y python3-tk && \
     touch msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/__init__.py && \
-    # Download drone detection weights
+    # Download weights
     pip3 install gdown && \
     cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/weights && \
     gdown https://drive.google.com/uc?id=1ZkK8AwVH1_MWo4tP6L4uGl9NxCf_SzrG && \
@@ -47,6 +67,14 @@ RUN apt-get update && \
     gdown https://drive.google.com/uc?id=1k8SvfBfU3YZk-Ogb8VjJ8OWcTkFfL0ab && \
     pip3 uninstall -y gdown && \
     rm -rf /var/lib/apt/lists/*
+
+# Torch to TensorRT package
+RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && \
+    cd torch2trt && \
+    pip3 install pillow==6.2 && \
+    python3 setup.py install && \
+    cd .. && \
+    rm -rf torch2trt
     
 RUN apt-get update && \
     apt-get install -y libsm6 libxext6 libxrender-dev && \
@@ -61,11 +89,8 @@ RUN apt-get update && \
     catkin build && \
     rm -rf /var/lib/apt/lists/*
 
-# Install dependencies for rosbag (needed for reading data from a rosbag)
-RUN pip3 install pycrypto python-gnupg
-
-# Modify avahi-config
-RUN perl -p -i -e 's|#allow-interfaces=eth0|allow-interfaces=wlp2s0,wlp2s1|g' /etc/avahi/avahi-daemon.conf
+# Modify avahi-config (this has to be done)
+RUN perl -p -i -e 's|#deny-interfaces=eth1|deny-interfaces=eth0,eth1|g' /etc/avahi/avahi-daemon.conf
 
 # ---------------------------- Reset argument ------------------------------ #
 ARG rebuild=0
@@ -76,22 +101,17 @@ ARG rebuild=0
 RUN apt-get update && \
     apt-get install -y avahi-utils && \
     rm -rf /var/lib/apt/lists/*
-
-# Install 'ping'
-RUN apt-get update && \
-    apt-get install -y iputils-ping && \
-    rm -rf /var/lib/apt/lists/*
 ##############################################
 
 # Add aliases to bashrc in docker containers
-RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch"' >> ~/.bashrc
+RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch"' >> ~/.bashrc && \
+    echo 'alias avahi_go="/etc/init.d/dbus start && service avahi-daemon start"' >> ~/.bashrc
 
 RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \
     git pull && \
     catkin build
 
-# Set GIT config based on local env vars
 ARG GIT_NAME=
 ARG GIT_EMAIL=
 RUN git config --global user.email "$GIT_EMAIL" && \

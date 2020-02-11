@@ -1,4 +1,4 @@
-FROM bramtoula/ros:melodic-trt-py3-tx2
+FROM bramtoula/ros:melodic-trt-py3-tx2-jp422
 WORKDIR /root
 
 # Clone and build MSL-RAPTOR with python3
@@ -17,20 +17,25 @@ RUN apt-get update && \
     apt-get install -y libatlas-base-dev gfortran && \
     pip3 install wheel && \
     pip3 install pybind11 && \
-    pip3 install scipy
+    pip3 install scipy && \
+    rm -rf /var/lib/apt/lists/* 
 
 RUN pip3 install numpy==1.16
 
 # Pytorch
 RUN apt-get update && \
+    pip3 install numpy==1.16 && \
     apt-get install -y python3-pip libatlas-base-dev git libjpeg-dev zlib1g-dev && \
     rm -rf /var/lib/apt/lists/* 
 
 RUN wget https://nvidia.box.com/shared/static/phqe92v26cbhqjohwtvxorrwnmrnfx1o.whl -O torch-1.3.0-cp36-cp36m-linux_aarch64.whl && \
     pip3 install torch-1.3.0-cp36-cp36m-linux_aarch64.whl && \
-    git clone --branch v0.5.0 https://github.com/pytorch/vision torchvision && \
+    git clone --branch v0.4.2 https://github.com/pytorch/vision torchvision && \
     cd torchvision && \
-    python3 setup.py install
+    python3 setup.py install && \
+    cd .. && \
+    rm torch-1.3.0-cp36-cp36m-linux_aarch64.whl && \
+    rm -rf torchvision
 
 # SiamMask
 RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
@@ -42,6 +47,14 @@ RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
     # Download weights
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_VOT.pth  && \
     wget http://www.robots.ox.ac.uk/~qwang/SiamMask_DAVIS.pth && \
+     # Torch2trt weights
+    pip3 install gdown && \
+    mkdir ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt && \
+    cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt && \
+    gdown https://drive.google.com/uc?id=1tm05dVN6sOXpm2KF_4FeS2B_2iPw8QRJ && \
+    pip3 uninstall -y gdown && \
+    tar -xzvf siammask_trt_weights.tar.gz && \
+    rm siammask_trt_weights.tar.gz  && \
     rm -rf /var/lib/apt/lists/* 
 
 # Set up YOLO
@@ -51,16 +64,19 @@ RUN apt-get update && \
     # Download weights
     pip3 install gdown && \
     cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/weights && \
-    gdown https://drive.google.com/uc?id=1UYu8E8ZmwSz2xkTCBYq44vOAn28fjdXa && \
+    gdown https://drive.google.com/uc?id=1ZkK8AwVH1_MWo4tP6L4uGl9NxCf_SzrG && \
     cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/cfg && \
-    gdown https://drive.google.com/uc?id=140b6leURXKktVPk1qGG5IvsHYGq2mGos && \
+    gdown https://drive.google.com/uc?id=1k8SvfBfU3YZk-Ogb8VjJ8OWcTkFfL0ab && \
     pip3 uninstall -y gdown && \
     rm -rf /var/lib/apt/lists/*
 
 # Torch to TensorRT package
 RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && \
     cd torch2trt && \
-    python3 setup.py install
+    pip3 install pillow==6.2 && \
+    python3 setup.py install && \
+    cd .. && \
+    rm -rf torch2trt
     
 RUN apt-get update && \
     apt-get install -y libsm6 libxext6 libxrender-dev && \
@@ -85,7 +101,8 @@ ARG rebuild=0
 #############   DEBUG TOOLS   ################
 # Install avahi debug tools such as avahi-resolve (good for testing, not needed for running)
 RUN apt-get update && \
-    apt-get install -y avahi-utils
+    apt-get install -y avahi-utils && \
+    rm -rf /var/lib/apt/lists/*
 ##############################################
 
 # Add aliases to bashrc in docker containers

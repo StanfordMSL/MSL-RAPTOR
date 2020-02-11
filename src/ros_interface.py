@@ -7,7 +7,7 @@ import numpy as np
 # ros
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
-from msl_raptor.msg import angled_bb
+from msl_raptor.msg import AngledBbox,AngledBboxes,TrackedObjects,TrackedObject
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
 import tf
@@ -23,22 +23,16 @@ class ros_interface:
         
         self.VERBOSE = True
 
-        # Paramters #############################
-        self.latest_img_time = -1
-        self.DETECT = 1
-        self.TRACK = 2
-        self.FAKED_BB = 3
-        self.IGNORE = 4
-        self.im_seg_mode = self.DETECT
-        self.latest_abb = None  # angled bound box [row, height, width, height, angle (radians)]
-        self.latest_bb_method = self.DETECT  
+        # Parameters #############################
+        self.im_process_output = []  # what is accessed by the main function after an image is processed
 
         self.ego_pose_rosmesg_buffer = ([], [])
         self.ego_pose_rosmesg_buffer_len = 50
         self.ego_pose_gt_rosmsg = None
 
-        self.img_seg = None  # object for parsing images into angled bounding boxes
+        self.im_seg = None  # object for parsing images into angled bounding boxes
         self.b_use_gt_bb = b_use_gt_bb  # toggle for debugging using ground truth bounding boxes
+        self.latest_img_time = -1
         ####################################################################
 
         self.ns = rospy.get_param('~ns')  # robot namespace
@@ -60,8 +54,8 @@ class ros_interface:
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1,buff_size=2**21)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
-        self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', PoseStamped, queue_size=5)
-        self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', angled_bb, queue_size=5)
+        self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', TrackedObjects, queue_size=5)
+        self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', AngledBboxes, queue_size=5)
         ####################################################################
 
     def ado_pose_gt_cb(self, msg):
@@ -111,60 +105,67 @@ class ros_interface:
         if self.camera is not None:
             image = cv2.undistort(image, self.camera.K, self.camera.dist_coefs, None, self.camera.new_camera_matrix)
         
-        self.latest_bb_method = self.im_seg_mode
-        if not self.b_use_gt_bb:
-            if self.im_seg_mode == self.DETECT:
-                bb_no_angle = self.img_seg.detect(image)
-                if not bb_no_angle:
-                    self.latest_abb = None
-                    self.latest_img_time = -1
-                    rospy.loginfo("Did not detect object")
-                    return
-                self.img_seg.reinit_tracker(bb_no_angle, image)
-                bb_4_corners = self.img_seg.track(image)
-                self.latest_abb = bb_corners_to_angled_bb(bb_4_corners.reshape(-1,2))
-            elif self.im_seg_mode == self.TRACK:
-                bb_4_corners = self.img_seg.track(image)
-                self.latest_abb = bb_corners_to_angled_bb(bb_4_corners.reshape(-1,2))
-            else:
-                raise RuntimeError("Unknown image segmentation mode")
-        else:
-            self.im_seg_mode = self.FAKED_BB
-            
+        self.latest_bb_method = self.im_seg.mode
+        self.im_process_output = self.im_seg.process_image(image,my_time)
+
         self.latest_img_time = my_time  # DO THIS LAST
         # self.img_seg_mode = self.IGNORE
         print("Image Callback time: {:.4f}".format(time.time() - tic))
 
 
-    def publish_filter_state(self, state_est, my_time, itr):
+
+    def publish_filter_state(self, obj_ids,ukf_dict):# state_est, my_time, itr):
         """
         Broadcast the estimated state of the filter. 
         State assumed to be a Nx1 numpy array of floats
         """
-        pose_msg = PoseStamped()
-        pose_msg.header.stamp = rospy.Time(my_time)
-        pose_msg.header.frame_id = 'world'
-        pose_msg.header.seq = np.uint32(itr)
-        pose_msg.pose.position.x = state_est[0]
-        pose_msg.pose.position.y = state_est[1]
-        pose_msg.pose.position.z = state_est[2]
-        pose_msg.pose.orientation.w = state_est[6]
-        pose_msg.pose.orientation.x = state_est[7]
-        pose_msg.pose.orientation.y = state_est[8]
-        pose_msg.pose.orientation.z = state_est[9]
-        self.state_pub.publish(pose_msg)
+        tracked_objects = []
+        for id in obj_ids:
+            obj = TrackedObject()
+            pose_msg = PoseStamped()
+            state_est = ukf_dict[id].mu
+            pose_msg.header.stamp = rospy.Time(ukf_dict[id].itr_time)
+            pose_msg.header.frame_id = 'world'
+            pose_msg.header.seq = np.uint32(ukf_dict[id].itr)
+            pose_msg.pose.position.x = state_est[0]
+            pose_msg.pose.position.y = state_est[1]
+            pose_msg.pose.position.z = state_est[2]
+            pose_msg.pose.orientation.w = state_est[6]
+            pose_msg.pose.orientation.x = state_est[7]
+            pose_msg.pose.orientation.y = state_est[8]
+            pose_msg.pose.orientation.z = state_est[9]
+
+            obj.pose = pose_msg
+            obj.class_str = ukf_dict[id].class_str
+            obj.id = id
+
+            tracked_objects.append(obj)
+
+        self.state_pub.publish(tracked_objects)
 
 
-    def publish_bb_msg(self, bb, bb_seg_mode, bb_ts):
+    def publish_bb_msg(self,processed_image, bb_seg_mode, bb_ts):
         """
         publish custom message type for angled bounding box
         """
-        bb_msg = angled_bb()
-        bb_msg.header.stamp = rospy.Time.from_sec(bb_ts)
-        bb_msg.x = bb[0]
-        bb_msg.y = bb[1]
-        bb_msg.width = bb[2]
-        bb_msg.height = bb[3]
-        bb_msg.angle = bb[4]
-        bb_msg.im_seg_mode = bb_seg_mode
-        self.bb_data_pub.publish(bb_msg)
+        bb_list_msg = AngledBboxes()
+        header_stamp = rospy.Time.from_sec(bb_ts)
+        bb_list_msg.header.stamp = header_stamp
+        for box in processed_image:
+            bb, class_str,obj_id,_ = box
+
+            bb_msg = AngledBbox()
+            bb_msg.header.stamp = header_stamp
+            bb_msg.header.frame_id = '{}'.format(obj_id)  # this is an int defining which object this is
+            bb_msg.x = bb[0]
+            bb_msg.y = bb[1]
+            bb_msg.width = bb[2]
+            bb_msg.height = bb[3]
+            bb_msg.angle = bb[4]
+            bb_msg.im_seg_mode = bb_seg_mode
+            bb_msg.class_str = class_str
+            bb_msg.id = obj_id
+
+            bb_list_msg.boxes.append(bb_msg)
+
+        self.bb_data_pub.publish(bb_list_msg)
