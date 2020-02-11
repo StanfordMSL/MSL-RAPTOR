@@ -40,6 +40,9 @@ class ImageSegmentor:
 
         self.mode = self.DETECT
 
+        # Pixels added around the bounding box used to initialize tracker
+        self.box_buffer = 10
+
         self.last_detection_time = None
         self.detection_period = detection_period
 
@@ -52,8 +55,8 @@ class ImageSegmentor:
 
         self.min_pix_from_edge = 5
         # Dicts containing each class
-        self.min_aspect_ratio = {'person':0.2,'mslquad':1}
-        self.max_aspect_ratio = {'person':1,'mslquad':5}
+        self.min_aspect_ratio = {'person':0.1,'mslquad':1}
+        self.max_aspect_ratio = {'person':0.4,'mslquad':5}
 
         self.F_005 = 161.4476
         self.im_width = im_width
@@ -63,14 +66,15 @@ class ImageSegmentor:
 
 
     def process_image(self,image,time):
-
         if self.mode == self.DETECT:
             bbs_no_angle = self.detect(image)  # returns a list of tuples: [(bb, class conf, object conf, class_id), ...]
             self.last_detection_time = time
             # No detections
-            if bbs_no_angle is False:
+            if len(bbs_no_angle) == 0:
                 print("Did not detect object")
                 return []
+            # Add buffer around detections
+            bbs_no_angle[:,2:4] += self.box_buffer
             # Detections to reinit tracker
             self.reinit_tracker(bbs_no_angle, image)
             self.mode = self.TRACK
