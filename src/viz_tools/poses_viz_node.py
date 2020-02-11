@@ -24,7 +24,7 @@ class poses_viz_node:
         
 
     def tracked_objects_cb(self, tracked_objects_msg):
-        if len(tracked_objects_msg) == 0:
+        if len(tracked_objects_msg.tracked_objects) == 0:
             return
 
         pose_arr = PoseArray()
