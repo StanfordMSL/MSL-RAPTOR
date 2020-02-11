@@ -1,1 +1,0 @@
-PoseStamped[] tracked_poses
