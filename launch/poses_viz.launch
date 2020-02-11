@@ -1,0 +1,13 @@
+<launch>
+  <arg name="id"              default="7" />
+  <arg name="tracked_id"      default="4" />
+  <arg name="robot_type"      default="quad" />
+  <arg name="ns"              value="/$(arg robot_type)$(arg id)" />
+  
+
+  <!-- Launch our main node -->
+  <node name="poses_viz_node_$(arg robot_type)$(arg id)" pkg="msl_raptor" type="poses_viz_node.py" output="screen">
+    <param name="ns"  value="$(arg ns)"/> 
+  </node>
+
+</launch>
