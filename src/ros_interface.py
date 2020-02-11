@@ -148,12 +148,14 @@ class ros_interface:
         """
         publish custom message type for angled bounding box
         """
-        bounding_boxes = []
+        bb_list_msg = AngledBboxes()
+        header_stamp = rospy.Time.from_sec(bb_ts)
+        bb_list_msg.header.stamp = header_stamp
         for box in processed_image:
             bb, class_str,obj_id,_ = box
 
             bb_msg = AngledBbox()
-            bb_msg.header.stamp = rospy.Time.from_sec(bb_ts)
+            bb_msg.header.stamp = header_stamp
             bb_msg.header.frame_id = '{}'.format(obj_id)  # this is an int defining which object this is
             bb_msg.x = bb[0]
             bb_msg.y = bb[1]
@@ -164,5 +166,6 @@ class ros_interface:
             bb_msg.class_str = class_str
             bb_msg.id = obj_id
 
-            bounding_boxes.append(bb_msg)
-        self.bb_data_pub.publish(bounding_boxes)
+            bb_list_msg.boxes.append(bb_msg)
+
+        self.bb_data_pub.publish(bb_list_msg)
