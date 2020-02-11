@@ -115,7 +115,7 @@ class ImageSegmentor:
         new_active_objects_ids_per_class = {}
         new_active_objects_ids = []
         for new_box in new_boxes:
-            class_str = new_box[-1]
+            class_str = self.class_map[new_box[-1]]
             if class_str not in self.active_objects_ids_per_class or len(self.active_objects_ids_per_class[class_str]) == 0:
                 # No active objects of this class
                 obj_id = self.new_tracked_object(class_str)
@@ -155,8 +155,6 @@ class ImageSegmentor:
     def detect(self,image):
         tic = time.time()
         detections = self.detector.detect(image)
-        # Change class ids from ints to strings
-        detections[:,-1] = np.array([self.class_map[id] for id in detections[:,-1]])
         valid_detections_ids = []
         # Ignore invalid detections
         for i,detection in enumerate(detections):
@@ -177,7 +175,7 @@ class ImageSegmentor:
 
     def valid_detection(self, detection):
         bb = detection[:4]
-        class_str = detection[-1]
+        class_str = self.class_map[detection[-1]]
         # Left side in image
         if (bb[0]) < self.min_pix_from_edge:
             return False
