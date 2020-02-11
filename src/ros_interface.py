@@ -7,7 +7,7 @@ import numpy as np
 # ros
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
-from msl_raptor.msg import AngledBbox,AngledBboxes,TrackedPoses
+from msl_raptor.msg import AngledBbox,AngledBboxes,TrackedObjects,TrackedObject
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
 import tf
@@ -54,7 +54,7 @@ class ros_interface:
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1,buff_size=2**21)
         rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
-        self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', TrackedPoses, queue_size=5)
+        self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', TrackedObjects, queue_size=5)
         self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', AngledBboxes, queue_size=5)
         ####################################################################
 
@@ -119,13 +119,14 @@ class ros_interface:
         Broadcast the estimated state of the filter. 
         State assumed to be a Nx1 numpy array of floats
         """
-        tracked_poses = TrackedPoses()
+        tracked_objects = []
         for id in obj_ids:
+            obj = TrackedObject()
             pose_msg = PoseStamped()
             state_est = ukf_dict[id].mu
             pose_msg.header.stamp = rospy.Time(ukf_dict[id].itr_time)
             pose_msg.header.frame_id = 'world'
-            pose_msg.header.seq = np.uint32(ukf_dict[id])
+            pose_msg.header.seq = np.uint32(ukf_dict[id].itr)
             pose_msg.pose.position.x = state_est[0]
             pose_msg.pose.position.y = state_est[1]
             pose_msg.pose.position.z = state_est[2]
@@ -134,16 +135,20 @@ class ros_interface:
             pose_msg.pose.orientation.y = state_est[8]
             pose_msg.pose.orientation.z = state_est[9]
 
-            tracked_poses.append(pose_msg)
+            obj.pose = pose_msg
+            obj.class_str = ukf_dict[id].class_str
+            obj.id = id
 
-        self.state_pub.publish(tracked_poses)
+            tracked_objects.append(obj)
+
+        self.state_pub.publish(tracked_objects)
 
 
     def publish_bb_msg(self,processed_image, bb_seg_mode, bb_ts):
         """
         publish custom message type for angled bounding box
         """
-        bounding_boxes = AngledBboxes()
+        bounding_boxes = []
         for box in processed_image:
             bb,_,obj_id,_ = box
 
