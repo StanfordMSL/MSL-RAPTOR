@@ -85,7 +85,8 @@ class YoloDetector:
 
         # Keep only certain number of instance per class
         if len(det) == 0:
-            return False
+            return np.array([])
+            print('No object detected')
         else:
             det_filtered = []
             for i,class_id in enumerate(self.classes_ids):
