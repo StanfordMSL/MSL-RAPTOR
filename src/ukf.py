@@ -45,10 +45,14 @@ class UKF:
         if self.class_str == 'mslquad':
             self.b_enforce_0_yaw = True
             self.b_enforce_z = False
+            self.b_enforce_0_pitch = False
+            self.b_enforce_0_roll = False
         elif self.class_str == 'person':
             self.height = 1.8
             self.b_enforce_z = True
             self.b_enforce_0_yaw = False
+            self.b_enforce_0_pitch = True
+            self.b_enforce_0_roll = True
 
         else:
             raise RuntimeError('Unknown object type: {}'.format(self.class_str))
@@ -200,6 +204,10 @@ class UKF:
         mu_out[6:10] = enforce_quat_format(quat_mul(axang_to_quat(innovation[6:9]), mu_bar[6:10]))
         mu_out[10:13] += innovation[9:12]
 
+        if self.b_enforce_0_roll:
+            mu_out[6:10] = remove_roll(mu_out[6:10])
+        if self.b_enforce_0_pitch:
+            mu_out[6:10] = remove_pitch(mu_out[6:10])
         if self.b_enforce_0_yaw:
             mu_out[6:10] = remove_yaw(mu_out[6:10])
         if self.b_enforce_z:
@@ -333,8 +341,7 @@ class UKF:
             quat_new = quat_mul(quat_delta, quat)
 
             next_states[6:10,:] = quat_new.T
-            if self.b_enforce_0_yaw:
-                next_states[6:10,:] = remove_yaw(quat_new).T
+            
         elif self.class_str.lower() == 'person':
             # People on on the groud
             # update position
@@ -351,8 +358,15 @@ class UKF:
             quat_new = quat_mul(quat_delta, quat)
 
             next_states[6:10,:] = quat_new.T
-            if self.b_enforce_0_yaw:
+            
+            
+        if self.b_enforce_0_roll:
                 next_states[6:10,:] = remove_yaw(quat_new).T
+        if self.b_enforce_0_pitch:
+            next_states[6:10,:] = remove_pitch(quat_new).T
+        if self.b_enforce_0_yaw:
+            next_states[6:10,:] = remove_roll(quat_new).T
+        
         else:
             raise RuntimeError('Unknown object type: {}'.format(self.class_str))
 
