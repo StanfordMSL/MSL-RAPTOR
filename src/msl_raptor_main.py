@@ -159,7 +159,7 @@ class camera:
         fov_lim_per_depth: how the boundary of the fov (width, heigh) changes per depth
         """
         ns = rospy.get_param('~ns')
-        camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo, 10)
+        camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo,500)
         self.K = np.reshape(camera_info.K, (3, 3))
         self.dist_coefs = np.reshape(camera_info.D, (5,))
         self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))

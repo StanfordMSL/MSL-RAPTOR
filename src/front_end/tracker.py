@@ -23,7 +23,7 @@ class SiammaskTracker:
         target_sz = np.array([w, h])
         self.state = siamese_init(sample_im, target_pos, target_sz, siammask, self.cfg['hp'], device=self.device)  # init tracker
         if use_tensorrt:
-             self.state['net'].init_trt(fp16_mode,features_trt,rpn_trt,mask_trt,refine_trt, use_loaded_weights=True, trt_weights_path='/root/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt')
+             self.state['net'].init_trt(fp16_mode,features_trt,rpn_trt,mask_trt,refine_trt, trt_weights_path='/root/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt')
 
         self.keys_to_share = ['target_pos','target_sz','score','mask','ploygon']
 

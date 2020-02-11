@@ -49,7 +49,7 @@ RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
     pip3 install gdown && \
     mkdir ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt && \
     cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt && \
-    gdown https://drive.google.com/uc?id=1tm05dVN6sOXpm2KF_4FeS2B_2iPw8QRJ && \
+    gdown https://drive.google.com/uc?id=1tpJMg-A9BYPpbVlVeDPrpihhvXaTEeDn && \
     pip3 uninstall -y gdown && \
     tar -xzvf siammask_trt_weights.tar.gz && \
     rm siammask_trt_weights.tar.gz  && \
