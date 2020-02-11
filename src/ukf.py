@@ -20,11 +20,12 @@ from utils_msl_raptor.math_utils import *
 
 class UKF:
 
-    def __init__(self, camera, bb_3d, obj_width, init_time=0.0, b_enforce_0_yaw=True, b_use_gt_bb=False, class_str='mslquad', obj_id=0):
+    def __init__(self, camera, bb_3d, obj_width, init_time=0.0, b_use_gt_bb=False, class_str='mslquad', obj_id=0):
 
         self.VERBOSE = True
 
         # Paramters #############################
+        # these should all prob be loaded from a param file?
         self.dim_state = 13
         self.dim_sig = 12  # covariance is 1 less dimension due to quaternion
         self.dim_meas = 5  # angled bounding box: row, col, width, height, angle
@@ -33,29 +34,21 @@ class UKF:
 
         self.class_str = class_str  # class name (string) e.g. 'person' or 'mslquad'
         self.obj_id = obj_id  # a unique int classifier
-        self.b_enforce_0_z = False
-        if self.class_str.lower() == 'mslquad':
-            # these should all prob be loaded from a param file?
-            self.b_enforce_0_yaw = b_enforce_0_yaw
-            kappa = 2  # based on State Estimation for Robotics (Barfoot)
-            self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
+        
+        kappa = 2  # based on State Estimation for Robotics (Barfoot)
+        self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
 
-            self.w0 = kappa / (kappa + self.dim_sig)
-            self.wi = 1 / (2 * (kappa + self.dim_sig))
-            self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
-            self.w_arr[0] = self.w0
-        elif self.class_str.lower() == 'person':
-            # these should all prob be loaded from a param file?
-            self.b_enforce_0_z = True
-            self.b_enforce_0_yaw = b_enforce_0_yaw
-
-            kappa = 2  # based on State Estimation for Robotics (Barfoot)
-            self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
-
-            self.w0 = kappa / (kappa + self.dim_sig)
-            self.wi = 1 / (2 * (kappa + self.dim_sig))
-            self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
-            self.w_arr[0] = self.w0
+        self.w0 = kappa / (kappa + self.dim_sig)
+        self.wi = 1 / (2 * (kappa + self.dim_sig))
+        self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
+        self.w_arr[0] = self.w0
+        if self.class_str == 'mslquad':
+            self.b_enforce_0_yaw = True
+            self.b_enforce_z = False
+        elif self.class_str == 'person':
+            self.height = 1.8
+            self.b_enforce_z = True
+            self.b_enforce_0_yaw = False
 
         else:
             raise RuntimeError('Unknown object type: {}'.format(self.class_str))
@@ -75,7 +68,7 @@ class UKF:
 
 
     def init_filter_elements(self, mu=None):
-        if self.class_str.lower() == 'mslquad':
+        if self.class_str == 'mslquad':
             dp = 0.1  # [m]
             dv = 0.005  # [m/s]
             dq = 0.1  # [rad] in ax ang 
@@ -89,15 +82,15 @@ class UKF:
                 self.mu = np.zeros((self.dim_state, ))  # set by main function initialization
             else:
                 self.mu = mu
-        elif self.class_str.lower() == 'person':
-            dp = 0.1  # [m]
-            dv = 0.005  # [m/s]
-            dq = 0.1  # [rad] in ax ang 
-            dw = 0.005  # [rad/s]
+        elif self.class_str == 'person':
+            dp = 0.005  # [m]
+            dv = 0.0025  # [m/s]
+            dq = 0.05  # [rad] in ax ang 
+            dw = 0.0025  # [rad/s]
             self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])
 
             self.Q = self.sigma/10  # Process Noise
-            self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
+            self.R = np.diag([10, 10, 20, 40, 0.15])  # Measurement Noise
             self.last_dt = 0.03
             if mu is None:
                 self.mu = np.zeros((self.dim_state, ))  # set by main function initialization
@@ -209,8 +202,8 @@ class UKF:
 
         if self.b_enforce_0_yaw:
             mu_out[6:10] = remove_yaw(mu_out[6:10])
-        if self.b_enforce_0_z:
-            mu_out[2] = 0
+        if self.b_enforce_z:
+            mu_out[2] = self.height
 
 
         sigma_out -=  k @ S @ k.T
@@ -308,8 +301,8 @@ class UKF:
         sps[idx_mu_not_q,1:] = mu[idx_mu_not_q].reshape(-1,1) + sig_step_all[idx_sigma_not_q,:]
         if self.b_enforce_0_yaw:
             sig_step_all[8, :] = 0
-        if self.b_enforce_0_z:
-            sig_step_all[2, :] = 0
+        if self.b_enforce_z:
+            sig_step_all[2, :] = self.height
 
         q_nom = mu[6:10]
         q_perturb = axang_to_quat(sig_step_all[6:9, :].T)

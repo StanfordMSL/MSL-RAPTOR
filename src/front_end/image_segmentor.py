@@ -13,7 +13,7 @@ class TrackedObject:
         self.latest_tracked_state = None
 
 class ImageSegmentor:
-    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[0,80], detect_classes_names = ['person','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5):
+    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[0], detect_classes_names = ['person'],use_trt=False, im_width=640, im_height=480, detection_period = 5):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         if detector_name == 'yolov3':
             self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_class_ids)
@@ -41,7 +41,7 @@ class ImageSegmentor:
         self.mode = self.DETECT
 
         # Pixels added around the bounding box used to initialize tracker
-        self.box_buffer = 10
+        self.box_buffer = 2
 
         self.last_detection_time = None
         self.detection_period = detection_period
@@ -61,8 +61,6 @@ class ImageSegmentor:
         self.F_005 = 161.4476
         self.im_width = im_width
         self.im_height = im_height
-
-        
 
 
     def process_image(self,image,time):
