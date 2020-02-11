@@ -28,10 +28,10 @@ class poses_viz_node:
             return
 
         pose_arr = PoseArray()
-        pose_arr.header = tracked_objects_msg[0].pose.header
+        pose_arr.header = tracked_objects_msg.tracked_objects[0].pose.header
 
-        for tracked_obj in tracked_objects_msg:
-            pose_arr.append(tracked_obj.pose.pose)
+        for tracked_obj in tracked_objects_msg.tracked_objects:
+            pose_arr.poses.append(tracked_obj.pose.pose)
 
         self.pose_array_pub.publish(pose_arr)
 
@@ -39,6 +39,7 @@ class poses_viz_node:
 if __name__ == '__main__':
     try:
         program = poses_viz_node()
+        rospy.spin()
     except:
         import traceback
         traceback.print_exc()
