@@ -78,17 +78,17 @@ class UKF:
     def init_filter_elements(self, mu=None):
         self.last_dt = 0.03
         if self.ukf_prms is not None:
-            if True:  # this is for debugging (its easier to try different values)
-                self.sigma = np.diag([float(self.ukf_prms['dp']), float(self.ukf_prms['dp']), float(self.ukf_prms['dp']), \
-                                      float(self.ukf_prms['dv']), float(self.ukf_prms['dv']), float(self.ukf_prms['dv']), \
-                                      float(self.ukf_prms['dq']), float(self.ukf_prms['dq']), float(self.ukf_prms['dq']), \
-                                      float(self.ukf_prms['dw']), float(self.ukf_prms['dw']), float(self.ukf_prms['dw'])])
-                self.Q = self.sigma / 10  # Process Noise
-                self.R = np.diag(self.ukf_prms['R'])  # Measurement Noise
-            else:
-                self.sigma = np.asarray(self.ukf_prms['simga0'])
-                self.Q = np.asarray(self.ukf_prms['Q'])  # Process Noise
-                self.R = np.diag(self.ukf_prms['R'])  # Measurement Noise
+            # if True:  # this is for DEBUGGING (its easier to try different values)
+            self.sigma = np.diag([float(self.ukf_prms['dp']), float(self.ukf_prms['dp']), float(self.ukf_prms['dp']), \
+                                    float(self.ukf_prms['dv']), float(self.ukf_prms['dv']), float(self.ukf_prms['dv']), \
+                                    float(self.ukf_prms['dq']), float(self.ukf_prms['dq']), float(self.ukf_prms['dq']), \
+                                    float(self.ukf_prms['dw']), float(self.ukf_prms['dw']), float(self.ukf_prms['dw'])])
+            self.Q = self.sigma / float(self.ukf_prms['Q_div_fact'])  # Process Noise
+            self.R = np.diag(self.ukf_prms['R'])  # Measurement Noise
+            # else:
+            #     self.sigma = np.asarray(self.ukf_prms['simga0'])
+            #     self.Q = self.sigma/float(self.ukf_prms['Q_div_fact'])  # Process Noise
+            #     self.R = np.diag(self.ukf_prms['R'])  # Measurement Noise
         else:
             dp = 0.1  # [m]
             dv = 0.005  # [m/s]
