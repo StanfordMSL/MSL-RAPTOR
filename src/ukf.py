@@ -4,11 +4,13 @@
 from multiprocessing import Pool, cpu_count
 from functools import partial
 from copy import copy
-import cv2
 import time
 import pdb
-
-#math
+import os
+import yaml
+# vision
+import cv2
+# math
 import numpy as np
 import numpy.linalg as la
 import rospy
@@ -25,7 +27,6 @@ class UKF:
         self.VERBOSE = True
 
         # Paramters #############################
-        # these should all prob be loaded from a param file?
         self.dim_state = 13
         self.dim_sig = 12  # covariance is 1 less dimension due to quaternion
         self.dim_meas = 5  # angled bounding box: row, col, width, height, angle
@@ -35,27 +36,30 @@ class UKF:
         self.class_str = class_str  # class name (string) e.g. 'person' or 'mslquad'
         self.obj_id = obj_id  # a unique int classifier
         
-        kappa = 2  # based on State Estimation for Robotics (Barfoot)
-        self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
-
+        if self.class_str == 'mslquad':
+            yaml_file = "mslquad_ukf_params.yaml"
+        elif self.class_str == 'person':
+            yaml_file = "person_ukf_params.yaml"
+            self.height = 1.8  # maybe load this from a person-specific yaml? (there is already one for a quad)
+        else:
+            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
+        
+        with open("/root/msl_raptor_ws/src/msl_raptor/params/" + yaml_file, 'r') as stream:
+            try:
+                ukf_prms = yaml.safe_load(stream)
+            except yaml.YAMLError as exc:
+                print(exc)
+        
+        self.b_enforce_0_yaw   = bool(ukf_prms['b_enforce_0_yaw'])
+        self.b_enforce_z       = bool(ukf_prms['b_enforce_z'])
+        self.b_enforce_0_pitch = bool(ukf_prms['b_enforce_0_pitch'])
+        self.b_enforce_0_roll  = bool(ukf_prms['b_enforce_0_roll'])
+        kappa = float(ukf_prms['kappa'])
         self.w0 = kappa / (kappa + self.dim_sig)
         self.wi = 1 / (2 * (kappa + self.dim_sig))
         self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
         self.w_arr[0] = self.w0
-        if self.class_str == 'mslquad':
-            self.b_enforce_0_yaw = True
-            self.b_enforce_z = False
-            self.b_enforce_0_pitch = False
-            self.b_enforce_0_roll = False
-        elif self.class_str == 'person':
-            self.height = 1.8
-            self.b_enforce_z = True
-            self.b_enforce_0_yaw = False
-            self.b_enforce_0_pitch = True
-            self.b_enforce_0_roll = True
-
-        else:
-            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
+        self.sig_pnt_multiplier = np.sqrt(self.dim_sig + kappa)
 
         self.init_filter_elements()
         

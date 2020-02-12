@@ -1,0 +1,5 @@
+b_enforce_0_yaw: False
+b_enforce_z: True
+b_enforce_0_pitch: True
+b_enforce_0_roll: True
+kappa: 2
