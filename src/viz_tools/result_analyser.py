@@ -17,7 +17,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
-from msl_raptor.msg import AngledBbox
+from msl_raptor.msg import AngledBbox, AngledBboxes, TrackedObjects, TrackedObject
 import tf
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
@@ -145,12 +145,16 @@ class result_analyser:
         """
         record estimated poses from msl-raptor
         """
+        tracked_obs = msg.tracked_objects
+        if len(tracked_obs) == 0:
+            return
+        to = tracked_obs[0]  # assumes 1 object for now
         if t is None:
-            self.t_est.append(msg.header.stamp.to_sec())
+            self.t_est.append(to.pose.header.stamp.to_sec())
         else:
             self.t_est.append(t)
 
-        my_state = self.pose_to_state_vec(msg.pose)
+        my_state = self.pose_to_state_vec(to.pose.pose)
         rpy = self.quat_to_ang(np.reshape(my_state[6:10], (1,4)))[0]
         self.x_est.append(my_state[0])
         self.y_est.append(my_state[1])
@@ -184,6 +188,7 @@ class result_analyser:
         record times of detect
         note message is custom MSL-RAPTOR angled bounding box
         """
+        msg = msg.boxes[0]
         t = msg.header.stamp.to_sec()
         if msg.im_seg_mode == self.DETECT:
             self.detect_time.append(t)
