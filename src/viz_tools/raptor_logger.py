@@ -45,15 +45,12 @@ class raptor_logger:
                                 ('Image Segmentation Mode', 'im_seg_mode', 1)]
         self.save_elms['prms'] = [('Camera Intrinsics (K)', 'K', 4),
                                   ('Object BB Size (len|wid|hei)', '3d_bb_dims', 3)]
-        # save_el_shape = (len(self.save_elements), len(self.save_elements[0]))
-        # self.num_to_write = np.sum(np.reshape([*zip(self.save_elements)], save_el_shape)[:,2].astype(int)) 
         
         # create files and write headers
         self.fh = {}
         if est_fn is not None:
             self.fh['est'] = open(est_fn,'w+')  # doing this here makes it appendable
             save_el_shape = (len(self.save_elms['est']), len(self.save_elms['est'][0]))
-            # self.num_to_write = np.sum(np.reshape([*zip(self.save_elements)], save_el_shape)[:,2].astype(int)) 
             data_header = ", ".join(np.reshape([*zip(self.save_elms['est'])], save_el_shape)[:,0].tolist())
             np.savetxt(self.fh['est'], X=[], header=data_header)  # write header
         if gt_fn is not None:
