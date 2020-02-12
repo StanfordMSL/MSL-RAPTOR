@@ -342,9 +342,13 @@ class UKF:
             next_states[6:10,:] = quat_new.T
             
         elif self.class_str.lower() == 'person':
-            # People on on the groud
+            # People on on the ground
             # update position
-            next_states[0:2,:] += dt * states[3:5,:]  # no z update
+            # Get unique vector pointing towards heading
+            yaw_angs = quat_to_ang(states[6:10,:].T)[:,2]
+            heading_vecs = np.array([np.cos(yaw_angs),np.sin(yaw_angs)])
+            
+            next_states[0:2,:] += dt  * np.sum(np.multiply(heading_vecs,states[3:5,:]),axis=0) * heading_vecs # no z update, projected on heading vector
 
             # update orientation
             quat = states[6:10,:].T  # current orientation
