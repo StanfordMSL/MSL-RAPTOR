@@ -146,17 +146,17 @@ def init_objects(ros):
     obj_width['mslquad'] = 2*half_width
 
     # Person
-    half_length = 0.35 / 2
-    half_width = 0.5 / 2
-    height = 1.8
-    bb_3d['person'] = np.array([[ half_length, half_width, 0, 1.],  # 1 front, left,  up (from quad's perspective)
-                          [ half_length, half_width,-height, 1.],  # 2 front, right, up
-                          [ half_length,-half_width,-height, 1.],  # 3 back,  right, up
-                          [ half_length,-half_width, 0, 1.],  # 4 back,  left,  up
-                          [-half_length,-half_width, 0, 1.],  # 5 front, left,  down
-                          [-half_length,-half_width,-height, 1.],  # 6 front, right, down
-                          [-half_length, half_width,-height, 1.],  # 7 back,  right, down
-                          [-half_length, half_width, 0, 1.]]) # 8 back,  left,  down
+    half_length = 0.3 / 2
+    half_width = 0.3 / 2
+    half_height = 1.8 / 2
+    bb_3d['person'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
+                          [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
+                          [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
+                          [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
+                          [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
+                          [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
+                          [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
+                          [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
     obj_width['person'] = 2*half_width
 

@@ -46,15 +46,15 @@ class UKF:
         
         with open("/root/msl_raptor_ws/src/msl_raptor/params/" + yaml_file, 'r') as stream:
             try:
-                ukf_prms = yaml.safe_load(stream)
+                self.ukf_prms = yaml.safe_load(stream)
             except yaml.YAMLError as exc:
                 print(exc)
         
-        self.b_enforce_0_yaw   = bool(ukf_prms['b_enforce_0_yaw'])
-        self.b_enforce_z       = bool(ukf_prms['b_enforce_z'])
-        self.b_enforce_0_pitch = bool(ukf_prms['b_enforce_0_pitch'])
-        self.b_enforce_0_roll  = bool(ukf_prms['b_enforce_0_roll'])
-        kappa = float(ukf_prms['kappa'])
+        self.b_enforce_0_yaw   = bool(self.ukf_prms['b_enforce_0_yaw'])
+        self.b_enforce_z       = bool(self.ukf_prms['b_enforce_z'])
+        self.b_enforce_0_pitch = bool(self.ukf_prms['b_enforce_0_pitch'])
+        self.b_enforce_0_roll  = bool(self.ukf_prms['b_enforce_0_roll'])
+        kappa = float(self.ukf_prms['kappa'])
         self.w0 = kappa / (kappa + self.dim_sig)
         self.wi = 1 / (2 * (kappa + self.dim_sig))
         self.w_arr = np.ones((1+ 2 * self.dim_sig,)) * self.wi
@@ -76,7 +76,20 @@ class UKF:
 
 
     def init_filter_elements(self, mu=None):
-        if self.class_str == 'mslquad':
+        self.last_dt = 0.03
+        if self.ukf_prms is not None:
+            if True:  # this is for debugging (its easier to try different values)
+                self.sigma = np.diag([float(self.ukf_prms['dp']), float(self.ukf_prms['dp']), float(self.ukf_prms['dp']), \
+                                      float(self.ukf_prms['dv']), float(self.ukf_prms['dv']), float(self.ukf_prms['dv']), \
+                                      float(self.ukf_prms['dq']), float(self.ukf_prms['dq']), float(self.ukf_prms['dq']), \
+                                      float(self.ukf_prms['dw']), float(self.ukf_prms['dw']), float(self.ukf_prms['dw'])])
+                self.Q = self.sigma / 10  # Process Noise
+                self.R = np.diag(self.ukf_prms['R'])  # Measurement Noise
+            else:
+                self.sigma = np.asarray(self.ukf_prms['simga0'])
+                self.Q = np.asarray(self.ukf_prms['Q'])  # Process Noise
+                self.R = np.diag(self.ukf_prms['R'])  # Measurement Noise
+        else:
             dp = 0.1  # [m]
             dv = 0.005  # [m/s]
             dq = 0.1  # [rad] in ax ang 
@@ -85,29 +98,11 @@ class UKF:
 
             self.Q = self.sigma/10  # Process Noise
             self.R = np.diag([2, 2, 10, 10, 0.08])  # Measurement Noise
-            self.last_dt = 0.03
-            if mu is None:
-                self.mu = np.zeros((self.dim_state, ))  # set by main function initialization
-            else:
-                self.mu = mu
-        elif self.class_str == 'person':
-            dp = 0.005  # [m]
-            dv = 0.0025  # [m/s]
-            dq = 0.005  # [rad] in ax ang 
-            dw = 0.0025  # [rad/s]
-            self.sigma = np.diag([dp, dp, dp, dv, dv, dv, dq, dq, dq, dw, dw, dw])
-
-            self.Q = self.sigma/10  # Process Noise
-            self.R = np.diag([10, 10, 20, 40, 0.15])  # Measurement Noise
-            self.last_dt = 0.03
-            if mu is None:
-                self.mu = np.zeros((self.dim_state, ))  # set by main function initialization
-            else:
-                self.mu = mu
         
+        if mu is None:
+            self.mu = np.zeros((self.dim_state, ))  # set by main function initialization
         else:
-            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
-
+            self.mu = mu
 
 
     def step_ukf(self, measurement, tf_ego_w, itr_time):
