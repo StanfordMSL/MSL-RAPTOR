@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # IMPORTS
 # system
-import sys, time
+import sys, os, time
 from copy import copy
 import pdb
 # math
@@ -21,7 +21,12 @@ from msl_raptor.msg import AngledBbox, AngledBboxes, TrackedObjects, TrackedObje
 import tf
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
+# Utils
+sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor')
 from ssp_utils import *
+from math_utils import *
+from ros_utils import *
+from raptor_logger import *
 
 class result_analyser:
 
@@ -43,11 +48,13 @@ class result_analyser:
         self.ado_est_topic = ego_quad_ns + '/msl_raptor_state'  # ego_quad_ns since it is ego_quad's estimate of the ado quad
         self.bb_data_topic = ego_quad_ns + '/bb_data'  # ego_quad_ns since it is ego_quad's estimate of the bounding box
         self.ego_gt_topic = ego_quad_ns + '/mavros/vision_pose/pose'
+        self.ego_est_topic = ego_quad_ns + '/mavros/local_position/pose'
         self.cam_info_topic = ego_quad_ns + '/camera/camera_info'
         self.topic_func_dict = {self.ado_gt_topic : self.parse_ado_gt_msg, 
                                 self.ado_est_topic : self.parse_ado_est_msg, 
                                 self.bb_data_topic : self.parse_bb_msg,
                                 self.ego_gt_topic : self.parse_ego_gt_msg, 
+                                self.ego_est_topic : self.parse_ego_est_msg,
                                 self.cam_info_topic: self.parse_camera_info_msg}
 
         self.b_degrees = True  # use degrees or radians
@@ -75,6 +82,8 @@ class result_analyser:
 
         self.ego_gt_time_pose = []
         self.ego_gt_pose = []
+        self.ego_est_pose = []
+        self.ego_est_time_pose = []
         self.ado_gt_pose = []
         self.ado_est_pose = []
         self.ado_est_state = []
@@ -88,6 +97,8 @@ class result_analyser:
         
         self.detect_times = []
         self.detect_end = None
+        self.abb_list = []
+        self.abb_time_list = []
 
         # Create camera (camera extrinsics from quad7.param in the msl_raptor project):
         self.tf_cam_ego = np.eye(4)
@@ -115,10 +126,14 @@ class result_analyser:
         self.new_camera_matrix = None
         
         #########################################################################################
-
+        est_log_name = os.path.dirname(os.path.realpath(__file__)) + "/log_" + rb_name.split("_")[-1] + "_EST.txt"
+        gt_log_name = os.path.dirname(os.path.realpath(__file__)) + "/log_" + rb_name.split("_")[-1] + "_GT.txt"
+        param_log_name = os.path.dirname(os.path.realpath(__file__)) + "/log_" + rb_name.split("_")[-1] + "_PARAM.txt"
+        self.logger = raptor_logger(source="MSLRAPTOR", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name)
         self.process_rb()
         self.do_plot()
         self.quat_eval()
+        self.logger.close_files()
 
 
     def quat_eval(self):
@@ -159,20 +174,33 @@ class result_analyser:
                             [-box_length/2, box_width/2,-box_height/2, 1.],
                             [-box_length/2, box_width/2, box_height/2, 1.]]).T
         # corners3D = get_3D_corners(vertices)
-        
+
+        # Write params to log file ########
+        log_data = {}
+        if self.new_camera_matrix is not None:
+            log_data['K'] = np.array([self.new_camera_matrix[0, 0], self.new_camera_matrix[1, 1], self.new_camera_matrix[0, 2], self.new_camera_matrix[1, 2]])
+        else:
+            log_data['K'] = np.array([self.K[0, 0], self.K[1, 1], self.K[0, 2], self.K[1, 2]])
+        log_data['3d_bb_dims'] = np.array([box_length, box_width, box_height])
+        self.logger.write_data_to_log(log_data, mode='prms')
+        ###################################
+
         for i in range(N):
             # extract data in form needed for ssp analysis
             t_est = self.t_est[i]
             tf_w_ado_est = pose_to_tf(self.ado_est_pose[i])
 
-            ego_msg, _ = find_closest_by_time(t_est, self.ego_gt_time_pose, message_list=self.ego_gt_pose)
-            tf_w_ego_gt = pose_to_tf(ego_msg)
+            pose_msg, _ = find_closest_by_time(t_est, self.ego_gt_time_pose, message_list=self.ego_gt_pose)
+            tf_w_ego_gt = pose_to_tf(pose_msg)
 
-            ado_msg, _ = find_closest_by_time(t_est, self.t_gt, message_list=self.ado_gt_pose)
-            tf_w_ado_gt = pose_to_tf(ego_msg)
+            pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
+            tf_w_ego_est = pose_to_tf(pose_msg)
 
-            tf_w_cam = tf_w_ego_gt @ invert_tf(self.tf_cam_ego)
-            tf_cam_w = invert_tf(tf_w_cam)
+            pose_msg, _ = find_closest_by_time(t_est, self.t_gt, message_list=self.ado_gt_pose)
+            tf_w_ado_gt = pose_to_tf(pose_msg)
+
+            tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
+            tf_cam_w = inv_tf(tf_w_cam)
             tf_cam_ado_est = tf_cam_w @ tf_w_ado_est
             tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
 
@@ -226,6 +254,26 @@ class result_analyser:
             testing_samples      += 1
             # if b_save_bb_imgs:
             #     draw_2d_proj_of_3D_bounding_box(img, corners2D_pr, corners2D_gt=corners2D_gt, epoch=None, batch_idx=None, detect_num=i, im_save_dir=bb_im_path)
+
+            # Write data to log file #############################
+            (abb, im_seg_mode), _ = find_closest_by_time(t_est, self.abb_time_list, message_list=self.abb_list)
+            corners3D_pr = (tf_w_ado_est @ vertices)[0:3,:]
+            corners3D_gt = (tf_w_ado_gt @ vertices)[0:3,:]
+            log_data['time'] = t_est
+            log_data['state_est'] = tf_to_state_vec(tf_w_ado_est)
+            log_data['state_gt'] = tf_to_state_vec(tf_w_ado_gt)
+            log_data['ego_state_est'] = tf_to_state_vec(tf_w_ego_est)
+            log_data['ego_state_gt'] = tf_to_state_vec(tf_w_ego_gt)
+            log_data['corners_3d_est'] = np.reshape(corners3D_pr, (corners3D_pr.size,))
+            log_data['corners_3d_gt'] = np.reshape(corners3D_gt, (corners3D_gt.size,))
+            log_data['proj_corners_est'] = np.reshape(proj_2d_pred.T, (proj_2d_pred.size,))
+            log_data['proj_corners_gt'] = np.reshape(proj_2d_gt.T, (proj_2d_gt.size,))
+            log_data['abb'] = abb
+            log_data['im_seg_mode'] = im_seg_mode
+            self.logger.write_data_to_log(log_data, mode='est')
+            pdb.set_trace()
+            self.logger.write_data_to_log(log_data, mode='gt')
+            ######################################################
 
         # Compute 2D projection error, 6D pose error, 5cm5degree error
         px_threshold = 5 # 5 pixel threshold for 2D reprojection error is standard in recent sota 6D object pose estimation works 
@@ -334,7 +382,7 @@ class result_analyser:
             self.t_est.append(t)
 
         my_state = pose_to_state_vec(to.pose.pose)
-        rpy = quat_to_ang(np.reshape(my_state[6:10], (1,4)), b_degrees=self.b_degrees)[0]
+        rpy = quat_to_ang(np.reshape(my_state[6:10], (1,4)), b_to_degrees=self.b_degrees)[0]
         self.ado_est_pose.append(to.pose.pose)
         self.ado_est_state.append(to.pose.pose)
         self.x_est.append(my_state[0])
@@ -372,6 +420,14 @@ class result_analyser:
         self.ego_gt_pose.append(msg.pose)
         self.ego_gt_time_pose.append(msg.header.stamp.to_sec())
 
+        
+    def parse_ego_est_msg(self, msg, t=None):
+        """
+        record optitrack poses of tracked quad
+        """
+        self.ego_est_pose.append(msg.pose)
+        self.ego_est_time_pose.append(msg.header.stamp.to_sec())
+
 
     def parse_bb_msg(self, msg, t=None):
         """
@@ -383,6 +439,8 @@ class result_analyser:
         if msg.im_seg_mode == self.DETECT:
             self.detect_time.append(t)
 
+        self.abb_list.append(([msg.x, msg.y, msg.width, msg.height, msg.angle*180./np.pi], msg.im_seg_mode))
+        self.abb_time_list.append(t)
         ######
         eps = 0.1 # min width of line
         if msg.im_seg_mode == self.DETECT:  # we are detecting now

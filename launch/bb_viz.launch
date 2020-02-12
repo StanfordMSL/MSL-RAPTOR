@@ -13,9 +13,4 @@
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
   </node>
 
-  <!-- Launch the plotting node too -->
-  <!-- <node name="plot_6dof_node" pkg="msl_raptor" type="plot_6dof.py" output="screen">
-    <param name="tracked_quad_ns"  value="$(arg robot_type)$(arg tracked_id)"/> 
-  </node> -->
-
 </launch>

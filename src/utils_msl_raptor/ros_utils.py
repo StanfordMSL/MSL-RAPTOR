@@ -11,8 +11,10 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
-from utils_msl_raptor.math_utils import *
-
+try:
+    from utils_msl_raptor.math_utils import *
+except:
+    from math_utils import *
 
 def pose_to_tf(pose):
     """
@@ -29,6 +31,16 @@ def pose_to_state_vec(pose):
     state = np.zeros((13,))
     state[0:3] = [pose.position.x, pose.position.y, pose.position.z]
     state[6:10] = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
+    if state[6] < 0:
+        state[6:10] *= -1
+    return state
+
+
+def tf_to_state_vec(tf):
+    """ Turn a 4x4 tf pose message into a 13 el state vector (w/ 0 vels) """
+    state = np.zeros((13,))
+    state[0:3] = tf[0:3, 3]
+    state[6:10] = rotm_to_quat(tf[0:3, 0:3])
     if state[6] < 0:
         state[6:10] *= -1
     return state

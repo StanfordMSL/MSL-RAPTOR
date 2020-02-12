@@ -62,11 +62,14 @@ def quat_mul(q, r):
     qout = np.concatenate((scalar,vec),axis=1)
     return enforce_quat_format(qout)
 
-def quat_to_ang(q):
+def quat_to_ang(q, b_to_degrees=True):
     """
     Convert a quaternion to euler angles (ASSUMES 'XYZ')
     """
-    return R.from_quat(np.roll(q,3,axis=1)).as_euler('XYZ')
+    unit_multiplier = 1
+    if b_to_degrees:
+        unit_multiplier = 180 / np.pi
+    return R.from_quat(np.roll(q,3,axis=1)).as_euler('XYZ') * unit_multiplier
 
 def ang_to_quat(angs):
     """
@@ -81,6 +84,14 @@ def quat_to_rotm(quat):
     with the UKF state quaternion). First element of quat is the scalar.
     """
     return R.from_quat(np.roll(np.reshape(quat, (-1, 4)),3,axis=1)).as_dcm()
+
+
+def rotm_to_quat(rotm):
+    """ 
+    calculate the rotation matrix of a given quaternion (frames assumed to be consistant 
+    with the UKF state quaternion). First element of quat is the scalar.
+    """
+    return np.roll(R.from_dcm(rotm).as_quat(),1)
 
 
 def quat_to_tf(quat):
