@@ -79,11 +79,15 @@ class UKF:
         self.last_dt = 0.03
         if self.ukf_prms is not None:
             # if True:  # this is for DEBUGGING (its easier to try different values)
-            self.sigma = np.diag([float(self.ukf_prms['dp']), float(self.ukf_prms['dp']), float(self.ukf_prms['dp']), \
-                                    float(self.ukf_prms['dv']), float(self.ukf_prms['dv']), float(self.ukf_prms['dv']), \
-                                    float(self.ukf_prms['dq']), float(self.ukf_prms['dq']), float(self.ukf_prms['dq']), \
-                                    float(self.ukf_prms['dw']), float(self.ukf_prms['dw']), float(self.ukf_prms['dw'])])
-            self.Q = self.sigma / float(self.ukf_prms['Q_div_fact'])  # Process Noise
+            self.sigma = np.diag([float(self.ukf_prms['dp_sigma'][0]), float(self.ukf_prms['dp_sigma'][1]), float(self.ukf_prms['dp_sigma'][2]), \
+                                    float(self.ukf_prms['dv_sigma'][0]), float(self.ukf_prms['dv_sigma'][1]), float(self.ukf_prms['dv_sigma'][2]), \
+                                    float(self.ukf_prms['dq_sigma'][0]), float(self.ukf_prms['dq_sigma'][1]), float(self.ukf_prms['dq_sigma'][2]), \
+                                    float(self.ukf_prms['dw_sigma'][0]), float(self.ukf_prms['dw_sigma'][1]), float(self.ukf_prms['dw_sigma'][2])])
+            # self.Q = self.sigma / float(self.ukf_prms['Q_div_fact'])  # Process Noise
+            self.Q = np.diag([float(self.ukf_prms['dp_q'][0]), float(self.ukf_prms['dp_q'][1]), float(self.ukf_prms['dp_q'][2]), \
+                                    float(self.ukf_prms['dv_q'][0]), float(self.ukf_prms['dv_q'][1]), float(self.ukf_prms['dv_q'][2]), \
+                                    float(self.ukf_prms['dq_q'][0]), float(self.ukf_prms['dq_q'][1]), float(self.ukf_prms['dq_q'][2]), \
+                                    float(self.ukf_prms['dw_q'][0]), float(self.ukf_prms['dw_q'][1]), float(self.ukf_prms['dw_q'][2])])
             self.R = np.diag(self.ukf_prms['R'])  # Measurement Noise
             # else:
             #     self.sigma = np.asarray(self.ukf_prms['simga0'])
