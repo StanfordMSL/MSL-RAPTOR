@@ -1,0 +1,2 @@
+# Camera Intrinsics (K), Object BB Size (len|wid|hei
+381.806213 430.044159 317.829224 250.373807 0.270000 0.270000 0.130000
