@@ -86,7 +86,9 @@ RUN apt-get update && \
 ##############################################
 
 # Add aliases to bashrc in docker containers
-RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch"' >> ~/.bashrc
+RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch"' >> ~/.bashrc && \
+    echo 'alias viz_go="roslaunch msl_raptor pose_viz.launch"' >> ~/.bashrc && \
+    echo 'alias metrics_go="cd /bags/results && python3 ~/msl_raptor_ws/src/msl_raptor/src/viz_tools/result_analyser.py"' >> ~/.bashrc
 
 RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \

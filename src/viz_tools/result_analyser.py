@@ -27,6 +27,7 @@ from ssp_utils import *
 from math_utils import *
 from ros_utils import *
 from raptor_logger import *
+from pose_metrics import *
 
 class result_analyser:
 
@@ -125,10 +126,11 @@ class result_analyser:
         self.dist_coefs = None
         self.new_camera_matrix = None
         
+        self.raptor_metrics = pose_metric_tracker()
         #########################################################################################
-        est_log_name = os.path.dirname(os.path.realpath(__file__)) + "/log_" + rb_name.split("_")[-1] + "_EST.txt"
-        gt_log_name = os.path.dirname(os.path.realpath(__file__)) + "/log_" + rb_name.split("_")[-1] + "_GT.txt"
-        param_log_name = os.path.dirname(os.path.realpath(__file__)) + "/log_" + rb_name.split("_")[-1] + "_PARAM.txt"
+        est_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_EST.txt"
+        gt_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_GT.txt"
+        param_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_PARAM.txt"
         self.logger = raptor_logger(source="MSLRAPTOR", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name)
         self.process_rb()
         self.do_plot()
@@ -140,25 +142,7 @@ class result_analyser:
         N = len(self.t_est)
         print("Post-processing data now ({} itrs)".format(N))
 
-        # To save
-        trans_dist = 0.0
-        angle_dist = 0.0
-        pixel_dist = 0.0
-        testing_samples = 0.0
-        testing_error_trans = 0.0
-        testing_error_angle = 0.0
-        testing_error_pixel = 0.0
-        errs_2d             = []
-        errs_3d             = []
-        errs_trans          = []
-        errs_angle          = []
-        errs_corner2D       = []
-        preds_trans         = []
-        preds_rot           = []
-        preds_corners2D     = []
-        gts_trans           = []
-        gts_rot             = []
-        gts_corners2D       = []
+
         corners2D_gt = None
 
         diam = 0.311
@@ -209,91 +193,31 @@ class result_analyser:
             tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
             R_gt = tf_cam_ado_gt[0:3, 0:3]
             t_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
-            Rt_gt = np.concatenate((R_gt, t_gt), axis=1)
-            Rt_pr = np.concatenate((R_pr, t_pr), axis=1)
-
-            corners2D_pr = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_pr, self.new_camera_matrix).T
-            corners2D_gt = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_gt, self.new_camera_matrix).T
             
             ######################################################
-
-            # Compute translation error
-            trans_dist = np.sqrt(np.sum(np.square(t_gt - t_pr)))
-            errs_trans.append(trans_dist)
-            
-            # Compute angle error
-            angle_dist = calcAngularDistance(R_gt, R_pr)
-            errs_angle.append(angle_dist)
-            
-            # Compute pixel error
-            Rt_gt        = np.concatenate((R_gt, t_gt), axis=1)
-            Rt_pr        = np.concatenate((R_pr, t_pr), axis=1)
-            proj_2d_gt   = compute_projection(vertices, Rt_gt, self.new_camera_matrix)
-            proj_2d_pred = compute_projection(vertices, Rt_pr, self.new_camera_matrix) 
-            norm         = np.linalg.norm(proj_2d_gt - proj_2d_pred, axis=0)
-            pixel_dist   = np.mean(norm)
-            errs_2d.append(pixel_dist)
-
-            # Compute corner prediction error
-            corners2D_gt = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_gt, self.new_camera_matrix).T
-            corner_norm = np.linalg.norm(corners2D_gt - corners2D_pr, axis=1)
-            corner_dist = np.mean(corner_norm)
-            errs_corner2D.append(corner_dist)
-
-            # Compute 3D distances
-            transform_3d_gt   = compute_transformation(vertices, Rt_gt) 
-            transform_3d_pred = compute_transformation(vertices, Rt_pr)  
-            norm3d            = np.linalg.norm(transform_3d_gt - transform_3d_pred, axis=0)
-            vertex_dist       = np.mean(norm3d)
-            errs_3d.append(vertex_dist)
-
-            # Sum errors
-            testing_error_trans  += trans_dist
-            testing_error_angle  += angle_dist
-            testing_error_pixel  += pixel_dist
-            testing_samples      += 1
-            # if b_save_bb_imgs:
-            #     draw_2d_proj_of_3D_bounding_box(img, corners2D_pr, corners2D_gt=corners2D_gt, epoch=None, batch_idx=None, detect_num=i, im_save_dir=bb_im_path)
+            self.raptor_metrics.update_all_metrics(vertices=vertices, R_gt=R_gt, t_gt=t_gt, R_pr=R_pr, t_pr=t_pr, K=self.new_camera_matrix)
 
             # Write data to log file #############################
             (abb, im_seg_mode), _ = find_closest_by_time(t_est, self.abb_time_list, message_list=self.abb_list)
-            corners3D_pr = (tf_w_ado_est @ vertices)[0:3,:]
-            corners3D_gt = (tf_w_ado_gt @ vertices)[0:3,:]
             log_data['time'] = t_est
             log_data['state_est'] = tf_to_state_vec(tf_w_ado_est)
             log_data['state_gt'] = tf_to_state_vec(tf_w_ado_gt)
             log_data['ego_state_est'] = tf_to_state_vec(tf_w_ego_est)
             log_data['ego_state_gt'] = tf_to_state_vec(tf_w_ego_gt)
+            corners3D_pr = (tf_w_ado_est @ vertices)[0:3,:]
+            corners3D_gt = (tf_w_ado_gt @ vertices)[0:3,:]
             log_data['corners_3d_est'] = np.reshape(corners3D_pr, (corners3D_pr.size,))
             log_data['corners_3d_gt'] = np.reshape(corners3D_gt, (corners3D_gt.size,))
-            log_data['proj_corners_est'] = np.reshape(proj_2d_pred.T, (proj_2d_pred.size,))
-            log_data['proj_corners_gt'] = np.reshape(proj_2d_gt.T, (proj_2d_gt.size,))
+            log_data['proj_corners_est'] = np.reshape(self.raptor_metrics.proj_2d_pr.T, (self.raptor_metrics.proj_2d_pr.size,))
+            log_data['proj_corners_gt'] = np.reshape(self.raptor_metrics.proj_2d_gt.T, (self.raptor_metrics.proj_2d_gt.size,))
             log_data['abb'] = abb
             log_data['im_seg_mode'] = im_seg_mode
             self.logger.write_data_to_log(log_data, mode='est')
-            pdb.set_trace()
             self.logger.write_data_to_log(log_data, mode='gt')
             ######################################################
 
-        # Compute 2D projection error, 6D pose error, 5cm5degree error
-        px_threshold = 5 # 5 pixel threshold for 2D reprojection error is standard in recent sota 6D object pose estimation works 
-        eps          = 1e-5
-        acc          = len(np.where(np.array(errs_2d) <= px_threshold)[0]) * 100. / (len(errs_2d)+eps)
-        acc5cm5deg   = len(np.where((np.array(errs_trans) <= 0.05) & (np.array(errs_angle) <= 5))[0]) * 100. / (len(errs_trans)+eps)
-        acc3d10      = len(np.where(np.array(errs_3d) <= diam * 0.1)[0]) * 100. / (len(errs_3d)+eps)
-        acc5cm5deg   = len(np.where((np.array(errs_trans) <= 0.05) & (np.array(errs_angle) <= 5))[0]) * 100. / (len(errs_trans)+eps)
-        corner_acc   = len(np.where(np.array(errs_corner2D) <= px_threshold)[0]) * 100. / (len(errs_corner2D)+eps)
-        mean_err_2d  = np.mean(errs_2d)
-        mean_corner_err_2d = np.mean(errs_corner2D)
-        nts = float(testing_samples)
-
-        # Print test statistics
-        logging('\nResults of {}'.format(self.name))
-        logging('   Acc using {} px 2D Projection = {:.2f}%'.format(px_threshold, acc))
-        logging('   Acc using 10% threshold - {} vx 3D Transformation = {:.2f}%'.format(diam * 0.1, acc3d10))
-        logging('   Acc using 5 cm 5 degree metric = {:.2f}%'.format(acc5cm5deg))
-        logging("   Mean 2D pixel error is %f, Mean vertex error is %f, mean corner error is %f" % (mean_err_2d, np.mean(errs_3d), mean_corner_err_2d))
-        logging('   Translation error: %f m, angle error: %f degree, pixel error: % f pix' % (testing_error_trans/nts, testing_error_angle/nts, testing_error_pixel/nts) )
+        self.raptor_metrics.calc_final_metrics()
+        self.raptor_metrics.print_final_metrics()
         pdb.set_trace()
 
         print("done with post process!")
