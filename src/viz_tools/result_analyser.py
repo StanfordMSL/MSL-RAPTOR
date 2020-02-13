@@ -128,9 +128,9 @@ class result_analyser:
         
         self.raptor_metrics = pose_metric_tracker()
         #########################################################################################
-        est_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_EST.txt"
-        gt_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_GT.txt"
-        param_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_PARAM.txt"
+        est_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_EST.log"
+        gt_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_GT.log"
+        param_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_PARAM.log"
         self.logger = raptor_logger(source="MSLRAPTOR", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name)
         self.process_rb()
         self.do_plot()

@@ -21,7 +21,7 @@ from msl_raptor.msg import AngledBbox, AngledBboxes, TrackedObjects, TrackedObje
 import tf
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-# from ssp_utils import *
+from ssp_utils import *
 
 
 class raptor_logger:
@@ -49,21 +49,29 @@ class raptor_logger:
         # create files and write headers
         self.fh = {}
         if est_fn is not None:
+            self.create_file_dir(est_fn)
             self.fh['est'] = open(est_fn,'w+')  # doing this here makes it appendable
             save_el_shape = (len(self.save_elms['est']), len(self.save_elms['est'][0]))
             data_header = ", ".join(np.reshape([*zip(self.save_elms['est'])], save_el_shape)[:,0].tolist())
             np.savetxt(self.fh['est'], X=[], header=data_header)  # write header
         if gt_fn is not None:
+            self.create_file_dir(gt_fn)
             self.fh['gt'] = open(gt_fn,'w+')  # doing this here makes it appendable
             save_el_shape = (len(self.save_elms['gt']), len(self.save_elms['gt'][0]))
             data_header = ", ".join(np.reshape([*zip(self.save_elms['gt'])], save_el_shape)[:,0].tolist())
             np.savetxt(self.fh['gt'], X=[], header=data_header)  # write header
         if param_fn is not None:
+            self.create_file_dir(param_fn)
             self.fh['prms'] = open(param_fn,'w+')  # doing this here makes it appendable
             save_el_shape = (len(self.save_elms['prms']), len(self.save_elms['prms'][0]))
             data_header = ", ".join(np.reshape([*zip(self.save_elms['prms'])], save_el_shape)[:,0].tolist())
             np.savetxt(self.fh['prms'], X=[], header=data_header)  # write header
 
+
+    def create_file_dir(self, fn_with_dir):
+        path = "/".join(fn_with_dir.split("/")[:-1])
+        if not os.path.exists( path ):
+            os.makedirs( path )
 
     def write_data_to_log(self, data, mode='est'):
         """ mode can be est, gt, or param"""
