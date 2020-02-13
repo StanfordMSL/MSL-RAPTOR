@@ -348,7 +348,7 @@ class UKF:
         elif self.class_str.lower() == 'person':
             # People on on the ground
             # update position
-            # Get unique vector pointing towards heading
+            # Get unique vector pointing towards heading. Maybe use heading from next_states?
             yaw_angs = quat_to_ang(states[6:10,:].T)[:,2]
             heading_vecs = np.array([np.cos(yaw_angs),np.sin(yaw_angs)])
             
