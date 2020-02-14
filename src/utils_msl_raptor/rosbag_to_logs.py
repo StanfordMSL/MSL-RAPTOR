@@ -7,10 +7,6 @@ import pdb
 # math
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-# plots
-import matplotlib
-# matplotlib.use('Agg')  ## This is needed for the gui to work from a virtual container
-import matplotlib.pyplot as plt
 # ros
 import rosbag
 import rospy
@@ -36,7 +32,7 @@ class rosbags_to_logs:
     The code currently also runs the quantitative metric analysis in the processes, but this is optional and will be done 
     again in the result_analyser. 
     """
-    def __init__(self, rb_name=None, ego_quad_ns="/quad7", ado_quad_ns="/quad4"):
+    def __init__(self, rb_name=None, ego_quad_ns="/quad7", ado_quad_ns="/mug2_scene3_norm"):
         
         us_split = rb_name.split("_")
         if rb_name[-4:] == '.bag' or "_".join(us_split[0:3]) == 'msl_raptor_output':
@@ -227,8 +223,9 @@ class rosbags_to_logs:
 
     def process_rb(self):
         print("Processing {}".format(self.rb_name))
-        for topic, msg, t in self.bag.read_messages( topics=list(self.topic_func_dict.keys()) ):
-            self.topic_func_dict[topic](msg)
+        for topic, msg, t in self.bag.read_messages():
+            if topic in self.topic_func_dict:
+                self.topic_func_dict[topic](msg)
         self.t_est = np.asarray(self.t_est)
         self.t0 = np.min(self.t_est)
         self.tf = np.max(self.t_est) - self.t0

@@ -61,6 +61,8 @@ def find_closest_by_time(time_to_match, time_list, message_list=None):
     Assumes lists are sorted earlier to later. Returns closest item in list by time. If two numbers are equally close, return the smallest number.
     Adapted from https://stackoverflow.com/questions/12141150/from-list-of-integers-get-number-closest-to-a-given-value/12141511#12141511
     """
+    if time_list is None or len(time_list)==0:
+        raise RuntimeError("missing time info!")
     if message_list is None:
         message_list = time_list
     pos = bisect_left(time_list, time_to_match)

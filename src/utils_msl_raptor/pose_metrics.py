@@ -199,7 +199,7 @@ class pose_metric_tracker:
         N = float(self.num_measurements)
         logging('\nResults of {}'.format(self.name))
         logging('   Acc using {} px 2D Projection = {:.2f}%'.format(self.px_thresh, self.acc))
-        logging('   Acc using {}% threshold - {} vx 3D Transformation = {:.2f}%'.format(self.prct_thresh, self.diam * self.prct_thresh, self.acc3d10))
+        logging('   Acc using {}% threshold - {} vx 3D Transformation = {:.2f}%'.format(self.prct_thresh, self.diam * self.prct_thresh/100, self.acc3d10))
         logging('   Acc using {} cm {} degree metric = {:.2f}%'.format(self.trans_thresh*100, self.ang_thresh, self.acc5cm5deg))
         logging('   Mean 2D pixel error is %f, Mean vertex error is %f, mean corner error is %f' % (self.mean_err_2d, self.mean_err_3d, self.mean_corner_err_2d))
         logging('   Translation error: %f m, angle error: %f degree, pixel error: %f pix' % (self.testing_error_trans/N, self.testing_error_angle/N, self.testing_error_pixel/N) )
