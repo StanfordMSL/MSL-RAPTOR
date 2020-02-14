@@ -30,7 +30,12 @@ from raptor_logger import *
 from pose_metrics import *
 
 class rosbags_to_logs:
-
+    """
+    This class takes in the rosbag that is output from mslraptor and processes it into our custom log format 
+    this enables us to unify output with the baseline method)
+    The code currently also runs the quantitative metric analysis in the processes, but this is optional and will be done 
+    again in the result_analyser. 
+    """
     def __init__(self, rb_name=None, ego_quad_ns="/quad7", ado_quad_ns="/quad4"):
         if rb_name is not None:
             if len(rb_name) > 4 and rb_name[-4:] == ".bag":

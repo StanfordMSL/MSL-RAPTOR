@@ -222,13 +222,18 @@ class result_analyser:
         print("done with post process!")
 
 
-
     def do_plot(self):
         self.fig, self.axes = plt.subplots(3, 2, clear=True)
         est_line_style = 'r-'
         gt_line_style = 'b-'
         ang_type = 'rad'
         if self.b_degrees:
+            self.roll_gt *= 180/np.pi
+            self.roll_est *= 180/np.pi
+            self.pitch_gt *= 180/np.pi
+            self.pitch_est *= 180/np.pi
+            self.yaw_gt *= 180/np.pi
+            self.yaw_est *= 180/np.pi
             ang_type = 'deg'
 
         self.x_gt_plt, = self.axes[0,0].plot(self.t_gt, self.x_gt, gt_line_style)
