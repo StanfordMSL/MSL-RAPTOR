@@ -184,8 +184,12 @@ class camera:
         ns = rospy.get_param('~ns')
         camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo,500)
         self.K = np.reshape(camera_info.K, (3, 3))
-        self.dist_coefs = np.reshape(camera_info.D, (5,))
-        self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
+        if len(camera_info.D) == 5:
+            self.dist_coefs = np.reshape(camera_info.D, (5,))
+            self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
+        else:
+            self.dist_coefs = None
+            self.new_camera_matrix = self.K
 
         self.K_inv = la.inv(self.K)
         self.new_camera_matrix_inv = la.inv(self.new_camera_matrix)
