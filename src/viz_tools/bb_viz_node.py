@@ -50,8 +50,12 @@ class bb_viz_node:
         self.itr = 0
         camera_info = rospy.wait_for_message(self.ns + '/camera/camera_info', CameraInfo, 30)
         self.K = np.reshape(camera_info.K, (3, 3))
-        self.dist_coefs = np.reshape(camera_info.D, (5,))
-        self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
+        if len(camera_info.D) == 5:
+            self.dist_coefs = np.reshape(camera_info.D, (5,))
+            self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
+        else:
+            self.dist_coefs = None
+            self.new_camera_matrix = self.K
         
         self.all_white_image = 255 * np.ones((camera_info.height, camera_info.width, 3), np.uint8)
         self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(self.all_white_image, "passthrough"))

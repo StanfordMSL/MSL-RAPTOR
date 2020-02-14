@@ -41,6 +41,12 @@ class UKF:
         elif self.class_str == 'person':
             yaml_file = "person_ukf_params.yaml"
             self.height = 1.8  # maybe load this from a person-specific yaml? (there is already one for a quad)
+        elif self.class_str == 'cup':
+            yaml_file = "cup_ukf_params.yaml"
+        elif self.class_str == 'bowl':
+            yaml_file = "bowl_ukf_params.yaml"
+        elif self.class_str == 'laptop':
+            yaml_file = "laptop_ukf_params.yaml"
         else:
             raise RuntimeError('Unknown object type: {}'.format(self.class_str))
         
@@ -328,7 +334,8 @@ class UKF:
         states = states.reshape(13,-1)
         next_states = copy(states)
 
-        if self.class_str.lower() == 'mslquad':
+        # General point mass model
+        if self.class_str.lower() in ['mslquad','cup','bowl','laptop'] :
 
             # update position
             next_states[0:3,:] += dt * states[3:6,:]
