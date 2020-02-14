@@ -13,7 +13,7 @@ class TrackedObject:
         self.latest_tracked_state = None
 
 class ImageSegmentor:
-    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[0,80], detect_classes_names = ['person','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5):
+    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[0,41,45,63,80], detect_classes_names = ['person','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         if detector_name == 'yolov3':
             self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_class_ids)
@@ -55,8 +55,8 @@ class ImageSegmentor:
 
         self.min_pix_from_edge = 5
         # Dicts containing each class
-        self.min_aspect_ratio = {'person':0.1,'mslquad':1}
-        self.max_aspect_ratio = {'person':0.4,'mslquad':5}
+        self.min_aspect_ratio = {'person':0.1,'mslquad':1,'bowl':0.5,'cup':0.2,'laptop':0.3}
+        self.max_aspect_ratio = {'person':0.4,'mslquad':5,'bowl':2,'cup':0.8,'laptop':3}
 
         self.F_005 = 161.4476
         self.im_width = im_width
