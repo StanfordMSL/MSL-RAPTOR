@@ -13,7 +13,7 @@ class TrackedObject:
         self.latest_tracked_state = None
 
 class ImageSegmentor:
-    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[0,41,45,63,80], detect_classes_names = ['person','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5):
+    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         if detector_name == 'yolov3':
             self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_class_ids)
@@ -41,7 +41,7 @@ class ImageSegmentor:
         self.mode = self.DETECT
 
         # Pixels added around the bounding box used to initialize tracker
-        self.box_buffer = 2
+        self.box_buffer = -10
 
         self.last_detection_time = None
         self.detection_period = detection_period
@@ -55,8 +55,8 @@ class ImageSegmentor:
 
         self.min_pix_from_edge = 5
         # Dicts containing each class
-        self.min_aspect_ratio = {'person':0.1,'mslquad':1,'bowl':0.5,'cup':0.2,'laptop':0.3}
-        self.max_aspect_ratio = {'person':0.4,'mslquad':5,'bowl':2,'cup':0.8,'laptop':3}
+        self.min_aspect_ratio = {'person':0.1,'mslquad':1,'bowl':0.5,'cup':0.2,'laptop':0.3,'bottle':0.1}
+        self.max_aspect_ratio = {'person':0.4,'mslquad':5,'bowl':2,'cup':1.3,'laptop':3,'bottle':0.4}
 
         self.F_005 = 161.4476
         self.im_width = im_width
@@ -127,8 +127,8 @@ class ImageSegmentor:
                 obj_id = None
                 # Go through active candidate objects
                 for id in self.active_objects_ids_per_class[class_str]:
-                    # Make sure the candidate object isn't already matched to a new detection
-                    if id in new_active_objects_ids:
+                    # Make sure the candidate object isn't already matched to a new detection, and already has a ukf prediction
+                    if id in new_active_objects_ids or id not in self.ukf_dict:
                         continue
                     # Probabilistic check of if the measurement matches the ukf prediction
                     abb = np.concatenate([new_box[:4],[0]])
@@ -201,7 +201,7 @@ class ImageSegmentor:
         # Aspect ratio valid
         ar = bb[2]/bb[3]
         if ar < self.min_aspect_ratio[class_str] or ar > self.max_aspect_ratio[class_str]:
-            print("rejecting measurement: INVALID ASPECT RATIO")
+            print("rejecting measurement: INVALID ASPECT RATIO for "+class_str+": "+str(ar))
             return False
 
         return True
@@ -217,8 +217,8 @@ class ImageSegmentor:
         z_x_l = (0-mu_x_l)/sigma_x
         z_x_r = (self.im_width-mu_x_r)/sigma_x
 
-        if z_x_l > -self.z_075_one_sided or z_x_r < self.z_075_one_sided:
-            print("Rejected measurement with values left {} and right {}".format(z_x_l,z_x_r))
+        if z_x_l > -self.z_090_one_sided or z_x_r < self.z_090_one_sided:
+            print("Rejected measurement with values left {} and right {} for {}".format(z_x_l,z_x_r,ukf.class_str))
             return False
 
         mu_y_l = abb[1] - abb[3]/2

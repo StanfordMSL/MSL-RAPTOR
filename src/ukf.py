@@ -47,6 +47,8 @@ class UKF:
             yaml_file = "bowl_ukf_params.yaml"
         elif self.class_str == 'laptop':
             yaml_file = "laptop_ukf_params.yaml"
+        elif self.class_str == 'bottle':
+            yaml_file = "bottle_ukf_params.yaml"
         else:
             raise RuntimeError('Unknown object type: {}'.format(self.class_str))
         
@@ -335,7 +337,7 @@ class UKF:
         next_states = copy(states)
 
         # General point mass model
-        if self.class_str.lower() in ['mslquad','cup','bowl','laptop'] :
+        if self.class_str.lower() in ['mslquad','cup','bowl','laptop','bottle'] :
 
             # update position
             next_states[0:3,:] += dt * states[3:6,:]

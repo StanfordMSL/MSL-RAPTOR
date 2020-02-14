@@ -47,7 +47,7 @@ class ros_interface:
         ##########################
     
     def get_first_image(self):
-        return self.bridge.imgmsg_to_cv2(rospy.wait_for_message(self.ns + '/camera/image_raw',Image), desired_encoding="passthrough")
+        return self.bridge.imgmsg_to_cv2(rospy.wait_for_message(self.ns + '/camera/image_raw',Image), desired_encoding="bgr8")
 
     def create_subs_and_pubs(self):
         # Subscribers / Listeners & Publishers #############################   
@@ -99,7 +99,7 @@ class ros_interface:
 
         self.tf_w_ego = pose_to_tf(find_closest_by_time(my_time, self.ego_pose_rosmesg_buffer[1], self.ego_pose_rosmesg_buffer[0])[0])
 
-        image = self.bridge.imgmsg_to_cv2(msg,desired_encoding="passthrough")
+        image = self.bridge.imgmsg_to_cv2(msg,desired_encoding="bgr8")
         
         # undistort the fisheye effect in the image
         if self.camera is not None:

@@ -163,9 +163,9 @@ def init_objects(ros):
 
     # Bowl
     # init 3d bounding box in bowl frame
-    half_length = 1.425279974937438965e-01 / 2
-    half_width = 1.394219994544982910e-01 /2
-    half_height = 6.570599973201751709e-02 / 2
+    half_length = 0.16512399911880049316 / 2
+    half_width = 0.1653299927711486816 /2
+    half_height = 0.08048000186681747437 / 2
     bb_3d['bowl'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
                           [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
                           [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
@@ -179,9 +179,9 @@ def init_objects(ros):
 
     # Cup
     # init 3d bounding box in bowl frame
-    half_length = 1.069279983639717102e-01 / 2
-    half_width = 7.403399795293807983e-02 / 2
-    half_height = 1.011200025677680969e-01 / 2
+    half_length = 0.14643399417400360 / 2
+    half_width = 0.08373200148344039917 / 2
+    half_height = 0.1146159991621971130 / 2
     bb_3d['cup'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
                           [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
                           [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
@@ -195,10 +195,26 @@ def init_objects(ros):
 
     # Laptop
     # init 3d bounding box in bowl frame
-    half_length = 3.066860139369964600e-01
-    half_width = 2.790839970111846924e-01
-    half_height = 1.686280071735382080e-01
+    half_length = 3.066860139369964600e-01 /2
+    half_width = 2.790839970111846924e-01/2
+    half_height = 1.686280071735382080e-01/2
     bb_3d['laptop'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
+                          [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
+                          [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
+                          [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
+                          [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
+                          [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
+                          [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
+                          [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
+
+    obj_width['laptop'] = 2*half_width
+    
+    # Bottle
+    # init 3d bounding box in bowl frame
+    half_length = 0.08774200081825256348/2
+    half_width = 0.08990000188350677490/2
+    half_height = 0.2205220013856887817/2
+    bb_3d['bottle'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
                           [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
                           [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
                           [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up

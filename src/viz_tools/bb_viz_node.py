@@ -58,7 +58,7 @@ class bb_viz_node:
             self.new_camera_matrix = self.K
         
         self.all_white_image = 255 * np.ones((camera_info.height, camera_info.width, 3), np.uint8)
-        self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(self.all_white_image, "passthrough"))
+        self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(self.all_white_image, "bgr8"))
 
 
     def image_cb(self, msg):
@@ -121,7 +121,7 @@ class bb_viz_node:
             my_time = bb_list_msg.header.stamp.to_sec()
             im_msg, pos_in_queue = self.find_closest_by_time_ros2(my_time, self.img_buffer[1], self.img_buffer[0])
             print("queue pos: {}".format(pos_in_queue))
-            image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="passthrough")
+            image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="bgr8")
             image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
         else:
             image = copy(self.all_white_image)
@@ -144,7 +144,7 @@ class bb_viz_node:
 
             box = np.int0(cv2.boxPoints( ( (bb_msg.x, bb_msg.y), (bb_msg.width, bb_msg.height), -np.degrees(bb_msg.angle))) )
             cv2.drawContours(image, [box], 0, box_color, 2)
-        self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(image, "passthrough"))
+        self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(image, "bgr8"))
 
         # cv2.imwrite('/test_img{}.png'.format(self.itr), image)
         self.itr += 1
