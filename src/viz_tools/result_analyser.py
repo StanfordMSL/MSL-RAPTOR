@@ -31,38 +31,32 @@ from pose_metrics import *
 
 class result_analyser:
 
-    def __init__(self, rb_name=None, ego_quad_ns="/quad7", ado_quad_ns="/quad4"):
-        if rb_name is not None:
-            if len(rb_name) > 4 and rb_name[-4:] == ".bag":
-                self.rb_name = rb_name
+    def __init__(self, log_identifier, ego_quad_ns="/quad7", ado_quad_ns="/quad4"):
+        us_split = log_identifier.split("_")
+        if log_identifier[-4:] == '.bag' or "_".join(us_split[0:3]) == 'msl_raptor_output':
+            # This means id is the source rosbag name for the log files
+            if log_identifier[-4:] == '.bag':
+                log_base_name = "log_" + us_split[-1][:-4]
             else:
-                self.rb_name = rb_name + ".bag"
+                log_base_name = "log_" + us_split[-1]
+        elif log_identifier[0:3] == 'log':
+            # we assume this is the log's name (w/o EST/GT/PARAMS etc)
+            log_base_name = "_".join(us_split[:-1])
         else:
-            raise RuntimeError("rb_name = None - need to provide rosbag name (with or without .bag)")
+            raise RuntimeError("We do not recognize log file! {} not understood".format(log_identifier))
 
-        try:
-            self.bag = rosbag.Bag(self.rb_name, 'r')
-        except Exception as e:
-            raise RuntimeError("Unable to Process Rosbag!!\n{}".format(e))
-
-        self.ado_gt_topic = ado_quad_ns + '/mavros/vision_pose/pose'
-        self.ado_est_topic = ego_quad_ns + '/msl_raptor_state'  # ego_quad_ns since it is ego_quad's estimate of the ado quad
-        self.bb_data_topic = ego_quad_ns + '/bb_data'  # ego_quad_ns since it is ego_quad's estimate of the bounding box
-        self.ego_gt_topic = ego_quad_ns + '/mavros/vision_pose/pose'
-        self.ego_est_topic = ego_quad_ns + '/mavros/local_position/pose'
-        self.cam_info_topic = ego_quad_ns + '/camera/camera_info'
-        self.topic_func_dict = {self.ado_gt_topic : self.parse_ado_gt_msg, 
-                                self.ado_est_topic : self.parse_ado_est_msg, 
-                                self.bb_data_topic : self.parse_bb_msg,
-                                self.ego_gt_topic : self.parse_ego_gt_msg, 
-                                self.ego_est_topic : self.parse_ego_est_msg,
-                                self.cam_info_topic: self.parse_camera_info_msg}
-
+        self.log_dir = '/root/msl_raptor_ws/src/msl_raptor/logs'
+        est_log_name = self.log_dir + "/" + log_base_name + "_EST.log"
+        gt_log_name = self.log_dir + "/" + log_base_name + "_GT.log"
+        param_log_name = self.log_dir + "/" + log_base_name + "_PARAM.log"
+        self.logger = raptor_logger(source="MSLRAPTOR", mode="read", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name)
         self.b_degrees = True  # use degrees or radians
 
         self.fig = None
         self.axes = None
         self.name = 'mslquad'
+
+        # data to extract
         self.t0 = -1
         self.tf = -1
         self.t_est = []
@@ -80,14 +74,12 @@ class result_analyser:
         self.yaw_est = []
         self.yaw_gt = []
 
-
         self.ego_gt_time_pose = []
         self.ego_gt_pose = []
         self.ego_est_pose = []
         self.ego_est_time_pose = []
         self.ado_gt_pose = []
         self.ado_est_pose = []
-        self.ado_est_state = []
 
         self.DETECT = 1
         self.TRACK = 2
@@ -98,90 +90,117 @@ class result_analyser:
         
         self.detect_times = []
         self.detect_end = None
-        self.abb_list = []
-        self.abb_time_list = []
 
-        # Create camera (camera extrinsics from quad7.param in the msl_raptor project):
-        self.tf_cam_ego = np.eye(4)
-        self.tf_cam_ego[0:3, 3] = np.asarray([0.01504337, -0.06380886, -0.13854437])
-        self.tf_cam_ego[0:3, 0:3] = np.reshape([-6.82621737e-04, -9.99890488e-01, -1.47832690e-02, 3.50423970e-02,  1.47502748e-02, -9.99276969e-01, 9.99385593e-01, -1.20016936e-03,  3.50284906e-02], (3, 3))
-        
-        # Correct Rotation w/ Manual Calibration
-        Angle_x = 8./180. 
-        Angle_y = 8./180.
-        Angle_z = 0./180. 
-        R_deltax = np.array([[ 1.             , 0.             , 0.              ],
-                             [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
-                             [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
-        R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
-                             [ 0.             , 1.             , 0               ],
-                             [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
-        R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
-                             [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
-                             [ 0.             , 0.             , 1.              ]])
-        R_delta = np.dot(R_deltax, np.dot(R_deltay, R_deltaz))
-        self.tf_cam_ego[0:3,0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3,0:3])
-
+        # params to extract
         self.K = None
         self.dist_coefs = None
         self.new_camera_matrix = None
-        
+        self.prm_data = None
+        self.est_data = None
+        self.gt_data = None
+        self.box_length = None
+        self.box_width = None
+        self.box_height = None
         self.raptor_metrics = pose_metric_tracker()
-        #########################################################################################
-        est_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_EST.log"
-        gt_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_GT.log"
-        param_log_name = os.path.dirname(os.path.realpath(__file__)) + "/logs/log_" + rb_name.split("_")[-1] + "_PARAM.log"
-        self.logger = raptor_logger(source="MSLRAPTOR", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name)
-        self.process_rb()
+        #################################
+
+        self.extract_logs()
         self.do_plot()
         self.quat_eval()
-        self.logger.close_files()
+
+
+    def extract_logs(self):
+        # read the data
+        log_data = self.logger.read_logs()
+        if 'prms' in log_data:
+            self.prm_data = log_data['prms']
+
+            # extract params
+            self.new_camera_matrix = self.prm_data['K']
+            self.tf_cam_ego = np.reshape(self.prm_data['tf_cam_ego'], (4, 4))
+            self.box_length, self.box_width, self.box_height, self.diam = list(self.prm_data['3d_bb_dims'])
+            self.vertices = np.array(  [[ self.box_length/2, self.box_width/2, self.box_height/2, 1.],
+                                        [ self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
+                                        [ self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
+                                        [ self.box_length/2,-self.box_width/2, self.box_height/2, 1.],
+                                        [-self.box_length/2,-self.box_width/2, self.box_height/2, 1.],
+                                        [-self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
+                                        [-self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
+                                        [-self.box_length/2, self.box_width/2, self.box_height/2, 1.]]).T
+
+        # extract est
+        if 'est' in log_data:
+            self.est_data = log_data['est']
+            self.t_est = self.est_data['time']
+            self.tf = self.t_est[-1]
+            ado_state_est_mat = self.est_data['state_est']
+            self.x_est = ado_state_est_mat[:, 0]
+            self.y_est = ado_state_est_mat[:, 1]
+            self.z_est = ado_state_est_mat[:, 2]
+            rpy_mat = quat_to_ang(ado_state_est_mat[:, 6:10])
+            self.roll_est = rpy_mat[:, 0]
+            self.pitch_est = rpy_mat[:, 1]
+            self.yaw_est = rpy_mat[:, 2]
+            
+            self.ego_est_time_pose = self.est_data['time']  # use same times
+            
+            n = len(ado_state_est_mat)
+            self.ado_est_pose = np.concatenate((quat_to_rotm(ado_state_est_mat[:, 6:10]), 
+                                                np.expand_dims(ado_state_est_mat[:, 0:3], axis=2)), axis=2)
+            self.ado_est_pose = np.concatenate((self.ado_est_pose, np.reshape([0,0,0,1]*n, (n,1,4))), axis=1)
+
+            ego_state_est_mat = self.est_data['ego_state_est']
+            n = len(ego_state_est_mat)
+            self.ego_est_pose = np.concatenate((quat_to_rotm(ego_state_est_mat[:, 6:10]),  
+                                                np.expand_dims(ego_state_est_mat[:, 0:3], axis=2)), axis=2)
+            self.ego_est_pose = np.concatenate((self.ego_est_pose, np.reshape([0,0,0,1]*n, (n,1,4))), axis=1)
+
+
+        # extract gt
+        if 'gt' in log_data:
+            self.gt_data = log_data['gt']
+            self.t_gt = self.gt_data['time']
+            ado_state_gt_mat = self.gt_data['state_gt']
+            self.x_gt = ado_state_gt_mat[:, 0]
+            self.y_gt = ado_state_gt_mat[:, 1]
+            self.z_gt = ado_state_gt_mat[:, 2]
+            rpy_mat = quat_to_ang(ado_state_gt_mat[:, 6:10])
+            self.roll_gt = rpy_mat[:, 0]
+            self.pitch_gt = rpy_mat[:, 1]
+            self.yaw_gt = rpy_mat[:, 2]
+            
+            self.ego_gt_time_pose = self.gt_data['time']  # use same times
+            
+            n = len(ado_state_gt_mat)
+            self.ado_gt_pose = np.concatenate((quat_to_rotm(ado_state_gt_mat[:, 6:10]), 
+                                                np.expand_dims(ado_state_gt_mat[:, 0:3], axis=2)), axis=2)
+            self.ado_gt_pose = list(np.concatenate((self.ado_gt_pose, np.reshape([0,0,0,1]*n, (n,1,4))), axis=1))
+
+            ego_state_gt_mat = self.gt_data['ego_state_gt']
+            n = len(ego_state_gt_mat)
+            self.ego_gt_pose = np.concatenate((quat_to_rotm(ego_state_gt_mat[:, 6:10]), 
+                                                np.expand_dims(ego_state_gt_mat[:, 0:3], axis=2)), axis=2)
+            self.ego_gt_pose = list(np.concatenate((self.ego_gt_pose, np.reshape([0,0,0,1]*n, (n,1,4))), axis=1))
+        
 
 
     def quat_eval(self):
         N = len(self.t_est)
         print("Post-processing data now ({} itrs)".format(N))
-
-
         corners2D_gt = None
 
-        diam = 0.311
-        box_length = 0.27
-        box_width = 0.27
-        box_height = 0.13
-        vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
-                            [ box_length/2, box_width/2,-box_height/2, 1.],
-                            [ box_length/2,-box_width/2,-box_height/2, 1.],
-                            [ box_length/2,-box_width/2, box_height/2, 1.],
-                            [-box_length/2,-box_width/2, box_height/2, 1.],
-                            [-box_length/2,-box_width/2,-box_height/2, 1.],
-                            [-box_length/2, box_width/2,-box_height/2, 1.],
-                            [-box_length/2, box_width/2, box_height/2, 1.]]).T
-        # corners3D = get_3D_corners(vertices)
-
-        # Write params to log file ########
-        log_data = {}
-        if self.new_camera_matrix is not None:
-            log_data['K'] = np.array([self.new_camera_matrix[0, 0], self.new_camera_matrix[1, 1], self.new_camera_matrix[0, 2], self.new_camera_matrix[1, 2]])
-        else:
-            log_data['K'] = np.array([self.K[0, 0], self.K[1, 1], self.K[0, 2], self.K[1, 2]])
-        log_data['3d_bb_dims'] = np.array([box_length, box_width, box_height])
-        self.logger.write_data_to_log(log_data, mode='prms')
         ###################################
 
         for i in range(N):
             # extract data in form needed for ssp analysis
             t_est = self.t_est[i]
-            tf_w_ado_est = pose_to_tf(self.ado_est_pose[i])
+            tf_w_ado_est = self.ado_est_pose[i]
 
-            pose_msg, _ = find_closest_by_time(t_est, self.ego_gt_time_pose, message_list=self.ego_gt_pose)
-            tf_w_ego_gt = pose_to_tf(pose_msg)
+            tf_w_ego_gt, _ = find_closest_by_time(t_est, self.ego_gt_time_pose, message_list=self.ego_gt_pose)
 
-            pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
-            tf_w_ego_est = pose_to_tf(pose_msg)
+            tf_w_ego_est, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
 
-            pose_msg, _ = find_closest_by_time(t_est, self.t_gt, message_list=self.ado_gt_pose)
-            tf_w_ado_gt = pose_to_tf(pose_msg)
+            tf_w_ado_gt, _ = find_closest_by_time(t_est, self.t_gt, message_list=self.ado_gt_pose)
 
             tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
             tf_cam_w = inv_tf(tf_w_cam)
@@ -194,46 +213,14 @@ class result_analyser:
             R_gt = tf_cam_ado_gt[0:3, 0:3]
             t_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
             
-            ######################################################
-            self.raptor_metrics.update_all_metrics(vertices=vertices, R_gt=R_gt, t_gt=t_gt, R_pr=R_pr, t_pr=t_pr, K=self.new_camera_matrix)
+            self.raptor_metrics.update_all_metrics(vertices=self.vertices, R_gt=R_gt, t_gt=t_gt, R_pr=R_pr, t_pr=t_pr, K=self.new_camera_matrix)
 
-            # Write data to log file #############################
-            (abb, im_seg_mode), _ = find_closest_by_time(t_est, self.abb_time_list, message_list=self.abb_list)
-            log_data['time'] = t_est
-            log_data['state_est'] = tf_to_state_vec(tf_w_ado_est)
-            log_data['state_gt'] = tf_to_state_vec(tf_w_ado_gt)
-            log_data['ego_state_est'] = tf_to_state_vec(tf_w_ego_est)
-            log_data['ego_state_gt'] = tf_to_state_vec(tf_w_ego_gt)
-            corners3D_pr = (tf_w_ado_est @ vertices)[0:3,:]
-            corners3D_gt = (tf_w_ado_gt @ vertices)[0:3,:]
-            log_data['corners_3d_est'] = np.reshape(corners3D_pr, (corners3D_pr.size,))
-            log_data['corners_3d_gt'] = np.reshape(corners3D_gt, (corners3D_gt.size,))
-            log_data['proj_corners_est'] = np.reshape(self.raptor_metrics.proj_2d_pr.T, (self.raptor_metrics.proj_2d_pr.size,))
-            log_data['proj_corners_gt'] = np.reshape(self.raptor_metrics.proj_2d_gt.T, (self.raptor_metrics.proj_2d_gt.size,))
-            log_data['abb'] = abb
-            log_data['im_seg_mode'] = im_seg_mode
-            self.logger.write_data_to_log(log_data, mode='est')
-            self.logger.write_data_to_log(log_data, mode='gt')
             ######################################################
 
         self.raptor_metrics.calc_final_metrics()
         self.raptor_metrics.print_final_metrics()
-        pdb.set_trace()
-
         print("done with post process!")
 
-
-    def process_rb(self):
-        print("Processing {}".format(self.rb_name))
-        for topic, msg, t in self.bag.read_messages( topics=list(self.topic_func_dict.keys()) ):
-            self.topic_func_dict[topic](msg)
-        self.t_est = np.asarray(self.t_est)
-        self.t0 = np.min(self.t_est)
-        self.tf = np.max(self.t_est) - self.t0
-        self.t_est -= self.t0
-        self.t_gt = np.asarray(self.t_gt) - self.t0
-        self.detect_time = np.asarray(self.detect_time) - self.t0
-        self.detect_times = np.asarray(self.detect_times) - self.t0
 
 
     def do_plot(self):
@@ -243,7 +230,7 @@ class result_analyser:
         ang_type = 'rad'
         if self.b_degrees:
             ang_type = 'deg'
-        
+
         self.x_gt_plt, = self.axes[0,0].plot(self.t_gt, self.x_gt, gt_line_style)
         self.x_est_plt, = self.axes[0,0].plot(self.t_est, self.x_est, est_line_style)
         self.axes[0, 0].set_ylabel("x [m]")
@@ -282,121 +269,16 @@ class result_analyser:
 
         plt.suptitle("MSL-RAPTOR Results (Blue - Est, Red - GT, Green - Front End Detect Mode)")
         plt.show(block=False)
-       
-
-    def parse_camera_info_msg(self, msg, t=None):
-        if self.K is None:
-            camera_info = msg
-            self.K = np.reshape(camera_info.K, (3, 3))
-            self.dist_coefs = np.reshape(camera_info.D, (5,))
-            self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
-        
-    
-    def parse_ado_est_msg(self, msg, t=None):
-        """
-        record estimated poses from msl-raptor
-        """
-        tracked_obs = msg.tracked_objects
-        if len(tracked_obs) == 0:
-            return
-        to = tracked_obs[0]  # assumes 1 object for now
-        if t is None:
-            self.t_est.append(to.pose.header.stamp.to_sec())
-        else:
-            self.t_est.append(t)
-
-        my_state = pose_to_state_vec(to.pose.pose)
-        rpy = quat_to_ang(np.reshape(my_state[6:10], (1,4)), b_to_degrees=self.b_degrees)[0]
-        self.ado_est_pose.append(to.pose.pose)
-        self.ado_est_state.append(to.pose.pose)
-        self.x_est.append(my_state[0])
-        self.y_est.append(my_state[1])
-        self.z_est.append(my_state[2])
-        self.roll_est.append(rpy[0])
-        self.pitch_est.append(rpy[1])
-        self.yaw_est.append(rpy[2])
-
-
-    def parse_ado_gt_msg(self, msg, t=None):
-        """
-        record optitrack poses of tracked quad
-        """
-        if t is None:
-            self.t_gt.append(msg.header.stamp.to_sec())
-        else:
-            self.t_gt.append(t)
-
-        my_state = pose_to_state_vec(msg.pose)
-        rpy = quat_to_ang(np.reshape(my_state[6:10], (1,4)))[0]
-        self.ado_gt_pose.append(msg.pose)
-        self.x_gt.append(my_state[0])
-        self.y_gt.append(my_state[1])
-        self.z_gt.append(my_state[2])
-        self.roll_gt.append(rpy[0])
-        self.pitch_gt.append(rpy[1])
-        self.yaw_gt.append(rpy[2])
-
-        
-    def parse_ego_gt_msg(self, msg, t=None):
-        """
-        record optitrack poses of tracked quad
-        """
-        self.ego_gt_pose.append(msg.pose)
-        self.ego_gt_time_pose.append(msg.header.stamp.to_sec())
-
-        
-    def parse_ego_est_msg(self, msg, t=None):
-        """
-        record optitrack poses of tracked quad
-        """
-        self.ego_est_pose.append(msg.pose)
-        self.ego_est_time_pose.append(msg.header.stamp.to_sec())
-
-
-    def parse_bb_msg(self, msg, t=None):
-        """
-        record times of detect
-        note message is custom MSL-RAPTOR angled bounding box
-        """
-        msg = msg.boxes[0]
-        t = msg.header.stamp.to_sec()
-        if msg.im_seg_mode == self.DETECT:
-            self.detect_time.append(t)
-
-        self.abb_list.append(([msg.x, msg.y, msg.width, msg.height, msg.angle*180./np.pi], msg.im_seg_mode))
-        self.abb_time_list.append(t)
-        ######
-        eps = 0.1 # min width of line
-        if msg.im_seg_mode == self.DETECT:  # we are detecting now
-            if not self.detect_times:  # first run - init list
-                self.detect_times = [[t]]
-                self.detect_end = np.nan
-            elif len(self.detect_times[-1]) == 2: # we are starting a new run
-                self.detect_times.append([t])
-                self.detect_end = np.nan
-            else: # len(self.detect_times[-1]) = 1: # we are currently still on a streak of detects
-                self.detect_end = t
-        else: # not detecting
-            if not self.detect_times or len(self.detect_times[-1]) == 2: # we are still not detecting (we were not Detecting previously)
-                pass
-            else: # self.detect_times[-1][1]: # we were just tracking
-                self.detect_times[-1].append(self.detect_end)
-                self.detect_end = np.nan
-
-        self.detect_mode.append(msg.im_seg_mode)
-
-
-
-
 
 
 if __name__ == '__main__':
     try:
         if len(sys.argv) == 1:
-            raise RuntimeError("not enough arguments, must pass in the rosbag name (w/ or w/o .bag)")
+            raise RuntimeError("not enough arguments, must pass in the logfile name or source rosbag name (w/ or w/o .bag)")
         elif len(sys.argv) > 2:
-            raise RuntimeError("too many arguments, only pass in the rosbag name (w/ or w/o .bag)")
-        program = result_analyser(rb_name=sys.argv[1])
+            raise RuntimeError("too many arguments, only pass in the rosbag name or source rosbag name (w/ or w/o .bag)")
+        np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
+        program = result_analyser(log_identifier=sys.argv[1])
         input("\nPress enter to close program\n")
         
     except:

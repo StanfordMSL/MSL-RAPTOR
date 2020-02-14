@@ -26,7 +26,6 @@ sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor')
 from ssp_utils import *
 from math_utils import *
 from ros_utils import *
-from raptor_logger import *
 
 class pose_metric_tracker:
     def __init__(self, px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, name='mslquad', diam=0.311, eps=1e-5):
