@@ -1,17 +1,19 @@
 <launch>
-  <arg name="id"              default="7" />
-  <arg name="robot_type"      default="quad" />
-  <arg name="ns"              value="/$(arg robot_type)$(arg id)" />
-  <arg name="b_camera"        default="true" />
-  <arg name="b_use_gt_bb"     default="false" />
-  <arg name="b_enforce_0_yaw" default="true" />
-  <arg name="b_use_tensorrt"  default="true" />
+  <arg name="id"               default="7" />
+  <arg name="robot_type"       default="quad" />
+  <arg name="ns"               value="/$(arg robot_type)$(arg id)" />
+  <arg name="b_camera"         default="true" />
+  <arg name="b_use_gt_bb"      default="false" />
+  <arg name="b_enforce_0_yaw"  default="true" />
+  <arg name="b_use_tensorrt"   default="true" />
   <arg name="detection_period" default="5" /> <!-- period to use to redo safety detection in seconds -->
-  <arg name="b_rosbag"        default="false" />  <!-- boolean if we are reading data from a rosbag -->
-  <arg name="rb_path"         default="/bags" />  <!-- path to the rosbag -->
-  <arg name="rb_name"         default="rosbag_for_post_process_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
-  <arg name="b_record"        default="false" />  <!-- boolean if we are recording data in rosbag -->
-  <arg name="rb_start_delay"  default="2.0" /> <!-- how long to delay the start of the rosbag -->
+  <arg name="b_rosbag"         default="false" />  <!-- boolean if we are reading data from a rosbag -->
+  <arg name="shared_folder"    default="/mounted_folder" />  <!-- path to the mounted folder -->
+  <arg name="rb_path_in"       default="$(arg shared_folder)/rosbags_for_post_process" />  <!-- path to the rosbag -->
+  <arg name="rb_path_out"      default="$(arg shared_folder)/raptor_processed_bags" />  <!-- path to the rosbag -->
+  <arg name="rb_name"          default="rosbag_for_post_process_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
+  <arg name="b_record"         default="false" />  <!-- boolean if we are recording data in rosbag -->
+  <arg name="rb_start_delay"   default="2.0" /> <!-- how long to delay the start of the rosbag -->
   
   <group if="$(arg b_rosbag)">
     <param name="use_sim_time" value="true" />   <!--use the rosbag time instead of the computer's time. If using this use clock option in rosbag-->
@@ -51,18 +53,18 @@
 
   <!-- IF using rosbag, launch our node then play the rosbag (using a delay to ensure msl_raptor starts first) -->
   <group if="$(arg b_rosbag)">
-    <node pkg="rosbag" type="play" name="player" args="--clock $(arg rb_path)/$(arg rb_name).bag" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
+    <node pkg="rosbag" type="play" name="player" args="--clock $(arg rb_path_in)/$(arg rb_name).bag" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
   </group>
 
   <!-- IF we should record a rosbag of results -->
   <group if="$(arg b_record)">
     <group if="$(arg b_record)">
       <!-- if FROM a rosbag (i.e. post-processed), then use the name of the source rosbag to name the newly output bag -->
-      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-O /bags/results/msl_raptor_output_from_bag_$(arg rb_name) -a"/>
+      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-O $(arg rb_path_out)/msl_raptor_output_from_bag_$(arg rb_name) -a"/>
     </group>
     <group unless="$(arg b_rosbag)">
       <!-- if NOT from a rosbag (i.e. live), then use the current timestamp to name the bag -->
-      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o /bags/results/msl_raptor_output_live_ -a"/>
+      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ -a"/>
   </group>
   </group>
 </launch>

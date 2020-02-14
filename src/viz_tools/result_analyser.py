@@ -9,7 +9,6 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 # plots
 import matplotlib
-# matplotlib.use('Agg')  ## This is needed for the gui to work from a virtual container
 import matplotlib.pyplot as plt
 # ros
 import rosbag
@@ -45,11 +44,15 @@ class result_analyser:
         else:
             raise RuntimeError("We do not recognize log file! {} not understood".format(log_identifier))
 
-        self.log_dir = '/root/msl_raptor_ws/src/msl_raptor/logs'
-        est_log_name = self.log_dir + "/" + log_base_name + "_EST.log"
-        gt_log_name = self.log_dir + "/" + log_base_name + "_GT.log"
-        param_log_name = self.log_dir + "/" + log_base_name + "_PARAM.log"
-        self.logger = raptor_logger(source="MSLRAPTOR", mode="read", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name)
+        self.log_in_dir = '/mounted_folder/raptor_logs'
+        est_log_name = self.log_in_dir + "/" + log_base_name + "_EST.log"
+        gt_log_name = self.log_in_dir + "/" + log_base_name + "_GT.log"
+        param_log_name = self.log_in_dir + "/" + log_base_name + "_PARAM.log"
+        self.log_in_dir = '/mounted_folder/raptor_logs'
+        ssp_log_name = self.ssp_logs + "/" + log_base_name + "_PARAM.log"
+        if not os.path.isfile(ssp_log_name):
+            ssp_log_name = None
+        self.logger = raptor_logger(source="MSLRAPTOR", mode="read", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name, ssp_fn=ssp_log_name)
         self.b_degrees = True  # use degrees or radians
 
         self.fig = None
@@ -106,7 +109,7 @@ class result_analyser:
 
         self.extract_logs()
         self.do_plot()
-        self.quat_eval()
+        self.quant_eval()
 
 
     def extract_logs(self):
@@ -184,7 +187,7 @@ class result_analyser:
         
 
 
-    def quat_eval(self):
+    def quant_eval(self):
         N = len(self.t_est)
         print("Post-processing data now ({} itrs)".format(N))
         corners2D_gt = None

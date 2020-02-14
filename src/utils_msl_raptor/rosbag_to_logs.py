@@ -37,26 +37,37 @@ class rosbags_to_logs:
     again in the result_analyser. 
     """
     def __init__(self, rb_name=None, ego_quad_ns="/quad7", ado_quad_ns="/quad4"):
-        if rb_name is not None:
+        
+        us_split = rb_name.split("_")
+        if rb_name[-4:] == '.bag' or "_".join(us_split[0:3]) == 'msl_raptor_output':
+            # This means rosbag name is one that was post-processed
             if len(rb_name) > 4 and rb_name[-4:] == ".bag":
                 self.rb_name = rb_name
             else:
                 self.rb_name = rb_name + ".bag"
+        elif len(rb_name) > 4 and "_".join(us_split[0:4]) == 'rosbag_for_post_process':
+            # we assume this is the rosbag that fed into raptor
+            rb_name = "msl_raptor_output_from_bag_rosbag_for_post_process_" + us_split[4]
+            if rb_name[-4:] == ".bag":
+                self.rb_name = rb_name
+            else:
+                self.rb_name = rb_name + ".bag"
         else:
-            raise RuntimeError("rb_name = None - need to provide rosbag name (with or without .bag)")
+            raise RuntimeError("We do not recognize bag file! {} not understood".format(rb_name))
         
-        self.bag_path = "/bags/results"
+        self.rosbag_in_dir = "/mounted_folder/raptor_processed_bags"
+        self.log_out_dir = "/mounted_folder/raptor_logs"
         try:
-            self.bag = rosbag.Bag(self.bag_path + '/' + self.rb_name, 'r')
+            self.bag = rosbag.Bag(self.rosbag_in_dir + '/' + self.rb_name, 'r')
         except Exception as e:
             raise RuntimeError("Unable to Process Rosbag!!\n{}".format(e))
 
-        self.ado_gt_topic = ado_quad_ns + '/mavros/vision_pose/pose'
-        self.ado_est_topic = ego_quad_ns + '/msl_raptor_state'  # ego_quad_ns since it is ego_quad's estimate of the ado quad
-        self.bb_data_topic = ego_quad_ns + '/bb_data'  # ego_quad_ns since it is ego_quad's estimate of the bounding box
-        self.ego_gt_topic = ego_quad_ns + '/mavros/vision_pose/pose'
-        self.ego_est_topic = ego_quad_ns + '/mavros/local_position/pose'
-        self.cam_info_topic = ego_quad_ns + '/camera/camera_info'
+        self.ado_gt_topic    = ado_quad_ns + '/mavros/vision_pose/pose'
+        self.ado_est_topic   = ego_quad_ns + '/msl_raptor_state'  # ego_quad_ns since it is ego_quad's estimate of the ado quad
+        self.bb_data_topic   = ego_quad_ns + '/bb_data'  # ego_quad_ns since it is ego_quad's estimate of the bounding box
+        self.ego_gt_topic    = ego_quad_ns + '/mavros/vision_pose/pose'
+        self.ego_est_topic   = ego_quad_ns + '/mavros/local_position/pose'
+        self.cam_info_topic  = ego_quad_ns + '/camera/camera_info'
         self.topic_func_dict = {self.ado_gt_topic : self.parse_ado_gt_msg, 
                                 self.ado_est_topic : self.parse_ado_est_msg, 
                                 self.bb_data_topic : self.parse_bb_msg,
@@ -118,13 +129,12 @@ class rosbags_to_logs:
         self.dist_coefs = None
         self.new_camera_matrix = None
         #########################################################################################
-        self.log_dir = '/root/msl_raptor_ws/src/msl_raptor/logs'
-        est_log_name = self.log_dir + "/log_" + rb_name[:-4].split("_")[-1] + "_EST.log"
-        gt_log_name = self.log_dir + "/log_" + rb_name[:-4].split("_")[-1] + "_GT.log"
-        param_log_name = self.log_dir + "/log_" + rb_name[:-4].split("_")[-1] + "_PARAM.log"
+        
+        est_log_name   = self.log_out_dir + "/log_" + rb_name[:-4].split("_")[-1] + "_EST.log"
+        gt_log_name    = self.log_out_dir + "/log_" + rb_name[:-4].split("_")[-1] + "_GT.log"
+        param_log_name = self.log_out_dir + "/log_" + rb_name[:-4].split("_")[-1] + "_PARAM.log"
         self.logger = raptor_logger(source="MSLRAPTOR", mode="write", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name)
         self.process_rb()
-
 
         self.diam = 0.311
         self.box_length = 0.27
@@ -133,11 +143,11 @@ class rosbags_to_logs:
 
         self.raptor_metrics = pose_metric_tracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, name=self.name, diam=self.diam)
         
-        self.quat_eval()
+        self.process_rosbag()
         self.logger.close_files()
 
 
-    def quat_eval(self):
+    def process_rosbag(self):
         N = len(self.t_est)
         print("Post-processing data now ({} itrs)".format(N))
         vertices = np.array([[ self.box_length/2, self.box_width/2, self.box_height/2, 1.],
@@ -186,6 +196,7 @@ class rosbags_to_logs:
             t_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
             
             ######################################################
+            
             if self.raptor_metrics is not None:
                 self.raptor_metrics.update_all_metrics(vertices=vertices, R_gt=R_gt, t_gt=t_gt, R_pr=R_pr, t_pr=t_pr, K=self.new_camera_matrix)
 
