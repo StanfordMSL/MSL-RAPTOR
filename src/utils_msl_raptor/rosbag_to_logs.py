@@ -130,9 +130,9 @@ class rosbags_to_logs:
         self.new_camera_matrix = None
         #########################################################################################
         
-        est_log_name   = self.log_out_dir + "/log_" + rb_name[:-4].split("_")[-1] + "_EST.log"
-        gt_log_name    = self.log_out_dir + "/log_" + rb_name[:-4].split("_")[-1] + "_GT.log"
-        param_log_name = self.log_out_dir + "/log_" + rb_name[:-4].split("_")[-1] + "_PARAM.log"
+        est_log_name   = self.log_out_dir + "/log_" + self.rb_name[:-4].split("_")[-1] + "_EST.log"
+        gt_log_name    = self.log_out_dir + "/log_" + self.rb_name[:-4].split("_")[-1] + "_GT.log"
+        param_log_name = self.log_out_dir + "/log_" + self.rb_name[:-4].split("_")[-1] + "_PARAM.log"
         self.logger = raptor_logger(source="MSLRAPTOR", mode="write", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name)
         self.process_rb()
 

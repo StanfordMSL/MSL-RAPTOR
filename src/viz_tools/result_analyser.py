@@ -44,12 +44,12 @@ class result_analyser:
         else:
             raise RuntimeError("We do not recognize log file! {} not understood".format(log_identifier))
 
-        self.log_in_dir = '/mounted_folder/raptor_logs'
-        est_log_name = self.log_in_dir + "/" + log_base_name + "_EST.log"
-        gt_log_name = self.log_in_dir + "/" + log_base_name + "_GT.log"
-        param_log_name = self.log_in_dir + "/" + log_base_name + "_PARAM.log"
-        self.log_in_dir = '/mounted_folder/raptor_logs'
-        ssp_log_name = self.ssp_logs + "/" + log_base_name + "_PARAM.log"
+        log_in_dir = '/mounted_folder/raptor_logs'
+        est_log_name = log_in_dir + "/" + log_base_name + "_EST.log"
+        gt_log_name = log_in_dir + "/" + log_base_name + "_GT.log"
+        param_log_name = log_in_dir + "/" + log_base_name + "_PARAM.log"
+        log_in_dir = '/mounted_folder/ssp_logs'
+        ssp_log_name = log_in_dir + "/" + log_base_name + "_SSP.log"
         if not os.path.isfile(ssp_log_name):
             ssp_log_name = None
         self.logger = raptor_logger(source="MSLRAPTOR", mode="read", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name, ssp_fn=ssp_log_name)
@@ -60,6 +60,8 @@ class result_analyser:
         self.name = 'mslquad'
 
         # data to extract
+        self.est_data = None
+        self.gt_data = None
         self.t0 = -1
         self.tf = -1
         self.t_est = []
@@ -94,7 +96,18 @@ class result_analyser:
         self.detect_times = []
         self.detect_end = None
 
+        self.ssp_data = None
+        self.t_ssp     = []
+        self.x_ssp     = []
+        self.y_ssp     = []
+        self.z_ssp     = []
+        self.roll_ssp  = []
+        self.pitch_ssp = []
+        self.yaw_ssp   = []
+        self.ssp_ado_est_pose = None
+
         # params to extract
+        self.prm_data = None
         self.K = None
         self.dist_coefs = None
         self.new_camera_matrix = None
@@ -184,7 +197,39 @@ class result_analyser:
             self.ego_gt_pose = np.concatenate((quat_to_rotm(ego_state_gt_mat[:, 6:10]), 
                                                 np.expand_dims(ego_state_gt_mat[:, 0:3], axis=2)), axis=2)
             self.ego_gt_pose = list(np.concatenate((self.ego_gt_pose, np.reshape([0,0,0,1]*n, (n,1,4))), axis=1))
+
+
+            self.ego_est_time_pose = self.est_data['time']  # use same times
+            
+            n = len(ado_state_est_mat)
+            self.ado_est_pose = np.concatenate((quat_to_rotm(ado_state_est_mat[:, 6:10]), 
+                                                np.expand_dims(ado_state_est_mat[:, 0:3], axis=2)), axis=2)
+            self.ado_est_pose = np.concatenate((self.ado_est_pose, np.reshape([0,0,0,1]*n, (n,1,4))), axis=1)
+
+            ego_state_est_mat = self.est_data['ego_state_est']
+            n = len(ego_state_est_mat)
+            self.ego_est_pose = np.concatenate((quat_to_rotm(ego_state_est_mat[:, 6:10]),  
+                                                np.expand_dims(ego_state_est_mat[:, 0:3], axis=2)), axis=2)
+            self.ego_est_pose = np.concatenate((self.ego_est_pose, np.reshape([0,0,0,1]*n, (n,1,4))), axis=1)
+
         
+        # extract ssp
+        if 'ssp' in log_data:
+            self.ssp_data = log_data['ssp']
+            self.t_ssp = self.ssp_data['time']
+            ssp_ado_state_est_mat = self.ssp_data['state_est']
+            self.x_ssp = ssp_ado_state_est_mat[:, 0]
+            self.y_ssp = ssp_ado_state_est_mat[:, 1]
+            self.z_ssp = ssp_ado_state_est_mat[:, 2]
+            rpy_mat = quat_to_ang(ssp_ado_state_est_mat[:, 6:10])
+            self.roll_ssp = rpy_mat[:, 0]
+            self.pitch_ssp = rpy_mat[:, 1]
+            self.yaw_ssp = rpy_mat[:, 2]
+            
+            n = len(ssp_ado_state_est_mat)
+            self.ssp_ado_est_pose = np.concatenate((quat_to_rotm(ssp_ado_state_est_mat[:, 6:10]), 
+                                                    np.expand_dims(ssp_ado_state_est_mat[:, 0:3], axis=2)), axis=2)
+            self.ssp_ado_est_pose = list(np.concatenate((self.ssp_ado_est_pose, np.reshape([0,0,0,1]*n, (n,1,4))), axis=1))
 
 
     def quant_eval(self):
@@ -228,7 +273,8 @@ class result_analyser:
     def do_plot(self):
         self.fig, self.axes = plt.subplots(3, 2, clear=True)
         est_line_style = 'r-'
-        gt_line_style = 'b-'
+        gt_line_style  = 'b-'
+        ssp_line_style = 'm-'
         ang_type = 'rad'
         if self.b_degrees:
             self.roll_gt *= 180/np.pi
@@ -237,6 +283,10 @@ class result_analyser:
             self.pitch_est *= 180/np.pi
             self.yaw_gt *= 180/np.pi
             self.yaw_est *= 180/np.pi
+            if self.ssp_data is not None:
+                self.roll_ssp *= 180/np.pi
+                self.pitch_ssp *= 180/np.pi
+                self.yaw_ssp *= 180/np.pi
             ang_type = 'deg'
 
         self.x_gt_plt, = self.axes[0,0].plot(self.t_gt, self.x_gt, gt_line_style)
@@ -263,19 +313,30 @@ class result_analyser:
         self.yaw_est_plt, = self.axes[2,1].plot(self.t_est, self.yaw_est, est_line_style)
         self.axes[2, 1].set_ylabel("yaw [{}]".format(ang_type))
 
+        if self.ssp_data is not None:
+            self.x_ssp_plt, = self.axes[0,0].plot(self.t_ssp, self.x_ssp, ssp_line_style)
+            self.y_ssp_plt, = self.axes[1,0].plot(self.t_ssp, self.y_ssp, ssp_line_style)
+            self.z_ssp_plt, = self.axes[2,0].plot(self.t_ssp, self.z_ssp, ssp_line_style)
+            self.roll_ssp_plt, = self.axes[0,1].plot(self.t_ssp, self.roll_ssp, ssp_line_style)
+            self.pitch_ssp_plt, = self.axes[1,1].plot(self.t_ssp, self.pitch_ssp, ssp_line_style)
+            self.yaw_ssp_plt, = self.axes[2,1].plot(self.t_ssp, self.yaw_ssp, ssp_line_style)
+
+
         for ax in np.reshape(self.axes, (self.axes.size)):
             ax.set_xlim([0, self.tf])
             ax.set_xlabel("time (s)")
             yl1, yl2 = ax.get_ylim()
             for ts, tf in self.detect_times:
                 if np.isnan(tf) or tf - ts < 0.1: # detect mode happened just once - draw line
-                    # ax.axvline(ts, 'r-') # FOR SOME REASON THIS DOES NOT WORK!!
                     ax.plot([ts, ts], [-1e4, 1e4], linestyle='-', color="#d62728", linewidth=0.5) # using yl1 and yl2 for the line plot doesnt span the full range
                 else: # detect mode happened for a span - draw rect
                     ax.axvspan(ts, tf, facecolor='#d62728', alpha=0.5)  # red: #d62728, blue: 1f77b4, green: #2ca02c
             ax.set_ylim([yl1, yl2])
 
-        plt.suptitle("MSL-RAPTOR Results (Blue - Est, Red - GT, Green - Front End Detect Mode)")
+        if self.ssp_data is not None:
+            plt.suptitle("MSL-RAPTOR Results (Blue - GT, Red - Est, Magenta - SSP)")
+        else:
+            plt.suptitle("MSL-RAPTOR Results (Blue - GT, Red - Est)")
         plt.show(block=False)
 
 

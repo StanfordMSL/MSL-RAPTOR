@@ -7,28 +7,11 @@ import pdb
 # math
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-# plots
-import matplotlib
-# matplotlib.use('Agg')  ## This is needed for the gui to work from a virtual container
-import matplotlib.pyplot as plt
 # ros
-import rosbag
-import rospy
-from geometry_msgs.msg import PoseStamped, Twist, Pose
-from sensor_msgs.msg import Image, CameraInfo
-from std_msgs.msg import Float32MultiArray, MultiArrayDimension
-import tf
-import cv2
-from cv_bridge import CvBridge, CvBridgeError
 from ssp_utils import *
 
 class raptor_logger:
-    """
-    This class is a interface for working with the custom raptor logfiles. Data can be written / read through this class.
-    There are defined log files currently supported - est (for raptor's estimates), gt (raptors ground truth), prms (for parameters), 
-    and ssp (for the baseline). These logs will be read by the result_analyzer, and allow the different methods to be compared.
-    """
-    def __init__(self, source='MSLRAPTOR', mode="write", est_fn=None, gt_fn=None, param_fn=None):
+    def __init__(self, source='MSLRAPTOR', mode="write", est_fn=None, gt_fn=None, param_fn=None, ssp_fn=None):
         self.source = source  # MSLRAPTOR, SSP, GT
 
         self.save_elms = {}
@@ -36,14 +19,14 @@ class raptor_logger:
                                  ('Ado State Est', 'state_est', 13), 
                                  ('Ego State Est', 'ego_state_est', 13), 
                                  ('3D Corner Est (X|Y|Z)', 'corners_3d_est', 8*3), 
-                                 ('Corner 2D Projections (r|c)', 'proj_corners_est', 8*2), 
+                                 ('Corner 2D Projections Est (r|c)', 'proj_corners_est', 8*2), 
                                  ('Angled BB (r|c|w|h|ang_deg)', 'abb', 5),
                                  ('Image Segmentation Mode', 'im_seg_mode', 1)]
         self.save_elms['gt'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
                                 ('Ado State GT', 'state_gt', 13), 
                                 ('Ego State GT', 'ego_state_gt', 13), 
                                 ('3D Corner GT (X|Y|Z)', 'corners_3d_gt', 8*3), 
-                                ('Corner 2D Projections (r|c)', 'proj_corners_gt', 8*2), 
+                                ('Corner 2D Projections GT (r|c)', 'proj_corners_gt', 8*2), 
                                 ('Angled BB (r|c|w|h|ang_deg)', 'abb', 5),
                                 ('Image Segmentation Mode', 'im_seg_mode', 1)]
         self.save_elms['prms'] = [('Camera Intrinsics (K)', 'K', 4),
@@ -58,6 +41,7 @@ class raptor_logger:
                                  ('3D Corner GT (X|Y|Z)', 'corners_3d_gt', 8*3), 
                                  ('Corner 2D Projections Est (r|c)', 'proj_corners_est', 8*2), 
                                  ('Corner 2D Projections GT (r|c)', 'proj_corners_gt', 8*2)]
+        
         self.log_data = None
         self.fh = None
         self.fn = None
@@ -82,6 +66,12 @@ class raptor_logger:
                 save_el_shape = (len(self.save_elms['prms']), len(self.save_elms['prms'][0]))
                 data_header = ", ".join(np.reshape([*zip(self.save_elms['prms'])], save_el_shape)[:,0].tolist())
                 np.savetxt(self.fh['prms'], X=[], header=data_header)  # write header
+            if ssp_fn is not None:
+                self.create_file_dir(ssp_fn)
+                self.fh['ssp'] = open(ssp_fn,'w+')  # doing this here makes it appendable
+                save_el_shape = (len(self.save_elms['ssp']), len(self.save_elms['ssp'][0]))
+                data_header = ", ".join(np.reshape([*zip(self.save_elms['ssp'])], save_el_shape)[:,0].tolist())
+                np.savetxt(self.fh['ssp'], X=[], header=data_header)  # write header
         elif mode == "read":
             self.fn = {}
             if est_fn is not None:
@@ -90,6 +80,8 @@ class raptor_logger:
                 self.fn['gt'] = gt_fn
             if param_fn is not None:
                 self.fn['prms'] = param_fn
+            if ssp_fn is not None:
+                self.fn['ssp'] = ssp_fn
         else:
             raise RuntimeError("Unrecognized logging mode")
 
@@ -98,11 +90,6 @@ class raptor_logger:
         """ mode can be est, gt, ssp, or param"""
         if not mode in ['est', 'gt', 'ssp', 'prms']:
             raise RuntimeError("Mode {} not recognized (must be 'est', 'gt', 'ssp', or 'prms')".format(mode))
-        t = None  # time (seconds)
-        state = None  # 13 el pos, lin vel, quat, ang vel [ling/ ang vel might be NaN]
-        corners_3d_cam_frame = None
-        proj_corners = None
-        abb_2d = None
         save_el_shape = (len(self.save_elms[mode]), len(self.save_elms[mode][0]))
         num_to_write = np.sum(np.reshape([*zip(self.save_elms[mode])], save_el_shape)[:,2].astype(int)) 
         out = np.ones((1, num_to_write)) * 1e10
