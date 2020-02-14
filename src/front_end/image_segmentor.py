@@ -173,6 +173,8 @@ class ImageSegmentor:
     def score_state_consistent_measurement(self,ukf,abb):
         # Check if new measurement is too far from distribution of previous measurement
         # Hotelling's t-squared statistic
+        if not hasattr(ukf,'mu_obs'):
+            return np.inf
         return math.sqrt((abb-ukf.mu_obs)@ la.inv(ukf.S_obs) @ (abb-ukf.mu_obs).T)
         
 
