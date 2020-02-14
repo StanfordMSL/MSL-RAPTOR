@@ -95,6 +95,10 @@ class YoloDetector:
 
         det = det_filtered
 
+        if len(det) == 0:
+            return np.array([])
+            print('No object of the chosen classes detected')
+
         det = np.stack(det)
 
 

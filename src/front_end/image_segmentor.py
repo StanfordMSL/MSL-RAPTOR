@@ -157,6 +157,8 @@ class ImageSegmentor:
     def detect(self,image):
         tic = time.time()
         detections = self.detector.detect(image)
+        if len(detections) == 0:
+            return detections
         valid_detections_ids = []
         # Ignore invalid detections
         for i,detection in enumerate(detections):
