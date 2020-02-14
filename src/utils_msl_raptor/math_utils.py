@@ -62,7 +62,7 @@ def quat_mul(q, r):
     qout = np.concatenate((scalar,vec),axis=1)
     return enforce_quat_format(qout)
 
-def quat_to_ang(q, b_to_degrees=True):
+def quat_to_ang(q, b_to_degrees=False):
     """
     Convert a quaternion to euler angles (ASSUMES 'XYZ')
     """
