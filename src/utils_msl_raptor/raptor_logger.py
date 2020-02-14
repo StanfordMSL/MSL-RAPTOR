@@ -23,6 +23,11 @@ from cv_bridge import CvBridge, CvBridgeError
 from ssp_utils import *
 
 class raptor_logger:
+    """
+    This class is a interface for working with the custom raptor logfiles. Data can be written / read through this class.
+    There are defined log files currently supported - est (for raptor's estimates), gt (raptors ground truth), prms (for parameters), 
+    and ssp (for the baseline). These logs will be read by the result_analyzer, and allow the different methods to be compared.
+    """
     def __init__(self, source='MSLRAPTOR', mode="write", est_fn=None, gt_fn=None, param_fn=None):
         self.source = source  # MSLRAPTOR, SSP, GT
 

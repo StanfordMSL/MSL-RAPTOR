@@ -28,6 +28,10 @@ from math_utils import *
 from ros_utils import *
 
 class pose_metric_tracker:
+    """
+    This class is to help unify how ssp and raptor judge the results. It can be incrementally updated with results at each iteration, 
+    and at the end can calculate averages for the run. It calculates several metrics using the methodology from ssp's code.
+    """
     def __init__(self, px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, name='mslquad', diam=0.311, eps=1e-5):
 
         self.px_thresh    = px_thresh
