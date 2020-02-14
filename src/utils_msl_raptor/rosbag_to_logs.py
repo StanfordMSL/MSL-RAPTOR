@@ -120,7 +120,13 @@ class rosbags_to_logs:
         self.logger = raptor_logger(source="MSLRAPTOR", mode="write", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name)
         self.process_rb()
 
-        self.raptor_metrics = pose_metric_tracker()
+
+        self.diam = 0.311
+        self.box_length = 0.27
+        self.box_width = 0.27
+        self.box_height = 0.13
+
+        self.raptor_metrics = pose_metric_tracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, name=self.name, diam=self.diam)
         
         self.quat_eval()
         self.logger.close_files()
@@ -129,18 +135,14 @@ class rosbags_to_logs:
     def quat_eval(self):
         N = len(self.t_est)
         print("Post-processing data now ({} itrs)".format(N))
-        diam = 0.311
-        box_length = 0.27
-        box_width = 0.27
-        box_height = 0.13
-        vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
-                            [ box_length/2, box_width/2,-box_height/2, 1.],
-                            [ box_length/2,-box_width/2,-box_height/2, 1.],
-                            [ box_length/2,-box_width/2, box_height/2, 1.],
-                            [-box_length/2,-box_width/2, box_height/2, 1.],
-                            [-box_length/2,-box_width/2,-box_height/2, 1.],
-                            [-box_length/2, box_width/2,-box_height/2, 1.],
-                            [-box_length/2, box_width/2, box_height/2, 1.]]).T
+        vertices = np.array([[ self.box_length/2, self.box_width/2, self.box_height/2, 1.],
+                             [ self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
+                             [ self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
+                             [ self.box_length/2,-self.box_width/2, self.box_height/2, 1.],
+                             [-self.box_length/2,-self.box_width/2, self.box_height/2, 1.],
+                             [-self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
+                             [-self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
+                             [-self.box_length/2, self.box_width/2, self.box_height/2, 1.]]).T
 
         # Write params to log file ########
         log_data = {}
@@ -148,7 +150,7 @@ class rosbags_to_logs:
             log_data['K'] = np.array([self.new_camera_matrix[0, 0], self.new_camera_matrix[1, 1], self.new_camera_matrix[0, 2], self.new_camera_matrix[1, 2]])
         else:
             log_data['K'] = np.array([self.K[0, 0], self.K[1, 1], self.K[0, 2], self.K[1, 2]])
-        log_data['3d_bb_dims'] = np.array([box_length, box_width, box_height, diam])
+        log_data['3d_bb_dims'] = np.array([self.box_length, self.box_width, self.box_height, self.diam])
         log_data['tf_cam_ego'] = np.reshape(self.tf_cam_ego, (16,))
         self.logger.write_data_to_log(log_data, mode='prms')
         ###################################

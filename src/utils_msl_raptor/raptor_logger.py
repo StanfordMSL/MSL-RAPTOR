@@ -17,7 +17,6 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Pose
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
-from msl_raptor.msg import AngledBbox, AngledBboxes, TrackedObjects, TrackedObject
 import tf
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
@@ -45,7 +44,15 @@ class raptor_logger:
         self.save_elms['prms'] = [('Camera Intrinsics (K)', 'K', 4),
                                   ('Object BB Size (len|wid|hei|diam)', '3d_bb_dims', 4),
                                   ('tf_cam_ego', 'tf_cam_ego', 16)]
-        
+        self.save_elms['ssp'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
+                                 ('Ado State GT', 'state_gt', 13), 
+                                 ('Ado State Est', 'state_est', 13), 
+                                 ('Ego State Est', 'ego_state_est', 13), 
+                                 ('Ego State GT', 'ego_state_gt', 13), 
+                                 ('3D Corner Est (X|Y|Z)', 'corners_3d_gt', 8*3), 
+                                 ('3D Corner GT (X|Y|Z)', 'corners_3d_gt', 8*3), 
+                                 ('Corner 2D Projections Est (r|c)', 'proj_corners_est', 8*2), 
+                                 ('Corner 2D Projections GT (r|c)', 'proj_corners_gt', 8*2)]
         self.log_data = None
         self.fh = None
         self.fn = None
@@ -83,9 +90,9 @@ class raptor_logger:
 
 
     def write_data_to_log(self, data, mode='est'):
-        """ mode can be est, gt, or param"""
-        if not mode in ['est', 'gt', 'prms']:
-            raise RuntimeError("Mode {} not recognized (must be 'est', 'gt', or 'prms')".format(mode))
+        """ mode can be est, gt, ssp, or param"""
+        if not mode in ['est', 'gt', 'ssp', 'prms']:
+            raise RuntimeError("Mode {} not recognized (must be 'est', 'gt', 'ssp', or 'prms')".format(mode))
         t = None  # time (seconds)
         state = None  # 13 el pos, lin vel, quat, ang vel [ling/ ang vel might be NaN]
         corners_3d_cam_frame = None

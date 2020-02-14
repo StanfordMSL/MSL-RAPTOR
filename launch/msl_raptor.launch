@@ -35,15 +35,17 @@
   </node>
 
   <!-- IF using camera, launch our node -->
-  <group if="$(arg b_camera)">
-    <group ns="$(arg ns)">
-      <include file="$(find ocam_msl)/launch/ocam_ros.launch" >
-          <arg name="resolution"       value="0"/> <!-- These are the default cropping configurations from Ocam:  resolution: 0: 1280x960, 1: 1280x720, 2: 640x480, 3: 640x360    frame_rate: USB3.0 - 1280x960@45fps, 1280x720@60fps, 640x480@80fps, 320x240@160fps   USB2.0 - 1280x960@22.5fps, 1280x720@30fps, 640x480@80fps, 320x240@160fps -->
-          <arg name="frame_rate"       value="22.5"/>
-          <arg name="image_width"      value="640"/>
-          <arg name="image_height"     value="480" />
-          <arg name="camera_frame_id"  value="$(arg ns)/camera" />
-      </include>
+  <group unless="$(arg b_rosbag)">
+    <group if="$(arg b_camera)">
+      <group ns="$(arg ns)">
+        <include file="$(find ocam_msl)/launch/ocam_ros.launch" >
+            <arg name="resolution"       value="0"/> <!-- These are the default cropping configurations from Ocam:  resolution: 0: 1280x960, 1: 1280x720, 2: 640x480, 3: 640x360    frame_rate: USB3.0 - 1280x960@45fps, 1280x720@60fps, 640x480@80fps, 320x240@160fps   USB2.0 - 1280x960@22.5fps, 1280x720@30fps, 640x480@80fps, 320x240@160fps -->
+            <arg name="frame_rate"       value="22.5"/>
+            <arg name="image_width"      value="640"/>
+            <arg name="image_height"     value="480" />
+            <arg name="camera_frame_id"  value="$(arg ns)/camera" />
+        </include>
+      </group>
     </group>
   </group>
 
@@ -54,6 +56,13 @@
 
   <!-- IF we should record a rosbag of results -->
   <group if="$(arg b_record)">
-    <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o  /bags/results/msl_raptor_output -a"/>
+    <group if="$(arg b_record)">
+      <!-- if FROM a rosbag (i.e. post-processed), then use the name of the source rosbag to name the newly output bag -->
+      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-O /bags/results/msl_raptor_output_from_bag_$(arg rb_name) -a"/>
+    </group>
+    <group unless="$(arg b_rosbag)">
+      <!-- if NOT from a rosbag (i.e. live), then use the current timestamp to name the bag -->
+      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o /bags/results/msl_raptor_output_live_ -a"/>
+  </group>
   </group>
 </launch>
