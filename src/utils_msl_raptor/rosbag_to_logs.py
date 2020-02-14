@@ -204,7 +204,6 @@ class rosbags_to_logs:
         if self.raptor_metrics is not None:
             self.raptor_metrics.calc_final_metrics()
             self.raptor_metrics.print_final_metrics()
-        pdb.set_trace()
         print("done processing rosbag into logs!")
 
 
