@@ -57,7 +57,7 @@ if __name__ == '__main__':
             name = mesh_path.split("/")[-1].split(".")[0]
             class_str = name.split('_')[0].rstrip(digits)
             # print("dims for {}: ".format(name, spans))
-            print("---\nid: {}\nns: '{}'\nclass_str: {}".format(i + start_num, name, class_str))
+            print("---\nid: {}\nns: '{}'\nclass_str: '{}'".format(i + start_num, name, class_str))
             print("bound_box_l: {}\nbound_box_w: {}\nbound_box_h: {}".format(*spans))
         print("\n\nDONE!!!")
         

@@ -76,6 +76,7 @@ class rosbags_to_logs:
         self.ado_names_all = []  # all names we could possibly recognize
         self.bb_3d_dict_all = defaultdict(list)  # turns the name into the len, width, height, and diam of the object
         self.tf_cam_ego = None
+        self.obj_name_to_class_str_dict = {}
         self.read_yaml()
 
 
@@ -84,7 +85,7 @@ class rosbags_to_logs:
         self.name = 'mslquad'
         self.t0 = -1
         self.tf = -1
-        self.t_est = defaultdict(list)
+        self.t_est = set()
         self.t_gt = defaultdict(list)
 
         self.ego_gt_time_pose = []
@@ -93,8 +94,7 @@ class rosbags_to_logs:
         self.ego_est_time_pose = []
         self.ado_gt_pose = defaultdict(list)
 
-        self.obj_name_to_class_str_dict = {}
-        self.ado_est_pose_BY_TIME_BY_CLASS = defaultdict(defaultdict(list))
+        self.ado_est_pose_BY_TIME_BY_CLASS = defaultdict(dict)
         # self.ado_est_pose = defaultdict(list)
         self.ado_est_state = defaultdict(list)
 
@@ -161,36 +161,41 @@ class rosbags_to_logs:
             log_data['K'] = np.array([self.K[0, 0], self.K[1, 1], self.K[0, 2], self.K[1, 2]])
         bb_dim_arr = np.zeros((4*len(self.ado_names)))
         for i, n in enumerate(self.ado_names):
-            pdb.set_trace()
             bb_dim_arr[4*i:4*i+4] = self.bb_3d_dict_all[n]
         log_data['3d_bb_dims'] = bb_dim_arr
         log_data['tf_cam_ego'] = np.reshape(self.tf_cam_ego, (16,))
         self.logger.write_data_to_log(log_data, name='', mode='prms')
         ###################################
 
-        pdb.set_trace()
+        print("Post-processing data now")
         for name in self.ado_names:
             log_data = {}
-            N = len(self.t_est[name])
-            print("Post-processing data now ({} itrs)".format(N))
-            vertices = np.array([[ self.box_length/2, self.box_width/2, self.box_height/2, 1.],
-                                [ self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
-                                [ self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
-                                [ self.box_length/2,-self.box_width/2, self.box_height/2, 1.],
-                                [-self.box_length/2,-self.box_width/2, self.box_height/2, 1.],
-                                [-self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
-                                [-self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
-                                [-self.box_length/2, self.box_width/2, self.box_height/2, 1.]]).T
-            for i in range(N):
+            box_length, box_width, box_height, diam = self.bb_3d_dict_all[name]
+            vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
+                                 [ box_length/2, box_width/2,-box_height/2, 1.],
+                                 [ box_length/2,-box_width/2,-box_height/2, 1.],
+                                 [ box_length/2,-box_width/2, box_height/2, 1.],
+                                 [-box_length/2,-box_width/2, box_height/2, 1.],
+                                 [-box_length/2,-box_width/2,-box_height/2, 1.],
+                                 [-box_length/2, box_width/2,-box_height/2, 1.],
+                                 [-box_length/2, box_width/2, box_height/2, 1.]]).T
+            for i, t_gt in enumerate(self.t_gt[name]):
+                if t_gt < 0:
+                    continue
+                pdb.set_trace()
                 # extract data in form for logging
-                t_est = self.t_est[i]
+                t_est, _ = find_closest_by_time(t_gt, self.t_est)
 
-                pose_msg, ego_pose_ind = find_closest_by_time(t_est, self.ego_gt_time_pose[name], message_list=self.ego_gt_pose)
-                tf_w_ego_gt = pose_to_tf(pose_msg)
+                # pose_msg, ego_pose_ind = find_closest_by_time(t_est, self.ego_gt_time_pose[name], message_list=self.ego_gt_pose)
+                # tf_w_ego_gt = pose_to_tf(pose_msg)
+                tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[i])
 
                 # tf_w_ado_est = pose_to_tf(self.ado_est_pose[name][i])
                 class_str = self.obj_name_to_class_str_dict[name]
                 candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
+                if len(candidate_poses) == 0:
+                    # this means we didnt see this object at this time... i think...
+                    continue
                 time_gt = self.ego_gt_time_pose[name][ego_pose_ind]
                 tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ego_gt, time_gt, t_est, name, candidate_poses)
 
@@ -256,20 +261,11 @@ class rosbags_to_logs:
                 self.ado_names.add(name)
                 self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
         
-        for n in self.t_est:
-            self.t_est[n] = np.asarray(self.t_est[n])
-            min_t = np.min(self.t_est[n])
-            max_t = np.max(self.t_est[n])
-            if self.t0 is None:
-                self.t0 = min_t
-            elif self.t0 > min_t:
-                self.t0 = min_t
-            if self.tf is None:
-                self.tf = max_t - self.t0
-            elif self.tf < (max_t - self.t0):
-                self.tf = max_t - self.t0
-        for n in self.t_est:
-            self.t_est[n] -= self.t0
+        self.t_est = np.sort(list(self.t_est) )
+        self.t0 = np.min(self.t_est)
+        self.tf = np.max(self.t_est)
+        self.t_est -= self.t0
+        for n in self.ado_names:
             self.t_gt[n] = np.asarray(self.t_gt[n]) - self.t0
         # self.detect_time[n] = np.asarray(self.detect_time) - self.t0
         # self.detect_times[n] = np.asarray(self.detect_times) - self.t0
@@ -301,7 +297,6 @@ class rosbags_to_logs:
                         R_delta = R_deltax @ R_deltay @ R_deltaz
                         self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
                     else:
-                        pdb.set_trace()
                         name = obj_dict['ns']
                         self.ado_names_all.append(name)
                         l = float(obj_dict['bound_box_l']) 
@@ -336,14 +331,20 @@ class rosbags_to_logs:
         tracked_obs = msg.tracked_objects
         if len(tracked_obs) == 0:
             return
-            
+        if t is None:
+            t_est = to.pose.header.stamp.to_sec()
+        else:
+            t_est = t
+        self.t_est.add(t_est)
         for to in tracked_obs:
-            if t is None:
-                self.t_est[name].append(to.pose.header.stamp.to_sec())
+            # if t is None:
+            #     self.t_est[name].append(to.pose.header.stamp.to_sec())
+            # else:
+            #     self.t_est[name].append(t)
+            if to.class_str in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append(to.pose.pose)
             else:
-                self.t_est[name].append(t)
-
-            self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append(to.pose.pose)
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [to.pose.pose]
             # self.ado_est_state[name].append(to.state)
 
 
