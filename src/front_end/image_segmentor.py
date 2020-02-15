@@ -122,6 +122,7 @@ class ImageSegmentor:
             if class_str not in self.active_objects_ids_per_class or len(self.active_objects_ids_per_class[class_str]) == 0:
                 # No active objects of this class
                 obj_id = self.new_tracked_object(class_str)
+                self.active_objects_ids_per_class[class_str] = [obj_id]
             else:
                 # There exist some active objects of this class, check if they match
                 best_t = self.F_005
