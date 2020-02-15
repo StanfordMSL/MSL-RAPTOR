@@ -2,3 +2,4 @@ quad4
 bowl_blue_ikea_norm
 mug2_scene3_norm
 laptop_air_0_norm
+bottle_blue_google_norm
