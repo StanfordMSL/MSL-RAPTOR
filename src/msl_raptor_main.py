@@ -17,12 +17,14 @@ from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.math_utils import *
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/src/front_end')
 from image_segmentor import ImageSegmentor
-
+import yaml
 
 def run_execution_loop():
     b_enforce_0_yaw = rospy.get_param('~b_enforce_0_yaw') 
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb') 
     detection_period_ros = rospy.get_param('~detection_period') # In seconds
+    objects_sizes_yaml = rospy.get_param('~object_sizes_file')
+    objects_used_path = rospy.get_param('~object_used_file')
     b_filter_meas = True
     
     ros = ROS(b_use_gt_bb)  # create a ros interface object
@@ -41,7 +43,7 @@ def run_execution_loop():
     
     rate = rospy.Rate(30) # max filter rate
     ukf_dict = {}  # key: object_id value: ukf object
-    my_camera, bb_3d, obj_width = init_objects(ros)  # init camera, pose, etc
+    my_camera, bb_3d, obj_width = init_objects(ros,objects_sizes_yaml,objects_used_path)  # init camera, pose, etc
     ros.create_subs_and_pubs()
     dim_state = 13
     state_est = np.zeros((dim_state + dim_state**2, ))
@@ -122,19 +124,27 @@ def init_state_from_gt(ros, ukf):
     ukf.mu[0:3] += np.array([-2, .5, .5]) 
 
 
-def init_objects(ros):
+def init_objects(ros,objects_sizes_yaml,objects_used_path):
     # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
     ros.camera = camera(ros)
 
+    with open(objects_used_path) as f:
+        objects_used = f.readlines()
+    # you may also want to remove whitespace characters like `\n` at the end of each line
+    objects_used = [x.strip() for x in objects_used]
+
     bb_3d = {}
     obj_width = {}
-
-    # MSL quadrotor
-    # init 3d bounding box in quad frame
-    half_length = rospy.get_param('~target_bound_box_l') / 2
-    half_width = rospy.get_param('~target_bound_box_w') / 2
-    half_height = rospy.get_param('~target_bound_box_h') / 2
-    bb_3d['mslquad'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
+    with open(objects_sizes_yaml, 'r') as stream:
+        try:
+            obj_prms = list(yaml.load_all(stream))
+            for obj_dict in obj_prms:
+                if obj_dict['ns'] in objects_used:
+                    half_length = float(obj_dict['bound_box_l']) /2
+                    half_width = float(obj_dict['bound_box_w']) /2
+                    half_height = float(obj_dict['bound_box_h']) /2
+                    
+                    bb_3d[obj_dict['class_str']] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
                           [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
                           [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
                           [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
@@ -143,88 +153,9 @@ def init_objects(ros):
                           [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
                           [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
-    obj_width['mslquad'] = 2*half_width
-
-    # Person
-    half_length = 0.35 / 2
-    half_width = 0.5 / 2
-    height = 1.8
-    bb_3d['person'] = np.array([[ half_length, half_width, 0, 1.],  # 1 front, left,  up (from quad's perspective)
-                          [ half_length, half_width,-height, 1.],  # 2 front, right, up
-                          [ half_length,-half_width,-height, 1.],  # 3 back,  right, up
-                          [ half_length,-half_width, 0, 1.],  # 4 back,  left,  up
-                          [-half_length,-half_width, 0, 1.],  # 5 front, left,  down
-                          [-half_length,-half_width,-height, 1.],  # 6 front, right, down
-                          [-half_length, half_width,-height, 1.],  # 7 back,  right, down
-                          [-half_length, half_width, 0, 1.]]) # 8 back,  left,  down
-
-    obj_width['person'] = 2*half_width
-
-
-    # Bowl
-    # init 3d bounding box in bowl frame
-    half_length = 0.16512399911880049316 / 2
-    half_width = 0.1653299927711486816 /2
-    half_height = 0.08048000186681747437 / 2
-    bb_3d['bowl'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
-                          [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
-                          [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
-                          [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
-                          [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
-                          [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
-                          [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
-                          [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
-
-    obj_width['bowl'] = 2*half_width
-
-    # Cup
-    # init 3d bounding box in bowl frame
-    half_length = 0.14643399417400360 / 2
-    half_width = 0.08373200148344039917 / 2
-    half_height = 0.1146159991621971130 / 2
-    bb_3d['cup'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
-                          [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
-                          [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
-                          [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
-                          [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
-                          [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
-                          [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
-                          [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
-
-    obj_width['cup'] = 2*half_width
-
-    # Laptop
-    # init 3d bounding box in bowl frame
-    half_length = 3.066860139369964600e-01 /2
-    half_width = 2.790839970111846924e-01/2
-    half_height = 1.686280071735382080e-01/2
-    bb_3d['laptop'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
-                          [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
-                          [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
-                          [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
-                          [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
-                          [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
-                          [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
-                          [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
-
-    obj_width['laptop'] = 2*half_width
-    
-    # Bottle
-    # init 3d bounding box in bowl frame
-    half_length = 0.08774200081825256348/2
-    half_width = 0.08990000188350677490/2
-    half_height = 0.2205220013856887817/2
-    bb_3d['bottle'] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
-                          [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
-                          [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
-                          [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
-                          [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
-                          [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
-                          [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
-                          [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
-
-    obj_width['laptop'] = 2*half_width
-
+                    obj_width[obj_dict['class_str']] = 2*half_width
+        except yaml.YAMLError as exc:
+            print(exc)
 
     return ros.camera, bb_3d, obj_width
 

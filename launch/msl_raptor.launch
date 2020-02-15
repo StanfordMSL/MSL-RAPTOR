@@ -14,7 +14,9 @@
   <arg name="rb_name"          default="rosbag_for_post_process_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
   <arg name="b_record"         default="false" />  <!-- boolean if we are recording data in rosbag -->
   <arg name="rb_start_delay"   default="2.0" /> <!-- how long to delay the start of the rosbag -->
-  
+  <arg name="object_sizes_file"   default="$(find msl_raptor)/params/all_obs.yaml" /> <!-- yaml file containing all the object sizes -->
+  <arg name="object_used_file"   default="$(find msl_raptor)/params/objects_used.txt" /> <!-- yaml file containing all the object sizes -->
+
   <group if="$(arg b_rosbag)">
     <param name="use_sim_time" value="true" />   <!--use the rosbag time instead of the computer's time. If using this use clock option in rosbag-->
   </group>
@@ -33,7 +35,10 @@
     <param name="b_enforce_0_yaw"  value="$(arg b_enforce_0_yaw)"/> 
     <param name="detection_period"  value="$(arg detection_period)"/> 
     <param name="b_use_tensorrt"  value="$(arg b_use_tensorrt)"/>
+    <param name="object_sizes_file"  value="$(arg object_sizes_file)"/>
+    <param name="object_used_file"  value="$(arg object_used_file)"/>
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
+
   </node>
 
   <!-- IF using camera, launch our node -->
