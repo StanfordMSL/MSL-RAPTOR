@@ -147,11 +147,10 @@ class rosbags_to_logs:
                 min_trans_diff = dtran
                 min_rot_diff = dang
                 best_pose = tf_pr
-            elif min_trans_diff < dtran and min_rot_diff*1.2 > dang:  # accept if we are closer and angle isnt much worse
+            elif min_trans_diff > dtran and min_rot_diff*1.2 > dang:  # accept if we are closer and angle isnt much worse
                 min_trans_diff = dtran
                 min_rot_diff = dang
                 best_pose = tf_pr
-        pdb.set_trace()
         return best_pose
 
 
@@ -172,6 +171,7 @@ class rosbags_to_logs:
 
         print("Post-processing data now")
         for name in self.ado_names:
+            print("--------------- {}  ----------------".format(name))
             log_data = {}
             box_length, box_width, box_height, diam = self.bb_3d_dict_all[name]
             vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
@@ -200,12 +200,12 @@ class rosbags_to_logs:
                 if class_str not in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
                     # this means we didnt see this object at this time... i think...
                     continue
-                pdb.set_trace()
                 candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
                 tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ado_gt, candidate_poses)
                 if tf_w_ado_est is None:
                     continue  # there was no plausible candidate
 
+                print(i)
                 tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
                 tf_cam_w = inv_tf(tf_w_cam)
                 tf_cam_ado_est = tf_cam_w @ tf_w_ado_est
@@ -223,7 +223,6 @@ class rosbags_to_logs:
                     self.raptor_metrics.update_all_metrics(name=name, vertices=vertices, R_gt=R_gt, t_gt=t_gt, R_pr=R_pr, t_pr=t_pr, K=self.new_camera_matrix)
 
                 # Write data to log file #############################
-                (abb, im_seg_mode), _ = find_closest_by_time(t_est, self.abb_time_list, message_list=self.abb_list)
                 log_data['time'] = t_est
                 log_data['state_est'] = tf_to_state_vec(tf_w_ado_est)
                 log_data['state_gt'] = tf_to_state_vec(tf_w_ado_gt)
@@ -235,8 +234,11 @@ class rosbags_to_logs:
                 log_data['corners_3d_gt'] = np.reshape(corners3D_gt, (corners3D_gt.size,))
                 log_data['proj_corners_est'] = np.reshape(self.raptor_metrics.proj_2d_pr[name].T, (self.raptor_metrics.proj_2d_pr[name].size,))
                 log_data['proj_corners_gt'] = np.reshape(self.raptor_metrics.proj_2d_gt[name].T, (self.raptor_metrics.proj_2d_gt[name].size,))
-                log_data['abb'] = abb
-                log_data['im_seg_mode'] = im_seg_mode
+
+                if len(self.abb_time_list[name]) > 0:
+                    (abb, im_seg_mode), _ = find_closest_by_time(t_est, self.abb_time_list[name], message_list=self.abb_list[name])
+                    log_data['abb'] = abb
+                    log_data['im_seg_mode'] = im_seg_mode
                 self.logger.write_data_to_log(log_data, name, mode='est')
                 self.logger.write_data_to_log(log_data, name, mode='gt')
                 ######################################################
@@ -356,6 +358,8 @@ class rosbags_to_logs:
         """
         record optitrack poses of tracked quad
         """
+        if np.isnan(msg.pose.orientation.x):
+            return  # if the message is invalid, ignore it
         if t is None:
             self.t_gt[name].append(msg.header.stamp.to_sec())
         else:
