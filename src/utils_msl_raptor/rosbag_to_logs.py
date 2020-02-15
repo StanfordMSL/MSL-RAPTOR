@@ -220,11 +220,12 @@ class rosbags_to_logs:
             if topic in self.topic_func_dict:
                 self.topic_func_dict[topic](msg)
             elif name in self.ado_names_all: # this means we are a tracked object
-                topic_name = t_split[-2]
+                topic_name = t_split[-1]
+                topic_category = t_split[-2]
                 if topic_name == 'vision_pose': # ground truth
                     self.ado_names.add(name)
                     self.parse_ado_gt_msg(msg, name=name, t=t)
-                elif topic_name == 'local_position': # estimate
+                elif topic_name == 'msl_raptor_state' or topic_name == 'local_position': # estimate
                     self.ado_names.add(name)
                     self.parse_ado_est_msg(msg, name=name, t=t)
                 print(topic_name)
