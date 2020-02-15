@@ -124,13 +124,12 @@ class rosbags_to_logs:
         self.convert_rosbag_info_to_log()
         self.logger.close_files()
 
-    def find_closest_pose_est_by_class_and_time(self, tf_w_ego_gt, time_gt, t_est, candidate_poses, close_cutoff=0.5):
+
+    def find_closest_pose_est_by_class_and_time(self, tf_w_ado_gt, candidate_poses, close_cutoff=0.5):
         """
         first narrow the field by distance, then once things are "close" start using angle also
         """
-        best_pose = candidate_poses[0]
-        if len(candidate_poses) == 1:
-            return
+        best_pose = None
         min_trans_diff = 1e10
         min_rot_diff = np.pi
         R_gt = tf_w_ego_gt[0:3, 0:3]
@@ -140,12 +139,15 @@ class rosbags_to_logs:
             R_pr = tf_w_ego_gt[0:3, 0:3]
             t_pr = tf_w_ego_gt[0:3, 3]
             dtran = la.norm(t_pr - t_gt)
+            if dtran > 2*close_cutoff:
+                continue
+
             dang = calcAngularDistance(R_gt, R_pr)
-            if min_trans_diff > close_cutoff and close_cutoff > dtran:  # auto accept this for now
+            if min_trans_diff > 1e5: # accept regardless of rotation, but only if we havent already accepted another option
                 min_trans_diff = dtran
                 min_rot_diff = dang
                 best_pose = pose
-            elif min_trans_diff < dtran and min_rot_diff > dang:
+            elif min_trans_diff < dtran and min_rot_diff*1.2 > dang:  # accept if we are closer and angle isnt much worse
                 min_trans_diff = dtran
                 min_rot_diff = dang
                 best_pose = pose
@@ -185,25 +187,25 @@ class rosbags_to_logs:
                 # extract data in form for logging
                 t_est, _ = find_closest_by_time(t_gt, self.t_est)
 
-                # pose_msg, ego_pose_ind = find_closest_by_time(t_est, self.ego_gt_time_pose[name], message_list=self.ego_gt_pose)
-                # tf_w_ego_gt = pose_to_tf(pose_msg)
                 tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[i])
-
-                # tf_w_ado_est = pose_to_tf(self.ado_est_pose[name][i])
-                class_str = self.obj_name_to_class_str_dict[name]
-                if class_str not in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
-                    # this means we didnt see this object at this time... i think...
-                    continue
-                pdb.set_trace()
-                candidate_poses = self.obj_name_to_class_str_dict[name][class_str]
-                time_gt = self.ego_gt_time_pose[name][ego_pose_ind]
-                tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ego_gt, time_gt, t_est, name, candidate_poses)
 
                 pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose[name], message_list=self.ego_est_pose)
                 tf_w_ego_est = pose_to_tf(pose_msg)
 
                 pose_msg, _ = find_closest_by_time(t_est, self.t_gt[name], message_list=self.ado_gt_pose[name])
                 tf_w_ado_gt = pose_to_tf(pose_msg)
+
+                # tf_w_ado_est = pose_to_tf(self.ado_est_pose[name][i])
+                class_str = self.obj_name_to_class_str_dict[name]
+                # print("name = {} and class = {} ---> {}".format(name, class_str, self.ado_est_pose_BY_TIME_BY_CLASS[t_est].keys()))
+                if class_str not in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
+                    # this means we didnt see this object at this time... i think...
+                    continue
+                pdb.set_trace()
+                candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
+                tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ado_gt, t_gt, t_est, name, candidate_poses)
+                if tf_w_ado_est is None:
+                    continue  # there was no plausible candidate
 
                 tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
                 tf_cam_w = inv_tf(tf_w_cam)

@@ -48,7 +48,7 @@ bound_box_h: 0.092588
 ---
 id: 7
 ns: 'mug2_scene3_norm'
-class_str: 'mug'
+class_str: 'cup'
 bound_box_l: 0.146434
 bound_box_w: 0.083732
 bound_box_h: 0.114616
@@ -104,14 +104,14 @@ bound_box_h: 0.073166
 ---
 id: 15
 ns: 'mug_white_green_norm'
-class_str: 'mug'
+class_str: 'cup'
 bound_box_l: 0.134662
 bound_box_w: 0.088348
 bound_box_h: 0.102778
 ---
 id: 16
 ns: 'mug_vignesh_norm'
-class_str: 'mug'
+class_str: 'cup'
 bound_box_l: 0.112448
 bound_box_w: 0.102444
 bound_box_h: 0.08377
