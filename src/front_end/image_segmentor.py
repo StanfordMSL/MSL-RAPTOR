@@ -30,6 +30,7 @@ class ImageSegmentor:
 
         self.active_objects_ids_per_class = {}
         self.tracked_objects = []
+        self.last_lost_objects = []
         # self.last_boxes = []
         # self.last_classes = []
         self.ukf_dict = {}
@@ -95,6 +96,7 @@ class ImageSegmentor:
                 valid = self.valid_tracking(self.ukf_dict[obj_id],abb)
                 # If not valid we switch to detection
                 if not valid:
+                    self.last_lost_objects.append(obj_id)
                     self.mode = self.DETECT
             # If this is a new object it has already passed the detection check, it is considered valid for now
             else:
@@ -114,7 +116,6 @@ class ImageSegmentor:
 
 
     def reinit_tracker(self,new_boxes,image):
-        new_active_objects_ids_per_class = {}
         new_active_objects_ids = []
         for new_box in new_boxes:
             class_str = self.class_map[new_box[-1]]
@@ -139,20 +140,30 @@ class ImageSegmentor:
                         best_t = t
                         obj_id = id
 
-                # No object was matched, new object detected
+                
                 if obj_id == None:
+                    # No object was matched, new object detected
                     obj_id = self.new_tracked_object(class_str)
+                    if class_str in self.active_objects_ids_per_class:
+                        self.active_objects_ids_per_class[class_str].append(obj_id)
+                    else:
+                        self.active_objects_ids_per_class[class_str] = [obj_id]
+                else:
+                    # Previously tracked object was matched, if it triggered redetection we can keep it
+                    if obj_id in self.last_lost_objects: self.last_lost_objects.remove(obj_id)
 
             # Get tracker initialization from the detected box
             self.tracked_objects[obj_id].latest_tracked_state = self.tracker.reinit(new_box,image)
-            if class_str in new_active_objects_ids_per_class:
-                new_active_objects_ids_per_class[class_str].append(obj_id)
-            else:
-                new_active_objects_ids_per_class[class_str] = [obj_id]
+
+            # Keep track of new objects to not consider them for association
             new_active_objects_ids.append(obj_id)
 
-        # Remove from active objects the ones that have not been redetected
-        self.active_objects_ids_per_class = new_active_objects_ids_per_class
+        # Remove objects that triggered detection and were not matched to new detections
+        for obj_id in self.last_lost_objects:
+            self.active_objects_ids_per_class[self.tracked_objects[obj_id].class_str].remove(obj_id)
+
+        # Reset lost objects
+        self.last_lost_objects = []
 
     def detect(self,image):
         tic = time.time()
