@@ -11,9 +11,12 @@ from scipy.spatial.transform import Rotation as R
 from ssp_utils import *
 
 class raptor_logger:
-    def __init__(self, source='MSLRAPTOR', mode="write", est_fn=None, gt_fn=None, param_fn=None, ssp_fn=None):
-        self.source = source  # MSLRAPTOR, SSP, GT
-
+    def __init__(self, mode="write", names=None, base_path="./", b_ssp=False):
+        if names is None:
+            raise RuntimeError("Must provide list of names for tracked object")
+        self.names = names
+        self.base_path = base_path
+        self.b_ssp = b_ssp
         self.save_elms = {}
         self.save_elms['est'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
                                  ('Ado State Est', 'state_est', 13), 
@@ -45,51 +48,38 @@ class raptor_logger:
         self.log_data = None
         self.fh = None
         self.fn = None
+        if b_ssp:
+            modes = ['est', 'gt', 'prms']
+        else:
+            modes = ['ssp']
         if mode == "write":
             # create files and write headers
             self.fh = {}
-            if est_fn is not None:
-                self.create_file_dir(est_fn)
-                self.fh['est'] = open(est_fn,'w+')  # doing this here makes it appendable
-                save_el_shape = (len(self.save_elms['est']), len(self.save_elms['est'][0]))
-                data_header = ", ".join(np.reshape([*zip(self.save_elms['est'])], save_el_shape)[:,0].tolist())
-                np.savetxt(self.fh['est'], X=[], header=data_header)  # write header
-            if gt_fn is not None:
-                self.create_file_dir(gt_fn)
-                self.fh['gt'] = open(gt_fn,'w+')  # doing this here makes it appendable
-                save_el_shape = (len(self.save_elms['gt']), len(self.save_elms['gt'][0]))
-                data_header = ", ".join(np.reshape([*zip(self.save_elms['gt'])], save_el_shape)[:,0].tolist())
-                np.savetxt(self.fh['gt'], X=[], header=data_header)  # write header
-            if param_fn is not None:
-                self.create_file_dir(param_fn)
-                self.fh['prms'] = open(param_fn,'w+')  # doing this here makes it appendable
-                save_el_shape = (len(self.save_elms['prms']), len(self.save_elms['prms'][0]))
-                data_header = ", ".join(np.reshape([*zip(self.save_elms['prms'])], save_el_shape)[:,0].tolist())
-                np.savetxt(self.fh['prms'], X=[], header=data_header)  # write header
-            if ssp_fn is not None:
-                self.create_file_dir(ssp_fn)
-                self.fh['ssp'] = open(ssp_fn,'w+')  # doing this here makes it appendable
-                save_el_shape = (len(self.save_elms['ssp']), len(self.save_elms['ssp'][0]))
-                data_header = ", ".join(np.reshape([*zip(self.save_elms['ssp'])], save_el_shape)[:,0].tolist())
-                np.savetxt(self.fh['ssp'], X=[], header=data_header)  # write header
+            for n in names:
+                for m in modes:
+                    # Create logs
+                    fn = self.base_path + '_' + n + '_'+ m + '.log'
+                    pdb.set_trace()
+                    self.create_file_dir(fn)
+                    self.fh[m][n] = open(fn,'w+')  # doing this here makes it appendable
+                    save_el_shape = (len(self.save_elms[m]), len(self.save_elms[m][0]))
+                    data_header = ", ".join(np.reshape([*zip(self.save_elms[m])], save_el_shape)[:,0].tolist())
+                    np.savetxt(self.fh[m][n], X=[], header=data_header)  # write header
+
         elif mode == "read":
             self.fn = {}
-            if est_fn is not None:
-                self.fn['est'] = est_fn
-            if gt_fn is not None:
-                self.fn['gt'] = gt_fn
-            if param_fn is not None:
-                self.fn['prms'] = param_fn
-            if ssp_fn is not None:
-                self.fn['ssp'] = ssp_fn
+            for n in names:
+                for m in modes:
+                    fn = self.base_path + '_' + n + '_'+ m + '.log'
+                    self.fn[m][n] = fn
         else:
             raise RuntimeError("Unrecognized logging mode")
 
 
-    def write_data_to_log(self, data, mode='est'):
+    def write_data_to_log(self, data, name, mode='est'):
         """ mode can be est, gt, ssp, or param"""
-        if not mode in ['est', 'gt', 'ssp', 'prms']:
-            raise RuntimeError("Mode {} not recognized (must be 'est', 'gt', 'ssp', or 'prms')".format(mode))
+        if (not self.b_ssp and not mode in ['est', 'gt', 'prms']) or (self.b_ssp and not mode == 'ssp'):
+            raise RuntimeError("Mode {} not recognized".format(mode))
         save_el_shape = (len(self.save_elms[mode]), len(self.save_elms[mode][0]))
         num_to_write = np.sum(np.reshape([*zip(self.save_elms[mode])], save_el_shape)[:,2].astype(int)) 
         out = np.ones((1, num_to_write)) * 1e10
@@ -103,10 +93,10 @@ class raptor_logger:
                     pdb.set_trace()
             ind += count
         out[out>1e5] = np.nan
-        np.savetxt(self.fh[mode], X=out, fmt='%.6f')  # write to file
+        np.savetxt(self.fh[mode][name], X=out, fmt='%.6f')  # write to file
 
 
-    def read_logs(self):
+    def read_logs(self, name):
         """
         Return a dict with keys being log type (est /gt /prms). Each of these is a dict with the various types of values in the log
         """
@@ -118,7 +108,7 @@ class raptor_logger:
             log_data[log_type] = {}
             ind = 0
 
-            data = np.loadtxt(self.fn[log_type])
+            data = np.loadtxt(self.fn[log_type][name])
             for i, (header_str, dict_str, count) in enumerate(self.save_elms[log_type]):
                 if len(data.shape) > 1:
                     log_data[log_type][dict_str] = data[:, ind:(ind + count)]
@@ -139,7 +129,8 @@ class raptor_logger:
 
     def close_files(self):
         for fh_key in self.fh:
-            self.fh[fh_key].close()
+            for n in self.names:
+                self.fh[fh_key][n].close()
 
 
     def create_file_dir(self, fn_with_dir):
