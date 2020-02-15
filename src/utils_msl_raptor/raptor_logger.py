@@ -3,6 +3,7 @@
 # system
 import sys, time
 from copy import copy
+from collections import defaultdict
 import pdb
 # math
 import numpy as np
@@ -32,8 +33,12 @@ class raptor_logger:
                                 ('Corner 2D Projections GT (r|c)', 'proj_corners_gt', 8*2), 
                                 ('Angled BB (r|c|w|h|ang_deg)', 'abb', 5),
                                 ('Image Segmentation Mode', 'im_seg_mode', 1)]
+        all_name_str = ''
+        for n in self.names:
+            all_name_str += (n + ' ')
+        all_name_str = all_name_str[:-1]
         self.save_elms['prms'] = [('Camera Intrinsics (K)', 'K', 4),
-                                  ('Object BB Size (len|wid|hei|diam)', '3d_bb_dims', 4),
+                                  ('Object BB Size (|len|wid|hei|diam) [{}]'.format(all_name_str), '3d_bb_dims', 4*len(self.names)),
                                   ('tf_cam_ego', 'tf_cam_ego', 16)]
         self.save_elms['ssp'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
                                  ('Ado State GT', 'state_gt', 13), 
@@ -48,18 +53,25 @@ class raptor_logger:
         self.log_data = None
         self.fh = None
         self.fn = None
-        if b_ssp:
+        if not b_ssp:
             modes = ['est', 'gt', 'prms']
         else:
             modes = ['ssp']
         if mode == "write":
             # create files and write headers
-            self.fh = {}
-            for n in names:
-                for m in modes:
+            self.fh = defaultdict(dict)
+            for m in modes:
+                if m == 'prms':
+                    fn = self.base_path + '_' + m + '.log'
+                    self.create_file_dir(fn)
+                    self.fh[m] = open(fn,'w+')  # doing this here makes it appendable
+                    save_el_shape = (len(self.save_elms[m]), len(self.save_elms[m][0]))
+                    data_header = ", ".join(np.reshape([*zip(self.save_elms[m])], save_el_shape)[:,0].tolist())
+                    np.savetxt(self.fh[m], X=[], header=data_header)  # write header
+                    continue
+                for n in names:
                     # Create logs
                     fn = self.base_path + '_' + n + '_'+ m + '.log'
-                    pdb.set_trace()
                     self.create_file_dir(fn)
                     self.fh[m][n] = open(fn,'w+')  # doing this here makes it appendable
                     save_el_shape = (len(self.save_elms[m]), len(self.save_elms[m][0]))
@@ -67,16 +79,18 @@ class raptor_logger:
                     np.savetxt(self.fh[m][n], X=[], header=data_header)  # write header
 
         elif mode == "read":
-            self.fn = {}
-            for n in names:
-                for m in modes:
-                    fn = self.base_path + '_' + n + '_'+ m + '.log'
-                    self.fn[m][n] = fn
+            self.fn = defaultdict(dict)
+            for m in modes:
+                if m == 'prms':
+                    self.fn[m] = self.base_path + '_' + m + '.log'
+                    continue
+                for n in names:
+                    self.fn[m][n] = self.base_path + '_' + n + '_'+ m + '.log'
         else:
             raise RuntimeError("Unrecognized logging mode")
 
 
-    def write_data_to_log(self, data, name, mode='est'):
+    def write_data_to_log(self, data, name, mode):
         """ mode can be est, gt, ssp, or param"""
         if (not self.b_ssp and not mode in ['est', 'gt', 'prms']) or (self.b_ssp and not mode == 'ssp'):
             raise RuntimeError("Mode {} not recognized".format(mode))
@@ -93,7 +107,10 @@ class raptor_logger:
                     pdb.set_trace()
             ind += count
         out[out>1e5] = np.nan
-        np.savetxt(self.fh[mode][name], X=out, fmt='%.6f')  # write to file
+        if mode == 'prms':
+            np.savetxt(self.fh[mode], X=out, fmt='%.6f')  # write to file
+        else:
+            np.savetxt(self.fh[mode][name], X=out, fmt='%.6f')  # write to file
 
 
     def read_logs(self, name):
@@ -107,8 +124,10 @@ class raptor_logger:
                 continue  
             log_data[log_type] = {}
             ind = 0
-
-            data = np.loadtxt(self.fn[log_type][name])
+            if m == 'prms':
+                data = np.loadtxt(self.fn[log_type])
+            else:
+                data = np.loadtxt(self.fn[log_type][name])
             for i, (header_str, dict_str, count) in enumerate(self.save_elms[log_type]):
                 if len(data.shape) > 1:
                     log_data[log_type][dict_str] = data[:, ind:(ind + count)]

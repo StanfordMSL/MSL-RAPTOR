@@ -62,19 +62,17 @@ class rosbags_to_logs:
             raise RuntimeError("Unable to Process Rosbag!!\n{}".format(e))
 
 
-        self.ado_est_topic   = ego_quad_ns + '/msl_raptor_state'  # ego_quad_ns since it is ego_quad's estimate of the ado quad
         self.bb_data_topic   = ego_quad_ns + '/bb_data'  # ego_quad_ns since it is ego_quad's estimate of the bounding box
         self.ego_gt_topic    = ego_quad_ns + '/mavros/vision_pose/pose'
         self.ego_est_topic   = ego_quad_ns + '/mavros/local_position/pose'
         self.cam_info_topic  = ego_quad_ns + '/camera/camera_info'
-        self.topic_func_dict = {self.ado_est_topic : self.parse_ado_est_msg, 
-                                self.bb_data_topic : self.parse_bb_msg,
+        self.topic_func_dict = {self.bb_data_topic : self.parse_bb_msg,
                                 self.ego_gt_topic  : self.parse_ego_gt_msg, 
                                 self.ego_est_topic : self.parse_ego_est_msg,
                                 self.cam_info_topic: self.parse_camera_info_msg}
 
         # Read yaml file to get object params
-        self.ado_names = []  # names actually in our rosbag
+        self.ado_names = set()  # names actually in our rosbag
         self.ado_names_all = []  # all names we could possibly recognize
         self.bb_3d_dict_all = defaultdict(list)  # turns the name into the len, width, height, and diam of the object
         self.tf_cam_ego = None
@@ -118,89 +116,93 @@ class rosbags_to_logs:
         base_path = self.log_out_dir + "/log_" + self.rb_name[:-4].split("_")[-1] 
         self.logger = raptor_logger(mode="write", names=self.ado_names, base_path=base_path)
 
-        # self.diam = 0.311
-        # self.box_length = 0.27
-        # self.box_width = 0.27
-        # self.box_height = 0.13
-
-        self.raptor_metrics = pose_metric_tracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, name=self.names, diams=self.bb_3d_dict_all)
+        self.raptor_metrics = pose_metric_tracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=self.ado_names, diams=self.bb_3d_dict_all)
         
-        pdb.set_trace()
         self.convert_rosbag_info_to_log()
         self.logger.close_files()
 
 
     def convert_rosbag_info_to_log(self):
-        N = len(self.t_est)
-        print("Post-processing data now ({} itrs)".format(N))
-        vertices = np.array([[ self.box_length/2, self.box_width/2, self.box_height/2, 1.],
-                             [ self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
-                             [ self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
-                             [ self.box_length/2,-self.box_width/2, self.box_height/2, 1.],
-                             [-self.box_length/2,-self.box_width/2, self.box_height/2, 1.],
-                             [-self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
-                             [-self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
-                             [-self.box_length/2, self.box_width/2, self.box_height/2, 1.]]).T
-
         # Write params to log file ########
         log_data = {}
         if self.new_camera_matrix is not None:
             log_data['K'] = np.array([self.new_camera_matrix[0, 0], self.new_camera_matrix[1, 1], self.new_camera_matrix[0, 2], self.new_camera_matrix[1, 2]])
         else:
             log_data['K'] = np.array([self.K[0, 0], self.K[1, 1], self.K[0, 2], self.K[1, 2]])
-        log_data['3d_bb_dims'] = np.array([self.box_length, self.box_width, self.box_height, self.diam])
+        bb_dim_arr = np.zeros((4*len(self.ado_names)))
+        pdb.set_trace()
+        for i, n in enumerate(self.ado_names):
+            pdb.set_trace()
+            bb_dim_arr[4*i:4*i+4] = self.bb_3d_dict_all[n]
+        log_data['3d_bb_dims'] = bb_dim_arr
         log_data['tf_cam_ego'] = np.reshape(self.tf_cam_ego, (16,))
-        self.logger.write_data_to_log(log_data, mode='prms')
+        self.logger.write_data_to_log(log_data, name='', mode='prms')
         ###################################
 
-        for i in range(N):
-            # extract data in form for logging
-            t_est = self.t_est[i]
-            tf_w_ado_est = pose_to_tf(self.ado_est_pose[i])
+        pdb.set_trace()
+        for name in self.ado_names:
+            log_data = {}
+            N = len(self.t_est)
+            print("Post-processing data now ({} itrs)".format(N))
 
-            pose_msg, _ = find_closest_by_time(t_est, self.ego_gt_time_pose, message_list=self.ego_gt_pose)
-            tf_w_ego_gt = pose_to_tf(pose_msg)
 
-            pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
-            tf_w_ego_est = pose_to_tf(pose_msg)
 
-            pose_msg, _ = find_closest_by_time(t_est, self.t_gt, message_list=self.ado_gt_pose)
-            tf_w_ado_gt = pose_to_tf(pose_msg)
+            vertices = np.array([[ self.box_length/2, self.box_width/2, self.box_height/2, 1.],
+                                [ self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
+                                [ self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
+                                [ self.box_length/2,-self.box_width/2, self.box_height/2, 1.],
+                                [-self.box_length/2,-self.box_width/2, self.box_height/2, 1.],
+                                [-self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
+                                [-self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
+                                [-self.box_length/2, self.box_width/2, self.box_height/2, 1.]]).T
+            for i in range(N):
+                # extract data in form for logging
+                t_est = self.t_est[i]
+                tf_w_ado_est = pose_to_tf(self.ado_est_pose[name][i])
 
-            tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
-            tf_cam_w = inv_tf(tf_w_cam)
-            tf_cam_ado_est = tf_cam_w @ tf_w_ado_est
-            tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
+                pose_msg, _ = find_closest_by_time(t_est, self.ego_gt_time_pose[name], message_list=self.ego_gt_pose)
+                tf_w_ego_gt = pose_to_tf(pose_msg)
 
-            R_pr = tf_cam_ado_est[0:3, 0:3]
-            t_pr = tf_cam_ado_est[0:3, 3].reshape((3, 1))
-            tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
-            R_gt = tf_cam_ado_gt[0:3, 0:3]
-            t_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
-            
-            ######################################################
-            
-            if self.raptor_metrics is not None:
-                self.raptor_metrics.update_all_metrics(vertices=vertices, R_gt=R_gt, t_gt=t_gt, R_pr=R_pr, t_pr=t_pr, K=self.new_camera_matrix)
+                pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose[name], message_list=self.ego_est_pose)
+                tf_w_ego_est = pose_to_tf(pose_msg)
 
-            # Write data to log file #############################
-            (abb, im_seg_mode), _ = find_closest_by_time(t_est, self.abb_time_list, message_list=self.abb_list)
-            log_data['time'] = t_est
-            log_data['state_est'] = tf_to_state_vec(tf_w_ado_est)
-            log_data['state_gt'] = tf_to_state_vec(tf_w_ado_gt)
-            log_data['ego_state_est'] = tf_to_state_vec(tf_w_ego_est)
-            log_data['ego_state_gt'] = tf_to_state_vec(tf_w_ego_gt)
-            corners3D_pr = (tf_w_ado_est @ vertices)[0:3,:]
-            corners3D_gt = (tf_w_ado_gt @ vertices)[0:3,:]
-            log_data['corners_3d_est'] = np.reshape(corners3D_pr, (corners3D_pr.size,))
-            log_data['corners_3d_gt'] = np.reshape(corners3D_gt, (corners3D_gt.size,))
-            log_data['proj_corners_est'] = np.reshape(self.raptor_metrics.proj_2d_pr.T, (self.raptor_metrics.proj_2d_pr.size,))
-            log_data['proj_corners_gt'] = np.reshape(self.raptor_metrics.proj_2d_gt.T, (self.raptor_metrics.proj_2d_gt.size,))
-            log_data['abb'] = abb
-            log_data['im_seg_mode'] = im_seg_mode
-            self.logger.write_data_to_log(log_data, mode='est')
-            self.logger.write_data_to_log(log_data, mode='gt')
-            ######################################################
+                pose_msg, _ = find_closest_by_time(t_est, self.t_gt[name], message_list=self.ado_gt_pose[name])
+                tf_w_ado_gt = pose_to_tf(pose_msg)
+
+                tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
+                tf_cam_w = inv_tf(tf_w_cam)
+                tf_cam_ado_est = tf_cam_w @ tf_w_ado_est
+                tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
+
+                R_pr = tf_cam_ado_est[0:3, 0:3]
+                t_pr = tf_cam_ado_est[0:3, 3].reshape((3, 1))
+                tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
+                R_gt = tf_cam_ado_gt[0:3, 0:3]
+                t_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
+                
+                ######################################################
+                
+                if self.raptor_metrics is not None:
+                    self.raptor_metrics.update_all_metrics(name=name, vertices=vertices, R_gt=R_gt, t_gt=t_gt, R_pr=R_pr, t_pr=t_pr, K=self.new_camera_matrix)
+
+                # Write data to log file #############################
+                (abb, im_seg_mode), _ = find_closest_by_time(t_est, self.abb_time_list, message_list=self.abb_list)
+                log_data['time'] = t_est
+                log_data['state_est'] = tf_to_state_vec(tf_w_ado_est)
+                log_data['state_gt'] = tf_to_state_vec(tf_w_ado_gt)
+                log_data['ego_state_est'] = tf_to_state_vec(tf_w_ego_est)
+                log_data['ego_state_gt'] = tf_to_state_vec(tf_w_ego_gt)
+                corners3D_pr = (tf_w_ado_est @ vertices)[0:3,:]
+                corners3D_gt = (tf_w_ado_gt @ vertices)[0:3,:]
+                log_data['corners_3d_est'] = np.reshape(corners3D_pr, (corners3D_pr.size,))
+                log_data['corners_3d_gt'] = np.reshape(corners3D_gt, (corners3D_gt.size,))
+                log_data['proj_corners_est'] = np.reshape(self.raptor_metrics.proj_2d_pr[name].T, (self.raptor_metrics.proj_2d_pr[name].size,))
+                log_data['proj_corners_gt'] = np.reshape(self.raptor_metrics.proj_2d_gt[name].T, (self.raptor_metrics.proj_2d_gt[name].size,))
+                log_data['abb'] = abb
+                log_data['im_seg_mode'] = im_seg_mode
+                self.logger.write_data_to_log(log_data, name, mode='est')
+                self.logger.write_data_to_log(log_data, name, mode='gt')
+                ######################################################
 
         if self.raptor_metrics is not None:
             self.raptor_metrics.calc_final_metrics()
@@ -212,17 +214,21 @@ class rosbags_to_logs:
         print("Processing {}".format(self.rb_name))
         for topic, msg, t in self.bag.read_messages():
             t_split = topic.split("/")
-            name = t_split[0]
+            name = t_split[1]
+            
+            print(topic)
             if topic in self.topic_func_dict:
                 self.topic_func_dict[topic](msg)
-            elif name in self.ado_names and (t_split[-1] == 'pose' or t_split[-1] == 'msl_raptor_state'):
-                # this means we are a tracked object
-                if name not in self.ado_names:
-                    self.ado_names.append(name)
-                if t_split[-1] == 'pose': # ground truth
-                    self.parse_ado_gt_msg(msg, name=name)
-                if t_split[-1] == 'pose': # estimate truth
-                    self.parse_ado_est_msg(msg)
+            elif name in self.ado_names_all: # this means we are a tracked object
+                topic_name = t_split[-2]
+                if topic_name == 'vision_pose': # ground truth
+                    self.ado_names.add(name)
+                    self.parse_ado_gt_msg(msg, name=name, t=t)
+                elif topic_name == 'local_position': # estimate
+                    self.ado_names.add(name)
+                    self.parse_ado_est_msg(msg, name=name, t=t)
+                print(topic_name)
+                pdb.set_trace()
         
         for n in self.t_est:
             self.t_est[n] = np.asarray(self.t_est[n])
@@ -295,23 +301,23 @@ class rosbags_to_logs:
                 self.new_camera_matrix = self.K
     
 
-    def parse_ado_est_msg(self, msg, t=None):
+    def parse_ado_est_msg(self, msg, name, t=None):
         """
         record estimated poses from msl-raptor
         """
-        tracked_obs = msg.tracked_objects
-        if len(tracked_obs) == 0:
-            return
+        # tracked_obs = msg.tracked_objects
+        # if len(tracked_obs) == 0:
+        #     return
         # to = tracked_obs[0]  # assumes 1 object for now
-        for to in tracked_obs:
-            name = to.class_str
-            if t is None:
-                self.t_est[name].append(to.pose.header.stamp.to_sec())
-            else:
-                self.t_est[name].append(t)
+        # for to in tracked_obs:
+        to = msg
+        if t is None:
+            self.t_est[name].append(to.pose.header.stamp.to_sec())
+        else:
+            self.t_est[name].append(t)
 
-            self.ado_est_pose[name].append(to.pose.pose)
-            # self.ado_est_state[name].append(to.state)
+        self.ado_est_pose[name].append(to.pose.pose)
+        # self.ado_est_state[name].append(to.state)
 
 
     def parse_ado_gt_msg(self, msg, name, t=None):

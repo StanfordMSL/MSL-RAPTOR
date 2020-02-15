@@ -30,24 +30,24 @@ class pose_metric_tracker:
         self.diams        = diams
 
         # Init variables
-        self.num_measurements    = defaultdict(0)
-        self.testing_error_trans = defaultdict(0.0)
-        self.testing_error_angle = defaultdict(0.0)
-        self.testing_error_pixel = defaultdict(0.0)
+        self.num_measurements    = defaultdict(int)
+        self.testing_error_trans = defaultdict(float)
+        self.testing_error_angle = defaultdict(float)
+        self.testing_error_pixel = defaultdict(float)
         self.errs_2d             = defaultdict(list)
         self.errs_3d             = defaultdict(list)
         self.errs_trans          = defaultdict(list)
         self.errs_angle          = defaultdict(list)
         self.errs_corner2D       = defaultdict(list)
 
-        self.acc                = defaultdict(-1)
-        self.acc5cm5deg         = defaultdict(-1)
-        self.acc3d10            = defaultdict(-1)
-        self.acc5cm5deg         = defaultdict(-1)
-        self.corner_acc         = defaultdict(-1)
-        self.mean_err_2d        = defaultdict(-1)
-        self.mean_err_3d        = defaultdict(-1)
-        self.mean_corner_err_2d = defaultdict(-1)
+        self.acc                = defaultdict(float)
+        self.acc5cm5deg         = defaultdict(float)
+        self.acc3d10            = defaultdict(float)
+        self.acc5cm5deg         = defaultdict(float)
+        self.corner_acc         = defaultdict(float)
+        self.mean_err_2d        = defaultdict(float)
+        self.mean_err_3d        = defaultdict(float)
+        self.mean_corner_err_2d = defaultdict(float)
 
         # Provide external access to these variables
         self.proj_2d_gt = {}
