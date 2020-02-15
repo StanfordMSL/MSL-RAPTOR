@@ -130,7 +130,6 @@ class rosbags_to_logs:
         else:
             log_data['K'] = np.array([self.K[0, 0], self.K[1, 1], self.K[0, 2], self.K[1, 2]])
         bb_dim_arr = np.zeros((4*len(self.ado_names)))
-        pdb.set_trace()
         for i, n in enumerate(self.ado_names):
             pdb.set_trace()
             bb_dim_arr[4*i:4*i+4] = self.bb_3d_dict_all[n]
@@ -142,7 +141,7 @@ class rosbags_to_logs:
         pdb.set_trace()
         for name in self.ado_names:
             log_data = {}
-            N = len(self.t_est)
+            N = len(self.t_est[name])
             print("Post-processing data now ({} itrs)".format(N))
 
 
@@ -215,21 +214,14 @@ class rosbags_to_logs:
         for topic, msg, t in self.bag.read_messages():
             t_split = topic.split("/")
             name = t_split[1]
-            
-            print(topic)
+            topic_name = t_split[-1]
+            topic_category = t_split[-2]
             if topic in self.topic_func_dict:
                 self.topic_func_dict[topic](msg)
-            elif name in self.ado_names_all: # this means we are a tracked object
-                topic_name = t_split[-1]
-                topic_category = t_split[-2]
-                if topic_name == 'vision_pose': # ground truth
-                    self.ado_names.add(name)
-                    self.parse_ado_gt_msg(msg, name=name, t=t)
-                elif topic_name == 'msl_raptor_state' or topic_name == 'local_position': # estimate
-                    self.ado_names.add(name)
-                    self.parse_ado_est_msg(msg, name=name, t=t)
-                print(topic_name)
-                pdb.set_trace()
+            elif topic_name == 'msl_raptor_state': # estimate
+                self.parse_ado_est_msg(msg, t=t.to_sec())
+            elif name in self.ado_names_all and topic_name == 'pose' and topic_category == 'vision_pose': # ground truth
+                self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
         
         for n in self.t_est:
             self.t_est[n] = np.asarray(self.t_est[n])
@@ -302,23 +294,24 @@ class rosbags_to_logs:
                 self.new_camera_matrix = self.K
     
 
-    def parse_ado_est_msg(self, msg, name, t=None):
+    def parse_ado_est_msg(self, msg, t=None):
         """
         record estimated poses from msl-raptor
         """
-        # tracked_obs = msg.tracked_objects
-        # if len(tracked_obs) == 0:
-        #     return
-        # to = tracked_obs[0]  # assumes 1 object for now
-        # for to in tracked_obs:
-        to = msg
-        if t is None:
-            self.t_est[name].append(to.pose.header.stamp.to_sec())
-        else:
-            self.t_est[name].append(t)
+        tracked_obs = msg.tracked_objects
+        if len(tracked_obs) == 0:
+            return
+            
+        for to in tracked_obs:
+            name = to.class_str
+            self.ado_names.add(name)
+            if t is None:
+                self.t_est[name].append(to.pose.header.stamp.to_sec())
+            else:
+                self.t_est[name].append(t)
 
-        self.ado_est_pose[name].append(to.pose.pose)
-        # self.ado_est_state[name].append(to.state)
+            self.ado_est_pose[name].append(to.pose.pose)
+            # self.ado_est_state[name].append(to.state)
 
 
     def parse_ado_gt_msg(self, msg, name, t=None):
