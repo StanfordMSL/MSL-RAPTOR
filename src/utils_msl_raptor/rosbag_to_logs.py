@@ -92,7 +92,10 @@ class rosbags_to_logs:
         self.ego_est_pose = []
         self.ego_est_time_pose = []
         self.ado_gt_pose = defaultdict(list)
-        self.ado_est_pose = defaultdict(list)
+
+        self.obj_name_to_class_str_dict = {}
+        self.ado_est_pose_BY_TIME_BY_CLASS = defaultdict(defaultdict(list))
+        # self.ado_est_pose = defaultdict(list)
         self.ado_est_state = defaultdict(list)
 
         self.DETECT = 1
@@ -121,6 +124,33 @@ class rosbags_to_logs:
         self.convert_rosbag_info_to_log()
         self.logger.close_files()
 
+    def find_closest_pose_est_by_class_and_time(self, tf_w_ego_gt, time_gt, t_est, candidate_poses, close_cutoff=0.5):
+        """
+        first narrow the field by distance, then once things are "close" start using angle also
+        """
+        best_pose = candidate_poses[0]
+        if len(candidate_poses) == 1:
+            return
+        min_trans_diff = 1e10
+        min_rot_diff = np.pi
+        R_gt = tf_w_ego_gt[0:3, 0:3]
+        t_gt = tf_w_ego_gt[0:3, 3]
+        for pose in candidate_poses:
+            pdb.set_trace()
+            R_pr = tf_w_ego_gt[0:3, 0:3]
+            t_pr = tf_w_ego_gt[0:3, 3]
+            dtran = la.norm(t_pr - t_gt)
+            dang = calcAngularDistance(R_gt, R_pr)
+            if min_trans_diff > close_cutoff and close_cutoff > dtran:  # auto accept this for now
+                min_trans_diff = dtran
+                min_rot_diff = dang
+                best_pose = pose
+            elif min_trans_diff < dtran and min_rot_diff > dang:
+                min_trans_diff = dtran
+                min_rot_diff = dang
+                best_pose = pose
+        return best_pose
+
 
     def convert_rosbag_info_to_log(self):
         # Write params to log file ########
@@ -143,9 +173,6 @@ class rosbags_to_logs:
             log_data = {}
             N = len(self.t_est[name])
             print("Post-processing data now ({} itrs)".format(N))
-
-
-
             vertices = np.array([[ self.box_length/2, self.box_width/2, self.box_height/2, 1.],
                                 [ self.box_length/2, self.box_width/2,-self.box_height/2, 1.],
                                 [ self.box_length/2,-self.box_width/2,-self.box_height/2, 1.],
@@ -157,10 +184,15 @@ class rosbags_to_logs:
             for i in range(N):
                 # extract data in form for logging
                 t_est = self.t_est[i]
-                tf_w_ado_est = pose_to_tf(self.ado_est_pose[name][i])
 
-                pose_msg, _ = find_closest_by_time(t_est, self.ego_gt_time_pose[name], message_list=self.ego_gt_pose)
+                pose_msg, ego_pose_ind = find_closest_by_time(t_est, self.ego_gt_time_pose[name], message_list=self.ego_gt_pose)
                 tf_w_ego_gt = pose_to_tf(pose_msg)
+
+                # tf_w_ado_est = pose_to_tf(self.ado_est_pose[name][i])
+                class_str = self.obj_name_to_class_str_dict[name]
+                candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
+                time_gt = self.ego_gt_time_pose[name][ego_pose_ind]
+                tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ego_gt, time_gt, t_est, name, candidate_poses)
 
                 pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose[name], message_list=self.ego_est_pose)
                 tf_w_ego_est = pose_to_tf(pose_msg)
@@ -221,6 +253,7 @@ class rosbags_to_logs:
             elif topic_name == 'msl_raptor_state': # estimate
                 self.parse_ado_est_msg(msg, t=t.to_sec())
             elif name in self.ado_names_all and topic_name == 'pose' and topic_category == 'vision_pose': # ground truth
+                self.ado_names.add(name)
                 self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
         
         for n in self.t_est:
@@ -268,11 +301,13 @@ class rosbags_to_logs:
                         R_delta = R_deltax @ R_deltay @ R_deltaz
                         self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
                     else:
+                        pdb.set_trace()
                         name = obj_dict['ns']
                         self.ado_names_all.append(name)
                         l = float(obj_dict['bound_box_l']) 
                         w = float(obj_dict['bound_box_w'])
                         h = float(obj_dict['bound_box_h'])
+                        self.obj_name_to_class_str_dict[name] = obj_dict['class_str']
                         if 'diam' in obj_dict:
                             d = obj_dict['diam']
                         else:
@@ -303,14 +338,12 @@ class rosbags_to_logs:
             return
             
         for to in tracked_obs:
-            name = to.class_str
-            self.ado_names.add(name)
             if t is None:
                 self.t_est[name].append(to.pose.header.stamp.to_sec())
             else:
                 self.t_est[name].append(t)
 
-            self.ado_est_pose[name].append(to.pose.pose)
+            self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append(to.pose.pose)
             # self.ado_est_state[name].append(to.state)
 
 

@@ -12,108 +12,126 @@ bound_box_h: 3.13
 ---
 id: 2
 ns: 'bowl_blue_ikea_norm'
+class_str: bowl
 bound_box_l: 0.165124
 bound_box_w: 0.08048
 bound_box_h: 0.16533
 ---
 id: 3
 ns: 'laptop_dell_norm'
+class_str: laptop
 bound_box_l: 0.327984
 bound_box_w: 0.157998
 bound_box_h: 0.31608
 ---
 id: 4
 ns: 'can_tall_yellow_norm'
+class_str: can
 bound_box_l: 0.06885
 bound_box_w: 0.146584
 bound_box_h: 0.072112
 ---
 id: 5
 ns: 'bowl_brown_ikea_norm'
+class_str: bowl
 bound_box_l: 0.164824
 bound_box_w: 0.074876
 bound_box_h: 0.1635
 ---
 id: 6
 ns: 'camera_anastasia_norm'
+class_str: camera
 bound_box_l: 0.042087
 bound_box_w: 0.06787
 bound_box_h: 0.092588
 ---
 id: 7
 ns: 'mug2_scene3_norm'
+class_str: mug
 bound_box_l: 0.146434
 bound_box_w: 0.083732
 bound_box_h: 0.114616
 ---
 id: 8
 ns: 'bottle_starbuck_norm'
+class_str: bottle
 bound_box_l: 0.0828
 bound_box_w: 0.2467
 bound_box_h: 0.0809
 ---
 id: 9
 ns: 'bottle3_scene5_norm'
+class_str: bottle
 bound_box_l: 0.087742
 bound_box_w: 0.220522
 bound_box_h: 0.0899
 ---
 id: 10
 ns: 'camera_dslr_len_norm'
+class_str: camera
 bound_box_l: 0.135512
 bound_box_w: 0.125144
 bound_box_h: 0.154154
 ---
 id: 11
 ns: 'bowl_chinese_blue_norm'
+class_str: bowl
 bound_box_l: 0.170882
 bound_box_w: 0.089998
 bound_box_h: 0.172272
 ---
 id: 12
 ns: 'bottle_blue_google_norm'
+class_str: bottle
 bound_box_l: 0.075
 bound_box_w: 0.2509
 bound_box_h: 0.0759
 ---
 id: 13
 ns: 'camera_dslr_wo_len_norm'
+class_str: camera
 bound_box_l: 0.08836
 bound_box_w: 0.12833
 bound_box_h: 0.15613
 ---
 id: 14
 ns: 'can_porridge_norm'
+class_str: can
 bound_box_l: 0.0678
 bound_box_w: 0.123262
 bound_box_h: 0.073166
 ---
 id: 15
 ns: 'mug_white_green_norm'
+class_str: mug
 bound_box_l: 0.134662
 bound_box_w: 0.088348
 bound_box_h: 0.102778
 ---
 id: 16
 ns: 'mug_vignesh_norm'
+class_str: mug
 bound_box_l: 0.112448
 bound_box_w: 0.102444
 bound_box_h: 0.08377
 ---
 id: 17
 ns: 'laptop_air_0_norm'
+class_str: laptop
 bound_box_l: 0.388038
 bound_box_w: 0.168736
 bound_box_h: 0.335702
 ---
 id: 18
 ns: 'can_milk_wangwang_norm'
+class_str: can
 bound_box_l: 0.06986
 bound_box_w: 0.094776
 bound_box_h: 0.0727
 ---
 id: 19
 ns: 'laptop_air_1_norm'
+class_str: laptop
 bound_box_l: 0.34611
 bound_box_w: 0.200257
 bound_box_h: 0.335868

@@ -7,6 +7,8 @@ import pdb
 # math
 import math
 import numpy as np
+# magic
+from string import digits
 
 def load_mesh(mesh_path, is_save=False, is_normalized=False, is_flipped=False):
     with open(mesh_path, 'r') as f:
@@ -53,8 +55,9 @@ if __name__ == '__main__':
             vertices, faces  = load_mesh(mesh_path)
             spans = np.max(vertices, axis=0) - np.min(vertices, axis=0)
             name = mesh_path.split("/")[-1].split(".")[0]
+            class_str = name.split('_')[0].rstrip(digits)
             # print("dims for {}: ".format(name, spans))
-            print("---\nid: {}\nns: '{}'".format(i + start_num, name))
+            print("---\nid: {}\nns: '{}'\nclass_str: {}".format(i + start_num, name, class_str))
             print("bound_box_l: {}\nbound_box_w: {}\nbound_box_h: {}".format(*spans))
         print("\n\nDONE!!!")
         
