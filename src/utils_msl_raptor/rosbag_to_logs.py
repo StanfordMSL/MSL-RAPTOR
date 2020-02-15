@@ -132,12 +132,12 @@ class rosbags_to_logs:
         best_pose = None
         min_trans_diff = 1e10
         min_rot_diff = np.pi
-        R_gt = tf_w_ego_gt[0:3, 0:3]
-        t_gt = tf_w_ego_gt[0:3, 3]
+        R_gt = tf_w_ado_gt[0:3, 0:3]
+        t_gt = tf_w_ado_gt[0:3, 3]
         for pose in candidate_poses:
-            pdb.set_trace()
-            R_pr = tf_w_ego_gt[0:3, 0:3]
-            t_pr = tf_w_ego_gt[0:3, 3]
+            tf_pr = pose_to_tf(pose)
+            R_pr = tf_pr[0:3, 0:3]
+            t_pr = tf_pr[0:3, 3]
             dtran = la.norm(t_pr - t_gt)
             if dtran > 2*close_cutoff:
                 continue
@@ -146,11 +146,12 @@ class rosbags_to_logs:
             if min_trans_diff > 1e5: # accept regardless of rotation, but only if we havent already accepted another option
                 min_trans_diff = dtran
                 min_rot_diff = dang
-                best_pose = pose
+                best_pose = tf_pr
             elif min_trans_diff < dtran and min_rot_diff*1.2 > dang:  # accept if we are closer and angle isnt much worse
                 min_trans_diff = dtran
                 min_rot_diff = dang
-                best_pose = pose
+                best_pose = tf_pr
+        pdb.set_trace()
         return best_pose
 
 
@@ -188,12 +189,10 @@ class rosbags_to_logs:
                 t_est, _ = find_closest_by_time(t_gt, self.t_est)
 
                 tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[i])
-
-                pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose[name], message_list=self.ego_est_pose)
+                pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
                 tf_w_ego_est = pose_to_tf(pose_msg)
-
-                pose_msg, _ = find_closest_by_time(t_est, self.t_gt[name], message_list=self.ado_gt_pose[name])
-                tf_w_ado_gt = pose_to_tf(pose_msg)
+                # pose_msg, _ = find_closest_by_time(t_est, self.t_gt[name], message_list=self.ado_gt_pose[name])
+                tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[name][i])
 
                 # tf_w_ado_est = pose_to_tf(self.ado_est_pose[name][i])
                 class_str = self.obj_name_to_class_str_dict[name]
@@ -203,7 +202,7 @@ class rosbags_to_logs:
                     continue
                 pdb.set_trace()
                 candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
-                tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ado_gt, t_gt, t_est, name, candidate_poses)
+                tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ado_gt, candidate_poses)
                 if tf_w_ado_est is None:
                     continue  # there was no plausible candidate
 
