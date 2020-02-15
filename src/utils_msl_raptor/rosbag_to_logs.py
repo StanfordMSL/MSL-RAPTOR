@@ -78,7 +78,7 @@ class rosbags_to_logs:
         self.tf_cam_ego = None
         self.obj_name_to_class_str_dict = {}
         self.read_yaml()
-
+        ####################################
 
         self.fig = None
         self.axes = None
@@ -182,7 +182,6 @@ class rosbags_to_logs:
             for i, t_gt in enumerate(self.t_gt[name]):
                 if t_gt < 0:
                     continue
-                pdb.set_trace()
                 # extract data in form for logging
                 t_est, _ = find_closest_by_time(t_gt, self.t_est)
 
@@ -192,10 +191,11 @@ class rosbags_to_logs:
 
                 # tf_w_ado_est = pose_to_tf(self.ado_est_pose[name][i])
                 class_str = self.obj_name_to_class_str_dict[name]
-                candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
-                if len(candidate_poses) == 0:
+                if class_str not in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
                     # this means we didnt see this object at this time... i think...
                     continue
+                pdb.set_trace()
+                candidate_poses = self.obj_name_to_class_str_dict[name][class_str]
                 time_gt = self.ego_gt_time_pose[name][ego_pose_ind]
                 tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ego_gt, time_gt, t_est, name, candidate_poses)
 
@@ -261,10 +261,13 @@ class rosbags_to_logs:
                 self.ado_names.add(name)
                 self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
         
-        self.t_est = np.sort(list(self.t_est) )
+        self.t_est = np.sort(list(self.t_est))
         self.t0 = np.min(self.t_est)
         self.tf = np.max(self.t_est)
         self.t_est -= self.t0
+        old_keys = copy(list(self.ado_est_pose_BY_TIME_BY_CLASS.keys()))
+        for old_key in old_keys:
+            self.ado_est_pose_BY_TIME_BY_CLASS[old_key - self.t0] = self.ado_est_pose_BY_TIME_BY_CLASS.pop(old_key)
         for n in self.ado_names:
             self.t_gt[n] = np.asarray(self.t_gt[n]) - self.t0
         # self.detect_time[n] = np.asarray(self.detect_time) - self.t0

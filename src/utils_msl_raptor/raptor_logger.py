@@ -148,6 +148,9 @@ class raptor_logger:
 
     def close_files(self):
         for fh_key in self.fh:
+            if fh_key == 'prms':
+                self.fh[fh_key].close()
+                continue
             for n in self.names:
                 self.fh[fh_key][n].close()
 

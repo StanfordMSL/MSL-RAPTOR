@@ -170,7 +170,10 @@ class pose_metric_tracker:
 
     def calc_final_metrics(self):
         # Compute 2D projection error, 6D pose error, 5cm5degree error
+
         for name in self.names:
+            if self.num_measurements[name] == 0:
+                continue
             self.acc[name]          = len(np.where(np.array(self.errs_2d[name]) <= self.px_thresh)[0]) * 100. / (len(self.errs_2d[name]) + self.eps)
             self.acc5cm5deg[name]   = len(np.where((np.array(self.errs_trans[name]) <= self.trans_thresh) & (np.array(self.errs_angle[name]) <= self.ang_thresh))[0]) * 100. / (len(self.errs_trans[name]) + self.eps)
             self.acc3d10[name]      = len(np.where(np.array(self.errs_3d[name]) <= self.diams[name] * self.prct_thresh/100.)[0]) * 100. / (len(self.errs_3d[name]) + self.eps)
@@ -183,11 +186,18 @@ class pose_metric_tracker:
 
     def print_final_metrics(self):
         for name in self.names:
+            if self.num_measurements[name] == 0:
+                continue
             self.print_one_final_metrics(name)
 
 
     def print_one_final_metrics(self, name):
         # Print test statistics
+
+        if self.num_measurements[name] == 0:
+            print("WARNING: no data was stored in metric calculator for {}".format(name))
+            return
+
         N = float(self.num_measurements[name])
         logging('\nResults of {} -------------------------------'.format(name))
         logging('   Acc using {} px 2D Projection = {:.2f}%'.format(self.px_thresh, self.acc[name]))
