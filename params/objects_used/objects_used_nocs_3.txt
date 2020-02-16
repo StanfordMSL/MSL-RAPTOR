@@ -1,0 +1,4 @@
+bottle_starbuck_norm
+bowl_chinese_blue_norm
+camera_dslr_wo_len_norm
+can_porridge_norm

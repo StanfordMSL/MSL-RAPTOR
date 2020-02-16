@@ -1,0 +1,4 @@
+can_tall_yellow_norm
+mug_white_green_norm
+laptop_dell_norm
+camera_dslr_len_norm

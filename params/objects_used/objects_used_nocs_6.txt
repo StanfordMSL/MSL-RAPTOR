@@ -1,0 +1,4 @@
+can_tall_yellow_norm
+can_milk_wangwang_norm
+camera_dslr_len_norm
+laptop_dell_norm

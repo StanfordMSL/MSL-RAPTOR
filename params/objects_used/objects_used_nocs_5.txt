@@ -1,0 +1,5 @@
+can_tall_yellow_norm
+bottle_blue_google_norm
+bottle_starbuck_norm
+camera_anastasia_norm
+laptop_air_1_norm
