@@ -43,7 +43,8 @@ class ImageSegmentor:
         self.mode = self.DETECT
 
         # Pixels added around the bounding box used to initialize tracker
-        self.box_buffer = -10
+        # self.box_buffer = -10
+        self.box_buffer = 0
 
         self.last_detection_time = None
         self.detection_period = detection_period

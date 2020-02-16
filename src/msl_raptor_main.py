@@ -20,7 +20,6 @@ from image_segmentor import ImageSegmentor
 import yaml
 
 def run_execution_loop():
-    b_enforce_0_yaw = rospy.get_param('~b_enforce_0_yaw') 
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb') 
     detection_period_ros = rospy.get_param('~detection_period') # In seconds
     objects_sizes_yaml = rospy.get_param('~object_sizes_file')
