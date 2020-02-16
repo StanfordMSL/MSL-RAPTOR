@@ -5,7 +5,8 @@ import numpy as np
 import math
 import numpy.linalg as la
 from utils_msl_raptor.ukf_utils import bb_corners_to_angled_bb
-
+from utils_msl_raptor.ukf_utils import condensed_to_square
+from scipy.spatial.distance import pdist,squareform
 class TrackedObject:
     def __init__(self, object_id, class_str):
         self.id = object_id
@@ -63,12 +64,16 @@ class ImageSegmentor:
         self.im_width = im_width
         self.im_height = im_height
 
+        self.track_min_score = 0.5
+        self.min_square_pix_dist_other_objs = 16
+
     def stop_tracking_lost_objects(self):
         # Remove objects that triggered detection and were not matched to new detections
         for obj_id in self.last_lost_objects:
             c = self.tracked_objects[obj_id].class_str
             print('Removing '+c)
             self.active_objects_ids_per_class[c].remove(obj_id)
+        self.last_lost_objects = []
 
 
     def process_image(self,image,time):
@@ -93,24 +98,46 @@ class ImageSegmentor:
         
     def track(self,image):
         tic = time.time()
-        output = []
+        output = {}
+        prev_positions = []
+        new_positions = []
+        obj_ids = []
         # Go over each active tracked object
         for obj_id in sum(self.active_objects_ids_per_class.values(),[]):
+            
+
+            prev_pos= self.tracked_objects[obj_id].latest_tracked_state['target_pos']
             self.tracked_objects[obj_id].latest_tracked_state, abb, mask = self.tracker.track(image,self.tracked_objects[obj_id].latest_tracked_state)
             abb = bb_corners_to_angled_bb(abb.reshape(-1,2))
-
             # Check if measurement valid if we have a state estimate
             if obj_id in self.ukf_dict:
-                valid = self.valid_tracking(self.ukf_dict[obj_id],abb)
+                valid = self.valid_tracking(self.ukf_dict[obj_id],abb,self.tracked_objects[obj_id].latest_tracked_state['score'],obj_id)
                 # If not valid we switch to detection
                 if not valid:
                     self.last_lost_objects.append(obj_id)
                     self.mode = self.DETECT
+                    
             # If this is a new object it has already passed the detection check, it is considered valid for now
             else:
                 valid = True
 
-            output.append((abb,self.tracked_objects[obj_id].class_str,obj_id, valid))
+            # Keep track for further checks later
+            if valid:
+                obj_ids.append(obj_id)
+                prev_positions.append(prev_pos)
+                new_positions.append(self.tracked_objects[obj_id].latest_tracked_state['target_pos'])
+
+            output[obj_id] = [abb,self.tracked_objects[obj_id].class_str, valid]
+
+        # Checked if any objects collapsed to the same position during tracking
+        collapsed_objs_ids = self.find_collapsed_objects(obj_ids,prev_positions,new_positions)
+
+        for c_id in collapsed_objs_ids:
+            self.last_lost_objects.append(c_id)
+            self.mode = self.DETECT
+            # Set valid to false
+            output[c_id][-1] = False
+            print('Object '+str(c_id)+':tracked position is too close to another object')
 
         # dummy_object_ids = list(range(len(self.last_boxes)))  # DEBUG
         tic2 = time.time()
@@ -168,13 +195,9 @@ class ImageSegmentor:
             new_active_objects_ids.append(obj_id)
 
         # Remove objects that triggered detection and were not matched to new detections
-        for obj_id in self.last_lost_objects:
-            c = self.tracked_objects[obj_id].class_str
-            print('Removing '+c)
-            self.active_objects_ids_per_class[c].remove(obj_id)
+        self.stop_tracking_lost_objects()
 
-        # Reset lost objects
-        self.last_lost_objects = []
+        
 
     def detect(self,image):
         tic = time.time()
@@ -229,7 +252,11 @@ class ImageSegmentor:
         return True
 
 
-    def valid_tracking(self,ukf,abb):
+    def valid_tracking(self,ukf,abb,score,obj_id):
+        if score < self.track_min_score:
+            print('Object tracking score of '+str(score)+' - min '+str(self.track_min_score))
+            return False
+
         if not hasattr(ukf,'mu_obs'):
             return True
         # Check if row or column valid
@@ -265,4 +292,21 @@ class ImageSegmentor:
     def check_periodic_detection(self,time):
         if time - self.last_detection_time > self.detection_period:
             self.mode = self.DETECT
+
+    def find_collapsed_objects(self,obj_ids,prev_positions,new_positions):
+        dists = pdist(new_positions, 'sqeuclidean')
+        collapsed_ids = np.argwhere(dists < self.min_square_pix_dist_other_objs)
+
+        obj_ids_collapsed = []
+        # Check which of the positions changed most since its previous one and assume this is the wrong one
+        for c_id in collapsed_ids:
+            (i,j) = condensed_to_square(c_id,len(new_positions))
+            if np.linalg.norm(new_positions[i]-prev_positions[i]) >  np.linalg.norm(new_positions[j]-prev_positions[j]):
+                if obj_ids[i] not in obj_ids_collapsed: obj_ids_collapsed.append(obj_ids[i])
+            else:
+                if obj_ids[j] not in obj_ids_collapsed: obj_ids_collapsed.append(obj_ids[j])
+
+        return obj_ids_collapsed
+
+
         

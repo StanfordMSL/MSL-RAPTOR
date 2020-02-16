@@ -88,7 +88,7 @@ def run_execution_loop():
 
         # handle each object seen
         obj_ids_tracked = []
-        for abb, class_str, obj_id, valid in processed_image:
+        for obj_id, (abb, class_str, valid) in processed_image.items():
             ukf = None
             if not obj_id in ukf_dict:  # New Object
                 print("new object (id = {}, type = {})".format(obj_id, class_str))
