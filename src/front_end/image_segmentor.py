@@ -130,14 +130,15 @@ class ImageSegmentor:
             output[obj_id] = [abb,self.tracked_objects[obj_id].class_str, valid]
 
         # Checked if any objects collapsed to the same position during tracking
-        collapsed_objs_ids = self.find_collapsed_objects(obj_ids,prev_positions,new_positions)
+        if len(obj_ids) > 1:
+            collapsed_objs_ids = self.find_collapsed_objects(obj_ids,prev_positions,new_positions)
 
-        for c_id in collapsed_objs_ids:
-            self.last_lost_objects.append(c_id)
-            self.mode = self.DETECT
-            # Set valid to false
-            output[c_id][-1] = False
-            print('Object '+str(c_id)+':tracked position is too close to another object')
+            for c_id in collapsed_objs_ids:
+                self.last_lost_objects.append(c_id)
+                self.mode = self.DETECT
+                # Set valid to false
+                output[c_id][-1] = False
+                print('Object '+str(c_id)+':tracked position is too close to another object')
 
         # dummy_object_ids = list(range(len(self.last_boxes)))  # DEBUG
         tic2 = time.time()
