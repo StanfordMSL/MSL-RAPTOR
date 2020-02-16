@@ -76,11 +76,3 @@ def find_closest_by_time(time_to_match, time_list, message_list=None):
        return message_list[pos], pos
     else:
        return message_list[pos - 1], pos - 1
-
-
-def b_vs_debug():
-    try:
-        rospy.Time().now()
-    except:
-        return True
-    return False

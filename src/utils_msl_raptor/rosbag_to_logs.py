@@ -24,6 +24,7 @@ sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor')
 from ssp_utils import *
 from math_utils import *
 from ros_utils import *
+from ukf_utils import *
 from raptor_logger import *
 from pose_metrics import *
 
@@ -54,7 +55,8 @@ class rosbags_to_logs:
             raise RuntimeError("We do not recognize bag file! {} not understood".format(rb_name))
         
         self.rosbag_in_dir = "/mounted_folder/raptor_processed_bags"
-        self.log_out_dir = "/mounted_folder/" + data_source + "_logs"
+        self.log_out_dir = "/mounted_folder/" + data_source.lower() + "_logs"
+        makedirs(self.log_out_dir)
 
         try:
             self.bag = rosbag.Bag(self.rosbag_in_dir + '/' + self.rb_name, 'r')
@@ -77,6 +79,8 @@ class rosbags_to_logs:
         self.bb_3d_dict_all = defaultdict(list)  # turns the name into the len, width, height, and diam of the object
         self.tf_cam_ego = None
         self.obj_name_to_class_str_dict = {}
+        self.b_enforce_0_dict = {}
+        self.fixed_vals = {}
         self.read_yaml()
         ####################################
 
@@ -119,7 +123,7 @@ class rosbags_to_logs:
         base_path = self.log_out_dir + "/log_" + self.rb_name[:-4].split("_")[-1] 
         self.logger = RaptorLogger(mode="write", names=self.ado_names, base_path=base_path)
 
-        self.raptor_metrics = PoseMetricTracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=self.ado_names, diams=self.bb_3d_dict_all)
+        self.raptor_metrics = PoseMetricTracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=self.ado_names, bb_3d_dict=self.bb_3d_dict_all)
         
         self.convert_rosbag_info_to_log()
         self.logger.close_files()
@@ -182,30 +186,27 @@ class rosbags_to_logs:
                                  [-box_length/2,-box_width/2,-box_height/2, 1.],
                                  [-box_length/2, box_width/2,-box_height/2, 1.],
                                  [-box_length/2, box_width/2, box_height/2, 1.]]).T
-            for i, t_gt in enumerate(self.t_gt[name]):
-                if t_gt < 0:
+            for i, t_est in enumerate(self.t_est):
+                if t_est < 0:
                     continue
                 # extract data in form for logging
-                t_est, _ = find_closest_by_time(t_gt, self.t_est)
+                t_gt, gt_ind = find_closest_by_time(t_est, self.t_gt[name])
+                tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[gt_ind])
 
-                tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[i])
                 pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
                 tf_w_ego_est = pose_to_tf(pose_msg)
-                # pose_msg, _ = find_closest_by_time(t_est, self.t_gt[name], message_list=self.ado_gt_pose[name])
-                tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[name][i])
+                
+                tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[name][gt_ind])
 
-                # tf_w_ado_est = pose_to_tf(self.ado_est_pose[name][i])
                 class_str = self.obj_name_to_class_str_dict[name]
-                # print("name = {} and class = {} ---> {}".format(name, class_str, self.ado_est_pose_BY_TIME_BY_CLASS[t_est].keys()))
                 if class_str not in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
-                    # this means we didnt see this object at this time... i think...
-                    continue
+                    continue  # this means we didnt see this object at this time... i think...
                 candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
                 tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ado_gt, candidate_poses)
                 if tf_w_ado_est is None:
                     continue  # there was no plausible candidate
 
-                print(i)
+                print("name = {}, i = {}, t_est = {}, t_gt = {}".format(name, i, t_est, t_gt))
                 tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
                 tf_cam_w = inv_tf(tf_w_cam)
                 tf_cam_ado_est = tf_cam_w @ tf_w_ado_est
@@ -282,8 +283,12 @@ class rosbags_to_logs:
             try:
                 obj_prms = list(yaml.load_all(stream))
                 for obj_dict in obj_prms:
+                    name = obj_dict['ns']
+                    self.b_enforce_0_dict[name] = defaultdict(bool)  # false by default
+                    self.fixed_vals[name] = defaultdict(dict)
                     if obj_dict['id'] < 0 or obj_dict['ns'] == self.ego_gt_topic.split("/")[0][1:]: 
                         # this means its the ego robot, dont add it to ado (but get its camera params)
+                        self.ego_name = name
                         self.tf_cam_ego = np.eye(4)
                         self.tf_cam_ego[0:3, 3] = np.asarray(obj_dict['t_cam_ego'])
                         self.tf_cam_ego[0:3, 0:3] = np.reshape(obj_dict['R_cam_ego'], (3, 3))
@@ -303,7 +308,6 @@ class rosbags_to_logs:
                         R_delta = R_deltax @ R_deltay @ R_deltaz
                         self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
                     else:
-                        name = obj_dict['ns']
                         self.ado_names_all.append(name)
                         l = float(obj_dict['bound_box_l']) 
                         w = float(obj_dict['bound_box_w'])
@@ -314,6 +318,12 @@ class rosbags_to_logs:
                         else:
                             d = la.norm([l, w, h])
                         self.bb_3d_dict_all[name] = np.array([l, w, h, d])
+                        for el in obj_dict['b_enforce_0']:
+                            self.b_enforce_0_dict[name][el] = True
+                            additional_key = 'fixed_' + el
+                            if additional_key in obj_dict:
+                                self.fixed_vals[name][el] = obj_dict[additional_key]
+
             except yaml.YAMLError as exc:
                 print(exc)
 
@@ -343,14 +353,12 @@ class rosbags_to_logs:
             t_est = t
         self.t_est.add(t_est)
         for to in tracked_obs:
-            # if t is None:
-            #     self.t_est[name].append(to.pose.header.stamp.to_sec())
-            # else:
-            #     self.t_est[name].append(t)
+            pose = to.pose.pose
+
             if to.class_str in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
-                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append(to.pose.pose)
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append(pose)
             else:
-                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [to.pose.pose]
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [pose]
             # self.ado_est_state[name].append(to.state)
 
 
@@ -364,15 +372,16 @@ class rosbags_to_logs:
             self.t_gt[name].append(msg.header.stamp.to_sec())
         else:
             self.t_gt[name].append(t)
-
-        self.ado_gt_pose[name].append(msg.pose)
+        pose = enforce_constraints_pose(msg.pose, self.b_enforce_0_dict[name], self.fixed_vals[name])
+        self.ado_gt_pose[name].append(pose)
 
         
     def parse_ego_gt_msg(self, msg, t=None):
         """
         record optitrack poses of tracked quad
         """
-        self.ego_gt_pose.append(msg.pose)
+        pose = enforce_constraints_pose(msg.pose, self.b_enforce_0_dict[self.ego_name], self.fixed_vals[self.ego_name])
+        self.ego_gt_pose.append(pose)
         self.ego_gt_time_pose.append(msg.header.stamp.to_sec())
 
         
@@ -380,7 +389,8 @@ class rosbags_to_logs:
         """
         record optitrack poses of tracked quad
         """
-        self.ego_est_pose.append(msg.pose)
+        pose = enforce_constraints_pose(msg.pose, self.b_enforce_0_dict[self.ego_name], self.fixed_vals[self.ego_name])
+        self.ego_est_pose.append(pose)
         self.ego_est_time_pose.append(msg.header.stamp.to_sec())
 
 
