@@ -7,8 +7,8 @@ class SiammaskTracker:
 
         # Setup Model
         args = argparse.Namespace()
-        args.config = base_dir + 'SiamMask/experiments/siammask_sharp/config_davis.json'
-        args.resume = base_dir + 'SiamMask/experiments/siammask_sharp/SiamMask_DAVIS.pth'
+        args.config = base_dir + 'SiamMask/experiments/siammask_sharp/config_vot.json'
+        args.resume = base_dir + 'SiamMask/experiments/siammask_sharp/SiamMask_VOT.pth'
         self.cfg = load_config(args)
         from custom import Custom
         siammask = Custom(anchors=self.cfg['anchors'])
