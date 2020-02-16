@@ -28,7 +28,7 @@ from ros_utils import *
 from raptor_logger import *
 from pose_metrics import *
 
-class result_analyser:
+class ResultAnalyser:
 
     def __init__(self, log_identifier, ego_quad_ns="/quad7", ado_quad_ns="/quad4"):
         us_split = log_identifier.split("_")
@@ -52,7 +52,7 @@ class result_analyser:
         ssp_log_name = log_in_dir + "/" + log_base_name + "_SSP.log"
         if not os.path.isfile(ssp_log_name):
             ssp_log_name = None
-        self.logger = raptor_logger(source="MSLRAPTOR", mode="read", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name, ssp_fn=ssp_log_name)
+        self.logger = RaptorLogger(source="MSLRAPTOR", mode="read", est_fn=est_log_name, gt_fn=gt_log_name, param_fn=param_log_name, ssp_fn=ssp_log_name)
         self.b_degrees = True  # use degrees or radians
 
         self.fig = None
@@ -117,7 +117,7 @@ class result_analyser:
         self.box_length = None
         self.box_width = None
         self.box_height = None
-        self.raptor_metrics = pose_metric_tracker()
+        self.raptor_metrics = PoseMetricTracker()
         #################################
 
         self.extract_logs()
@@ -347,7 +347,7 @@ if __name__ == '__main__':
         elif len(sys.argv) > 2:
             raise RuntimeError("too many arguments, only pass in the rosbag name or source rosbag name (w/ or w/o .bag)")
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
-        program = result_analyser(log_identifier=sys.argv[1])
+        program = ResultAnalyser(log_identifier=sys.argv[1])
         input("\nPress enter to close program\n")
         
     except:

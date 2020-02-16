@@ -11,7 +11,7 @@ from scipy.spatial.transform import Rotation as R
 # ros
 from ssp_utils import *
 
-class raptor_logger:
+class RaptorLogger:
     def __init__(self, mode="write", names=None, base_path="./", b_ssp=False):
         if names is None:
             raise RuntimeError("Must provide list of names for tracked object")

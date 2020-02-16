@@ -117,9 +117,9 @@ class rosbags_to_logs:
         self.process_rb()
         
         base_path = self.log_out_dir + "/log_" + self.rb_name[:-4].split("_")[-1] 
-        self.logger = raptor_logger(mode="write", names=self.ado_names, base_path=base_path)
+        self.logger = RaptorLogger(mode="write", names=self.ado_names, base_path=base_path)
 
-        self.raptor_metrics = pose_metric_tracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=self.ado_names, diams=self.bb_3d_dict_all)
+        self.raptor_metrics = PoseMetricTracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=self.ado_names, diams=self.bb_3d_dict_all)
         
         self.convert_rosbag_info_to_log()
         self.logger.close_files()
