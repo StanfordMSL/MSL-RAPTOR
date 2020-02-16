@@ -30,7 +30,6 @@ def get_all_files(directory):
     return files
 
 def calcAngularDistance(gt_rot, pr_rot):
-
     rotDiff = np.dot(gt_rot, np.transpose(pr_rot))
     trace = np.trace(rotDiff) 
     return np.rad2deg(np.arccos((trace-1.0)/2.0))

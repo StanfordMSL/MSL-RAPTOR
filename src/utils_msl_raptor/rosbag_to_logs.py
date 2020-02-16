@@ -206,7 +206,6 @@ class rosbags_to_logs:
                 if tf_w_ado_est is None:
                     continue  # there was no plausible candidate
 
-                print("name = {}, i = {}, t_est = {}, t_gt = {}".format(name, i, t_est, t_gt))
                 tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
                 tf_cam_w = inv_tf(tf_w_cam)
                 tf_cam_ado_est = tf_cam_w @ tf_w_ado_est
@@ -218,6 +217,10 @@ class rosbags_to_logs:
                 R_gt = tf_cam_ado_gt[0:3, 0:3]
                 t_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
                 
+                print("name = {}, i = {}, t_est = {}, t_gt = {}".format(name, i, t_est, calcAngularDistance(R_gt, R_pr)))
+                # angs_est = quat_to_ang(rotm_to_quat(tf_w_ado_est[0:3, 0:3]).reshape((1,4)))
+                # angs_gt = quat_to_ang(rotm_to_quat(tf_w_ado_gt[0:3, 0:3]).reshape((1,4)))
+                # pdb.set_trace()
                 ######################################################
                 
                 if self.raptor_metrics is not None:
