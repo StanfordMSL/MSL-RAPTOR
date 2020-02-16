@@ -59,6 +59,7 @@ if __name__ == '__main__':
             # print("dims for {}: ".format(name, spans))
             print("---\nid: {}\nns: '{}'\nclass_str: '{}'".format(i + start_num, name, class_str))
             print("bound_box_l: {}\nbound_box_w: {}\nbound_box_h: {}".format(*spans))
+            print("b_enforce_0: []")
         print("\n\nDONE!!!")
         
     except:

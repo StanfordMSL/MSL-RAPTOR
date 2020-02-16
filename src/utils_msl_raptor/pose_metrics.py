@@ -21,13 +21,13 @@ class PoseMetricTracker:
     """
     def __init__(self, px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=None, bb_3d_dict=None, eps=1e-5):
 
-        self.px_thresh    = px_thresh
-        self.prct_thresh  = prct_thresh
-        self.trans_thresh = trans_thresh # meters
-        self.ang_thresh   = ang_thresh  # degrees
-        self.eps          = eps
-        self.names        = names
-        self.bb_3d_dict   = bb_3d_dict
+        self.px_thresh        = px_thresh
+        self.prct_thresh      = prct_thresh
+        self.trans_thresh     = trans_thresh # meters
+        self.ang_thresh       = ang_thresh  # degrees
+        self.eps              = eps
+        self.names            = names
+        self.bb_3d_dict       = bb_3d_dict
 
         # Init variables
         self.num_measurements    = defaultdict(int)

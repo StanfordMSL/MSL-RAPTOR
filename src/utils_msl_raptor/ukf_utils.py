@@ -7,7 +7,10 @@ import numpy as np
 import numpy.linalg as la
 import tf
 # libs & utils
-from utils_msl_raptor.math_utils import *
+try:
+    from utils_msl_raptor.math_utils import *
+except:
+    from math_utils import *
 
 
 def state_to_tf(state):
@@ -150,4 +153,46 @@ def remove_yaw(quats):
     angles= quat_to_ang(quats)
     angles[:,2] = 0
     return ang_to_quat(angles)
+
+
+def enforce_constraints_pose(pose, b_enforce_0_dict, fixed_vals):
+    """
+    Takes in a pose (from a ros message) and projects it to satisfy the contraints
+    """
+    if len(b_enforce_0_dict) == 0:
+        return pose
+
+    # handle position
+    if b_enforce_0_dict['x']:
+        if 'x' in fixed_vals:
+            pose.position.x = fixed_vals['x']
+        else:
+            pose.position.x = 0
+    if b_enforce_0_dict['y']:
+        if 'y' in fixed_vals:
+            pose.position.y = fixed_vals['y']
+        else:
+            pose.position.y = 0
+    if b_enforce_0_dict['z']:
+        if 'z' in fixed_vals:
+            pose.position.z = fixed_vals['z']
+        else:
+            pose.position.z = 0
+
+    # handle orientation
+    quat = np.reshape([pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z], (1,4))
+    if b_enforce_0_dict['roll']:
+        quat = remove_roll(quat)
+    if b_enforce_0_dict['pitch']:
+        quat = remove_pitch(quat)
+    if b_enforce_0_dict['yaw']:
+        quat = remove_yaw(quat)
+
+    pose.orientation.w = quat[0, 0]
+    pose.orientation.x = quat[0, 1]
+    pose.orientation.y = quat[0, 2]
+    pose.orientation.z = quat[0, 3]
+
+    return pose
+
 

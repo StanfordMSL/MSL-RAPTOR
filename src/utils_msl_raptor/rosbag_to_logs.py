@@ -24,6 +24,7 @@ sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor')
 from ssp_utils import *
 from math_utils import *
 from ros_utils import *
+from ukf_utils import *
 from raptor_logger import *
 from pose_metrics import *
 
@@ -78,6 +79,8 @@ class rosbags_to_logs:
         self.bb_3d_dict_all = defaultdict(list)  # turns the name into the len, width, height, and diam of the object
         self.tf_cam_ego = None
         self.obj_name_to_class_str_dict = {}
+        self.b_enforce_0_dict = {}
+        self.fixed_vals = {}
         self.read_yaml()
         ####################################
 
@@ -280,8 +283,12 @@ class rosbags_to_logs:
             try:
                 obj_prms = list(yaml.load_all(stream))
                 for obj_dict in obj_prms:
+                    name = obj_dict['ns']
+                    self.b_enforce_0_dict[name] = defaultdict(bool)  # false by default
+                    self.fixed_vals[name] = defaultdict(dict)
                     if obj_dict['id'] < 0 or obj_dict['ns'] == self.ego_gt_topic.split("/")[0][1:]: 
                         # this means its the ego robot, dont add it to ado (but get its camera params)
+                        self.ego_name = name
                         self.tf_cam_ego = np.eye(4)
                         self.tf_cam_ego[0:3, 3] = np.asarray(obj_dict['t_cam_ego'])
                         self.tf_cam_ego[0:3, 0:3] = np.reshape(obj_dict['R_cam_ego'], (3, 3))
@@ -301,7 +308,6 @@ class rosbags_to_logs:
                         R_delta = R_deltax @ R_deltay @ R_deltaz
                         self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
                     else:
-                        name = obj_dict['ns']
                         self.ado_names_all.append(name)
                         l = float(obj_dict['bound_box_l']) 
                         w = float(obj_dict['bound_box_w'])
@@ -312,6 +318,12 @@ class rosbags_to_logs:
                         else:
                             d = la.norm([l, w, h])
                         self.bb_3d_dict_all[name] = np.array([l, w, h, d])
+                        for el in obj_dict['b_enforce_0']:
+                            self.b_enforce_0_dict[name][el] = True
+                            additional_key = 'fixed_' + el
+                            if additional_key in obj_dict:
+                                self.fixed_vals[name][el] = obj_dict[additional_key]
+
             except yaml.YAMLError as exc:
                 print(exc)
 
@@ -341,14 +353,12 @@ class rosbags_to_logs:
             t_est = t
         self.t_est.add(t_est)
         for to in tracked_obs:
-            # if t is None:
-            #     self.t_est[name].append(to.pose.header.stamp.to_sec())
-            # else:
-            #     self.t_est[name].append(t)
+            pose = to.pose.pose
+
             if to.class_str in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
-                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append(to.pose.pose)
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append(pose)
             else:
-                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [to.pose.pose]
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [pose]
             # self.ado_est_state[name].append(to.state)
 
 
@@ -362,15 +372,16 @@ class rosbags_to_logs:
             self.t_gt[name].append(msg.header.stamp.to_sec())
         else:
             self.t_gt[name].append(t)
-
-        self.ado_gt_pose[name].append(msg.pose)
+        pose = enforce_constraints_pose(msg.pose, self.b_enforce_0_dict[name], self.fixed_vals[name])
+        self.ado_gt_pose[name].append(pose)
 
         
     def parse_ego_gt_msg(self, msg, t=None):
         """
         record optitrack poses of tracked quad
         """
-        self.ego_gt_pose.append(msg.pose)
+        pose = enforce_constraints_pose(msg.pose, self.b_enforce_0_dict[self.ego_name], self.fixed_vals[self.ego_name])
+        self.ego_gt_pose.append(pose)
         self.ego_gt_time_pose.append(msg.header.stamp.to_sec())
 
         
@@ -378,7 +389,8 @@ class rosbags_to_logs:
         """
         record optitrack poses of tracked quad
         """
-        self.ego_est_pose.append(msg.pose)
+        pose = enforce_constraints_pose(msg.pose, self.b_enforce_0_dict[self.ego_name], self.fixed_vals[self.ego_name])
+        self.ego_est_pose.append(pose)
         self.ego_est_time_pose.append(msg.header.stamp.to_sec())
 
 
