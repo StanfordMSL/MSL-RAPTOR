@@ -16,9 +16,9 @@ fixed_z: 1
 id: 1
 ns: 'quad4'
 class_str: 'mslquad'
-bound_box_l: 2.27
-bound_box_w: 2.27
-bound_box_h: 3.13
+bound_box_l: 0.27
+bound_box_w: 0.27
+bound_box_h: 0.13
 b_enforce_0: ['yaw']
 ---
 id: 2
