@@ -57,11 +57,18 @@ class ImageSegmentor:
         self.min_pix_from_edge = 5
         # Dicts containing each class
         self.min_aspect_ratio = {'person':0.1,'mslquad':1,'bowl':0.5,'cup':0.2,'laptop':0.3,'bottle':0.1}
-        self.max_aspect_ratio = {'person':0.4,'mslquad':5,'bowl':2,'cup':1.3,'laptop':3,'bottle':0.4}
+        self.max_aspect_ratio = {'person':0.4,'mslquad':5,'bowl':2,'cup':1.3,'laptop':3,'bottle':1.0}
 
         self.F_005 = 161.4476
         self.im_width = im_width
         self.im_height = im_height
+
+    def stop_tracking_lost_objects(self):
+        # Remove objects that triggered detection and were not matched to new detections
+        for obj_id in self.last_lost_objects:
+            c = self.tracked_objects[obj_id].class_str
+            print('Removing '+c)
+            self.active_objects_ids_per_class[c].remove(obj_id)
 
 
     def process_image(self,image,time):
@@ -71,7 +78,8 @@ class ImageSegmentor:
             # No detections
             if len(bbs_no_angle) == 0:
                 print("Did not detect object")
-                return []
+                self.stop_tracking_lost_objects()
+                return self.track(image)
             # Add buffer around detections
             bbs_no_angle[:,2:4] += self.box_buffer
             # Detections to reinit tracker
@@ -161,7 +169,9 @@ class ImageSegmentor:
 
         # Remove objects that triggered detection and were not matched to new detections
         for obj_id in self.last_lost_objects:
-            self.active_objects_ids_per_class[self.tracked_objects[obj_id].class_str].remove(obj_id)
+            c = self.tracked_objects[obj_id].class_str
+            print('Removing '+c)
+            self.active_objects_ids_per_class[c].remove(obj_id)
 
         # Reset lost objects
         self.last_lost_objects = []
