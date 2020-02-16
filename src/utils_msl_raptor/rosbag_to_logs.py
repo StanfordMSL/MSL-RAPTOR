@@ -54,7 +54,8 @@ class rosbags_to_logs:
             raise RuntimeError("We do not recognize bag file! {} not understood".format(rb_name))
         
         self.rosbag_in_dir = "/mounted_folder/raptor_processed_bags"
-        self.log_out_dir = "/mounted_folder/" + data_source + "_logs"
+        self.log_out_dir = "/mounted_folder/" + data_source.lower() + "_logs"
+        makedirs(self.log_out_dir)
 
         try:
             self.bag = rosbag.Bag(self.rosbag_in_dir + '/' + self.rb_name, 'r')
@@ -119,7 +120,7 @@ class rosbags_to_logs:
         base_path = self.log_out_dir + "/log_" + self.rb_name[:-4].split("_")[-1] 
         self.logger = RaptorLogger(mode="write", names=self.ado_names, base_path=base_path)
 
-        self.raptor_metrics = PoseMetricTracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=self.ado_names, diams=self.bb_3d_dict_all)
+        self.raptor_metrics = PoseMetricTracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=self.ado_names, bb_3d_dict=self.bb_3d_dict_all)
         
         self.convert_rosbag_info_to_log()
         self.logger.close_files()
@@ -182,30 +183,27 @@ class rosbags_to_logs:
                                  [-box_length/2,-box_width/2,-box_height/2, 1.],
                                  [-box_length/2, box_width/2,-box_height/2, 1.],
                                  [-box_length/2, box_width/2, box_height/2, 1.]]).T
-            for i, t_gt in enumerate(self.t_gt[name]):
-                if t_gt < 0:
+            for i, t_est in enumerate(self.t_est):
+                if t_est < 0:
                     continue
                 # extract data in form for logging
-                t_est, _ = find_closest_by_time(t_gt, self.t_est)
+                t_gt, gt_ind = find_closest_by_time(t_est, self.t_gt[name])
+                tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[gt_ind])
 
-                tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[i])
                 pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
                 tf_w_ego_est = pose_to_tf(pose_msg)
-                # pose_msg, _ = find_closest_by_time(t_est, self.t_gt[name], message_list=self.ado_gt_pose[name])
-                tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[name][i])
+                
+                tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[name][gt_ind])
 
-                # tf_w_ado_est = pose_to_tf(self.ado_est_pose[name][i])
                 class_str = self.obj_name_to_class_str_dict[name]
-                # print("name = {} and class = {} ---> {}".format(name, class_str, self.ado_est_pose_BY_TIME_BY_CLASS[t_est].keys()))
                 if class_str not in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
-                    # this means we didnt see this object at this time... i think...
-                    continue
+                    continue  # this means we didnt see this object at this time... i think...
                 candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
                 tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ado_gt, candidate_poses)
                 if tf_w_ado_est is None:
                     continue  # there was no plausible candidate
 
-                print(i)
+                print("name = {}, i = {}, t_est = {}, t_gt = {}".format(name, i, t_est, t_gt))
                 tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
                 tf_cam_w = inv_tf(tf_w_cam)
                 tf_cam_ado_est = tf_cam_w @ tf_w_ado_est

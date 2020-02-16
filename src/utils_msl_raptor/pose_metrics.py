@@ -19,7 +19,7 @@ class PoseMetricTracker:
     This class is to help unify how ssp and raptor judge the results. It can be incrementally updated with results at each iteration, 
     and at the end can calculate averages for the run. It calculates several metrics using the methodology from ssp's code.
     """
-    def __init__(self, px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=None, diams=None, eps=1e-5):
+    def __init__(self, px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=None, bb_3d_dict=None, eps=1e-5):
 
         self.px_thresh    = px_thresh
         self.prct_thresh  = prct_thresh
@@ -27,7 +27,7 @@ class PoseMetricTracker:
         self.ang_thresh   = ang_thresh  # degrees
         self.eps          = eps
         self.names        = names
-        self.diams        = diams
+        self.bb_3d_dict   = bb_3d_dict
 
         # Init variables
         self.num_measurements    = defaultdict(int)
@@ -176,7 +176,7 @@ class PoseMetricTracker:
                 continue
             self.acc[name]          = len(np.where(np.array(self.errs_2d[name]) <= self.px_thresh)[0]) * 100. / (len(self.errs_2d[name]) + self.eps)
             self.acc5cm5deg[name]   = len(np.where((np.array(self.errs_trans[name]) <= self.trans_thresh) & (np.array(self.errs_angle[name]) <= self.ang_thresh))[0]) * 100. / (len(self.errs_trans[name]) + self.eps)
-            self.acc3d10[name]      = len(np.where(np.array(self.errs_3d[name]) <= self.diams[name][-1] * self.prct_thresh/100.)[0]) * 100. / (len(self.errs_3d[name]) + self.eps)
+            self.acc3d10[name]      = len(np.where(np.array(self.errs_3d[name]) <= self.bb_3d_dict[name][-1] * self.prct_thresh/100.)[0]) * 100. / (len(self.errs_3d[name]) + self.eps)
             self.acc5cm5deg[name]   = len(np.where((np.array(self.errs_trans[name]) <= self.trans_thresh) & (np.array(self.errs_angle[name]) <= self.ang_thresh))[0]) * 100. / (len(self.errs_trans[name]) + self.eps)
             self.corner_acc[name]   = len(np.where(np.array(self.errs_corner2D[name]) <= self.px_thresh)[0]) * 100. / (len(self.errs_corner2D[name]) + self.eps)
             self.mean_err_2d[name]  = np.mean(self.errs_2d[name])
@@ -201,7 +201,7 @@ class PoseMetricTracker:
         N = float(self.num_measurements[name])
         logging('\nResults of {} -------------------------------'.format(name))
         logging('   Acc using {} px 2D Projection = {:.2f}%'.format(self.px_thresh, self.acc[name]))
-        logging('   Acc using {}% threshold - {} vx 3D Transformation = {:.2f}%'.format(self.prct_thresh, self.diams[name][-1] * self.prct_thresh/100, self.acc3d10[name]))
+        logging('   Acc using {}% threshold - {} vx 3D Transformation = {:.2f}%'.format(self.prct_thresh, self.bb_3d_dict[name][-1] * self.prct_thresh/100, self.acc3d10[name]))
         logging('   Acc using {} cm {} degree metric = {:.2f}%'.format(self.trans_thresh*100, self.ang_thresh, self.acc5cm5deg[name]))
         logging('   Mean 2D pixel error is %f, Mean vertex error is %f, mean corner error is %f' % (self.mean_err_2d[name], self.mean_err_3d[name], self.mean_corner_err_2d[name]))
         logging('   Translation error: %f m, angle error: %f degree, pixel error: %f pix' % (self.testing_error_trans[name]/N, self.testing_error_angle[name]/N, self.testing_error_pixel[name]/N) )
