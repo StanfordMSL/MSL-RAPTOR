@@ -25,7 +25,7 @@ def run_execution_loop():
     detection_period_ros = rospy.get_param('~detection_period') # In seconds
     objects_sizes_yaml = rospy.get_param('~object_sizes_file')
     objects_used_path = rospy.get_param('~object_used_file')
-    classes_names = rospy.get_param('~classes_names_file')
+    classes_names_file = rospy.get_param('~classes_names_file')
     b_filter_meas = True
     
     ros = ROS(b_use_gt_bb,b_verbose)  # create a ros interface object

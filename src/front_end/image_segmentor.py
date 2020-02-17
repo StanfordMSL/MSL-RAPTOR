@@ -66,7 +66,7 @@ class ImageSegmentor:
         self.im_width = im_width
         self.im_height = im_height
 
-        self.track_min_score = 0.5
+        self.track_min_score = 0.3
         self.min_square_pix_dist_other_objs = 16
 
         self.verbose = verbose
@@ -142,7 +142,7 @@ class ImageSegmentor:
                 self.mode = self.DETECT
                 # Set valid to false
                 output[c_id][-1] = False
-                print('Object '+str(c_id)+':tracked position is too close to another object')
+                print('Object '+str(c_id)+': tracked position is too close to another object')
 
         # dummy_object_ids = list(range(len(self.last_boxes)))  # DEBUG
         tic2 = time.time()
