@@ -7,11 +7,11 @@ t_cam_ego: [0.01504337, -0.06380886, -0.13854437]
 id: 0
 ns: 'person'
 class_str: 'person'
-bound_box_l: 0.3
-bound_box_w: 0.6
-bound_box_h: 2
+bound_box_l: 0.35
+bound_box_w: 0.5
+bound_box_h: 1.8
 b_enforce_0: ['z', 'roll', 'pitch']
-fixed_z: 1
+fixed_z: 0.9
 ---
 id: 1
 ns: 'quad4'
@@ -67,7 +67,7 @@ class_str: 'cup'
 bound_box_l: 0.146434
 bound_box_w: 0.083732
 bound_box_h: 0.114616
-b_enforce_0: ['yaw']
+b_enforce_0: []
 ---
 id: 8
 ns: 'bottle_starbuck_norm'
@@ -131,7 +131,7 @@ class_str: 'cup'
 bound_box_l: 0.134662
 bound_box_w: 0.088348
 bound_box_h: 0.102778
-b_enforce_0: ['yaw']
+b_enforce_0: []
 ---
 id: 16
 ns: 'mug_vignesh_norm'
@@ -139,7 +139,7 @@ class_str: 'cup'
 bound_box_l: 0.112448
 bound_box_w: 0.102444
 bound_box_h: 0.08377
-b_enforce_0: ['yaw']
+b_enforce_0: []
 ---
 id: 17
 ns: 'laptop_air_0_norm'

@@ -1,4 +1,4 @@
-b_enforce_0_yaw: False
+b_enforce_0_yaw: True
 b_enforce_z: False
 b_enforce_0_pitch: False
 b_enforce_0_roll: False
