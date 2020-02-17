@@ -16,6 +16,7 @@ class TrackedObject:
 class ImageSegmentor:
     def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_classes_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5,verbose=False):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
+        print('Using classes '+str(detect_classes_names))
         if detector_name == 'yolov3':
             self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_classes_ids)
         else:
