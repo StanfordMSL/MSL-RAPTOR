@@ -163,7 +163,7 @@ class RaptorLogger:
                 for k, name in enumerate(self.log_data[log_type]['ado_names']):
                     bb_3d_dict_all[name] = all_sizes[4*k : 4*k+4]  # len|wid|hei|diam
                 self.log_data[log_type][dict_str] = bb_3d_dict_all
-    return self.log_data[log_type]
+        return self.log_data[log_type]
 
 
     def write_data_to_log(self, data, name, mode):
