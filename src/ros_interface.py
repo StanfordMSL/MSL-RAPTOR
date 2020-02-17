@@ -19,9 +19,9 @@ import cv2
 
 class ros_interface:
 
-    def __init__(self, b_use_gt_bb=False):
+    def __init__(self, b_use_gt_bb=False,b_verbose=False):
         
-        self.VERBOSE = True
+        self.verbose = b_verbose
 
         # Parameters #############################
         self.im_process_output = []  # what is accessed by the main function after an image is processed
@@ -110,7 +110,8 @@ class ros_interface:
 
         self.latest_img_time = my_time  # DO THIS LAST
         # self.img_seg_mode = self.IGNORE
-        print("Image Callback time: {:.4f}".format(time.time() - tic))
+        if self.verbose:
+            print("Image Callback time: {:.4f}".format(time.time() - tic))
 
 
 

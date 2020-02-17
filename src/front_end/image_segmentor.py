@@ -14,7 +14,7 @@ class TrackedObject:
         self.latest_tracked_state = None
 
 class ImageSegmentor:
-    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5):
+    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_class_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5,verbose=False):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         if detector_name == 'yolov3':
             self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_class_ids)
@@ -66,6 +66,8 @@ class ImageSegmentor:
 
         self.track_min_score = 0.5
         self.min_square_pix_dist_other_objs = 16
+
+        self.verbose = verbose
 
     def stop_tracking_lost_objects(self):
         # Remove objects that triggered detection and were not matched to new detections
@@ -142,7 +144,8 @@ class ImageSegmentor:
 
         # dummy_object_ids = list(range(len(self.last_boxes)))  # DEBUG
         tic2 = time.time()
-        print("track time = {:.4f}".format(tic2- tic))
+        if self.verbose:
+            print("track time = {:.4f}".format(tic2- tic))
         return output
 
     def new_tracked_object(self,class_str):
