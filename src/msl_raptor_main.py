@@ -25,9 +25,12 @@ def run_execution_loop():
     detection_period_ros = rospy.get_param('~detection_period') # In seconds
     objects_sizes_yaml = rospy.get_param('~object_sizes_file')
     objects_used_path = rospy.get_param('~object_used_file')
+    classes_names = rospy.get_param('~classes_names_file')
     b_filter_meas = True
     
     ros = ROS(b_use_gt_bb,b_verbose)  # create a ros interface object
+
+    bb_3d, obj_width, classes_names, classes_ids = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file)  # Parse objects used and associated configurations
 
     if b_use_gt_bb:
         rospy.logwarn("\n\n\n------------- IN DEBUG MODE (Using Ground Truth Bounding Boxes) -------------\n\n\n")
@@ -37,13 +40,15 @@ def run_execution_loop():
         print('Waiting for first image')
         im = ros.get_first_image()
         print('initializing image segmentor!!!!!!')
-        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose)
+        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose,detect_classes_ids=classes_ids,detect_classes_names=classes_names)
         print('initializing DONE - PLAY BAG NOW!!!!!!')
         time.sleep(0.5)
     
     rate = rospy.Rate(30) # max filter rate
     ukf_dict = {}  # key: object_id value: ukf object
-    my_camera, bb_3d, obj_width = init_objects(ros,objects_sizes_yaml,objects_used_path)  # init camera, pose, etc
+    ros.camera = camera(ros)
+    my_camera = ros.camera
+
     ros.create_subs_and_pubs()
     dim_state = 13
     state_est = np.zeros((dim_state + dim_state**2, ))
@@ -125,15 +130,20 @@ def init_state_from_gt(ros, ukf):
     ukf.mu[0:3] += np.array([-2, .5, .5]) 
 
 
-def init_objects(ros,objects_sizes_yaml,objects_used_path):
+def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file):
     # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
-    ros.camera = camera(ros)
 
     with open(objects_used_path) as f:
         objects_used = f.readlines()
     # you may also want to remove whitespace characters like `\n` at the end of each line
     objects_used = [x.strip() for x in objects_used]
 
+    with open(classes_names_file) as f:
+        classes_names = f.readlines()
+    # you may also want to remove whitespace characters like `\n` at the end of each line
+    classes_names = [x.strip() for x in classes_names]
+    classes_used_names = []
+    classes_used_ids = []
     bb_3d = {}
     obj_width = {}
     with open(objects_sizes_yaml, 'r') as stream:
@@ -155,10 +165,18 @@ def init_objects(ros,objects_sizes_yaml,objects_used_path):
                           [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
                     obj_width[obj_dict['class_str']] = 2*half_width
+
+                    # Add the object's class to the classes used, if not there already
+                    if obj_dict['class_str'] not in classes_names:
+                        print('Class '+obj_dict['class_str']+' not found in the list of classes supported')
+                    elif obj_dict['class_str'] not in classes_used_names:
+                        classes_used_names.append(obj_dict['class_str'])
+                        classes_used_ids.append(classes_names.index(obj_dict['class_str']))
+
         except yaml.YAMLError as exc:
             print(exc)
 
-    return ros.camera, bb_3d, obj_width
+    return bb_3d, obj_width, classes_used_names, classes_used_ids
 
 
 def wait_intil_ros_ready(ros, rate):

@@ -48,7 +48,7 @@ def load_mesh(mesh_path, is_save=False, is_normalized=False, is_flipped=False):
 if __name__ == '__main__':
     try:
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
-        mesh_path = "/mounted_folder/obj_models/real_train/"
+        mesh_path = "/Users/benjamin/Documents/Cours/Stanford/msl/pose_estimation/nocs_dataset/obj_models/real_train/"
         obs_paths = glob.glob(mesh_path + '*.obj')
         start_num = 2
         for i, mesh_path in enumerate(obs_paths):
@@ -58,7 +58,7 @@ if __name__ == '__main__':
             class_str = name.split('_')[0].rstrip(digits)
             # print("dims for {}: ".format(name, spans))
             print("---\nid: {}\nns: '{}'\nclass_str: '{}'".format(i + start_num, name, class_str))
-            print("bound_box_l: {}\nbound_box_w: {}\nbound_box_h: {}".format(*spans))
+            print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
             print("b_enforce_0: []")
         print("\n\nDONE!!!")
         

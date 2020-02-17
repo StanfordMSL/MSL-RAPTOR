@@ -1,22 +1,23 @@
 <launch>
-  <arg name="id"               default="7" />
-  <arg name="robot_type"       default="quad" />
-  <arg name="ns"               value="/$(arg robot_type)$(arg id)" />
-  <arg name="b_camera"         default="true" />
-  <arg name="b_use_gt_bb"      default="false" />
-  <arg name="b_enforce_0_yaw"  default="true" />
-  <arg name="b_use_tensorrt"   default="true" />
-  <arg name="b_verbose"        default="false" />
-  <arg name="detection_period" default="5" /> <!-- period to use to redo safety detection in seconds -->
-  <arg name="b_rosbag"         default="false" />  <!-- boolean if we are reading data from a rosbag -->
-  <arg name="shared_folder"    default="/mounted_folder" />  <!-- path to the mounted folder -->
-  <arg name="rb_path_in"       default="$(arg shared_folder)/rosbags_for_post_process" />  <!-- path to the rosbag -->
-  <arg name="rb_path_out"      default="$(arg shared_folder)/raptor_processed_bags" />  <!-- path to the rosbag -->
-  <arg name="rb_name"          default="rosbag_for_post_process_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
-  <arg name="b_record"         default="false" />  <!-- boolean if we are recording data in rosbag -->
-  <arg name="rb_start_delay"   default="2.0" /> <!-- how long to delay the start of the rosbag -->
+  <arg name="id"                  default="7" />
+  <arg name="robot_type"          default="quad" />
+  <arg name="ns"                  value="/$(arg robot_type)$(arg id)" />
+  <arg name="b_camera"            default="true" />
+  <arg name="b_use_gt_bb"         default="false" />
+  <arg name="b_enforce_0_yaw"     default="true" />
+  <arg name="b_use_tensorrt"      default="true" />
+  <arg name="b_verbose"           default="false" />
+  <arg name="detection_period"    default="5" /> <!-- period to use to redo safety detection in seconds -->
+  <arg name="b_rosbag"            default="false" />  <!-- boolean if we are reading data from a rosbag -->
+  <arg name="shared_folder"       default="/mounted_folder" />  <!-- path to the mounted folder -->
+  <arg name="rb_path_in"          default="$(arg shared_folder)/rosbags_for_post_process" />  <!-- path to the rosbag -->
+  <arg name="rb_path_out"         default="$(arg shared_folder)/raptor_processed_bags" />  <!-- path to the rosbag -->
+  <arg name="rb_name"             default="rosbag_for_post_process_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
+  <arg name="b_record"            default="false" />  <!-- boolean if we are recording data in rosbag -->
+  <arg name="rb_start_delay"      default="2.0" /> <!-- how long to delay the start of the rosbag -->
+  <arg name="classes_names_file"  default="$(find msl_raptor)/params/classes.names" /> <!-- yaml file containing all the object sizes -->
   <arg name="object_sizes_file"   default="$(find msl_raptor)/params/all_obs.yaml" /> <!-- yaml file containing all the object sizes -->
-  <arg name="object_used_file"   default="$(find msl_raptor)/params/objects_used/objects_used.txt" /> <!-- yaml file containing all the object sizes -->
+  <arg name="object_used_file"    default="$(find msl_raptor)/params/objects_used/objects_used.txt" /> <!-- yaml file containing the names of objects used -->
 
   <group if="$(arg b_rosbag)">
     <param name="use_sim_time" value="true" />   <!--use the rosbag time instead of the computer's time. If using this use clock option in rosbag-->
@@ -39,6 +40,7 @@
     <param name="b_verbose"  value="$(arg b_verbose)"/>
     <param name="object_sizes_file"  value="$(arg object_sizes_file)"/>
     <param name="object_used_file"  value="$(arg object_used_file)"/>
+    <param name="classes_names_file"  value="$(arg classes_names_file)"/>
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
 
   </node>
