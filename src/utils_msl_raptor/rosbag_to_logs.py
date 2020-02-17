@@ -160,17 +160,17 @@ class rosbags_to_logs:
 
     def convert_rosbag_info_to_log(self):
         # Write params to log file ########
-        log_data = {}
+        param_data = {}
         if self.new_camera_matrix is not None:
-            log_data['K'] = np.array([self.new_camera_matrix[0, 0], self.new_camera_matrix[1, 1], self.new_camera_matrix[0, 2], self.new_camera_matrix[1, 2]])
+            param_data['K'] = np.array([self.new_camera_matrix[0, 0], self.new_camera_matrix[1, 1], self.new_camera_matrix[0, 2], self.new_camera_matrix[1, 2]])
         else:
-            log_data['K'] = np.array([self.K[0, 0], self.K[1, 1], self.K[0, 2], self.K[1, 2]])
+            param_data['K'] = np.array([self.K[0, 0], self.K[1, 1], self.K[0, 2], self.K[1, 2]])
         bb_dim_arr = np.zeros((4*len(self.ado_names)))
         for i, n in enumerate(self.ado_names):
             bb_dim_arr[4*i:4*i+4] = self.bb_3d_dict_all[n]
-        log_data['3d_bb_dims'] = bb_dim_arr
-        log_data['tf_cam_ego'] = np.reshape(self.tf_cam_ego, (16,))
-        self.logger.write_data_to_log(log_data, name='', mode='prms')
+        param_data['3d_bb_dims'] = bb_dim_arr
+        param_data['tf_cam_ego'] = np.reshape(self.tf_cam_ego, (16,))
+        self.logger.write_params(param_data)
         ###################################
 
         print("Post-processing data now")

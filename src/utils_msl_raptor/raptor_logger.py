@@ -12,13 +12,19 @@ from scipy.spatial.transform import Rotation as R
 from ssp_utils import *
 
 class RaptorLogger:
+
     def __init__(self, mode="write", names=None, base_path="./", b_ssp=False):
-        if names is None:
-            raise RuntimeError("Must provide list of names for tracked object")
+
         self.names = names
         self.base_path = base_path
         self.b_ssp = b_ssp
         self.save_elms = {}
+        
+        self.log_data = defaultdict(dict)
+        self.fh = None
+        self.fn = None
+        self.prm_fn = self.base_path + '_prms.log'
+
         self.save_elms['est'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
                                  ('Ado State Est', 'state_est', 13), 
                                  ('Ego State Est', 'ego_state_est', 13), 
@@ -33,13 +39,6 @@ class RaptorLogger:
                                 ('Corner 2D Projections GT (r|c)', 'proj_corners_gt', 8*2), 
                                 ('Angled BB (r|c|w|h|ang_deg)', 'abb', 5),
                                 ('Image Segmentation Mode', 'im_seg_mode', 1)]
-        all_name_str = ''
-        for n in self.names:
-            all_name_str += (n + ' ')
-        all_name_str = all_name_str[:-1]
-        self.save_elms['prms'] = [('Camera Intrinsics (K)', 'K', 4),
-                                  ('Object BB Size (|len|wid|hei|diam) [{}]'.format(all_name_str), '3d_bb_dims', 4*len(self.names)),
-                                  ('tf_cam_ego', 'tf_cam_ego', 16)]
         self.save_elms['ssp'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
                                  ('Ado State GT', 'state_gt', 13), 
                                  ('Ado State Est', 'state_est', 13), 
@@ -49,50 +48,120 @@ class RaptorLogger:
                                  ('3D Corner GT (X|Y|Z)', 'corners_3d_gt', 8*3), 
                                  ('Corner 2D Projections Est (r|c)', 'proj_corners_est', 8*2), 
                                  ('Corner 2D Projections GT (r|c)', 'proj_corners_gt', 8*2)]
-        
-        self.log_data = None
-        self.fh = None
-        self.fn = None
-        if not b_ssp:
-            modes = ['est', 'gt', 'prms']
-        else:
-            modes = ['ssp']
-        if mode == "write":
-            # create files and write headers
-            self.fh = defaultdict(dict)
-            for m in modes:
-                if m == 'prms':
-                    fn = self.base_path + '_' + m + '.log'
-                    self.create_file_dir(fn)
-                    self.fh[m] = open(fn,'w+')  # doing this here makes it appendable
-                    save_el_shape = (len(self.save_elms[m]), len(self.save_elms[m][0]))
-                    data_header = ", ".join(np.reshape([*zip(self.save_elms[m])], save_el_shape)[:,0].tolist())
-                    np.savetxt(self.fh[m], X=[], header=data_header)  # write header
-                    continue
-                for n in names:
-                    # Create logs
-                    fn = self.base_path + '_' + n + '_'+ m + '.log'
-                    self.create_file_dir(fn)
-                    self.fh[m][n] = open(fn,'w+')  # doing this here makes it appendable
-                    save_el_shape = (len(self.save_elms[m]), len(self.save_elms[m][0]))
-                    data_header = ", ".join(np.reshape([*zip(self.save_elms[m])], save_el_shape)[:,0].tolist())
-                    np.savetxt(self.fh[m][n], X=[], header=data_header)  # write header
 
-        elif mode == "read":
-            self.fn = defaultdict(dict)
-            for m in modes:
-                if m == 'prms':
-                    self.fn[m] = self.base_path + '_' + m + '.log'
-                    continue
-                for n in names:
-                    self.fn[m][n] = self.base_path + '_' + n + '_'+ m + '.log'
+        if not b_ssp:
+            self.modes = ['est', 'gt']
+        else:
+            self.modes = ['ssp']
+
+
+        if mode=="read":
+            self.init_read()
+        elif mode=="write":
+            if names is None:
+                raise RuntimeError("Must provide list of names for tracked object")
+            self.init_write()
         else:
             raise RuntimeError("Unrecognized logging mode")
 
 
+    def init_write(self):
+        all_name_str = ''
+        for n in self.names:
+            all_name_str += (n + ' ')
+        all_name_str = all_name_str[:-1]
+        self.save_elms['prms'] = [('Camera Intrinsics (K)', 'K', 4),
+                                    ('tf_cam_ego', 'tf_cam_ego', 16),
+                                    ('Object BB Size (len|wid|hei|diam) [{}]'.format(all_name_str), '3d_bb_dims', 4*len(self.names))]
+
+        # create files and write headers
+        self.fh = defaultdict(dict)
+        for m in self.modes:
+            for n in self.names:
+                # Create logs
+                fn = self.base_path + '_' + n + '_'+ m + '.log'
+                self.create_file_dir(fn)
+                self.fh[m][n] = open(fn,'w+')  # doing this here makes it appendable
+                save_el_shape = (len(self.save_elms[m]), len(self.save_elms[m][0]))
+                data_header = ", ".join(np.reshape([*zip(self.save_elms[m])], save_el_shape)[:,0].tolist())
+                np.savetxt(self.fh[m][n], X=[], header=data_header)  # write header
+        
+
+    def init_read(self):
+        self.save_elms['prms'] = [('Camera Intrinsics (K)', 'K', 4),
+                                    ('tf_cam_ego', 'tf_cam_ego', 16),
+                                    ('Object BB Size (len|wid|hei|diam) []', '3d_bb_dims', -1)]
+        self.read_params()
+        self.fn = defaultdict(dict)
+        for m in self.modes:
+            for n in self.names:
+                self.fn[m][n] = self.base_path + '_' + n + '_'+ m + '.log'
+
+
+    def write_params(self, param_data, mode='prms'):
+        # write header
+        self.create_file_dir(self.prm_fn)
+        prm_fh = open(self.prm_fn,'w+')  # doing this here makes it appendable
+        save_el_shape = (len(self.save_elms[mode]), len(self.save_elms[mode][0]))
+        data_header = ", ".join(np.reshape([*zip(self.save_elms[mode])], save_el_shape)[:,0].tolist())
+        np.savetxt(prm_fh, X=[], header=data_header)  # write header
+        
+        # write body
+        save_el_shape = (len(self.save_elms[mode]), len(self.save_elms[mode][0]))
+        num_to_write = np.sum(np.reshape([*zip(self.save_elms[mode])], save_el_shape)[:,2].astype(int)) 
+        out = np.ones((1, num_to_write)) * 1e10
+        ind = 0
+        for i, (header_str, dict_str, count) in enumerate(self.save_elms[mode]):
+            if dict_str in param_data:
+                try:
+                    out[0, ind:(ind + count)] = param_data[dict_str]
+                except:
+                    print("issue with {}".format(dict_str))
+                    pdb.set_trace()
+            ind += count
+        out[out>1e5] = np.nan
+        np.savetxt(prm_fh, X=out, fmt='%.6f')  # write to file
+        prm_fh.close()
+
+    
+    def read_params(self, log_type='prms'):
+        # get header
+        f = open(self.prm_fn)
+        header_str = f.readline()
+        self.log_data[log_type]['ado_names'] = header_str.split('[')[1].split(']')[0].split(' ')
+        self.names = self.log_data[log_type]['ado_names']
+
+        # Read rest of file
+        data = np.loadtxt(self.prm_fn)
+        f.close()
+        ind = 0
+        for i, (header_str, dict_str, count) in enumerate(self.save_elms[log_type]):
+            if len(data.shape) > 1:
+                self.log_data[log_type][dict_str] = data[:, ind:(ind + count)]
+            else:
+                self.log_data[log_type][dict_str] = data[ind:(ind + count)]
+            ind += count
+            if dict_str == 'K': # Turn camera intrinsics back into a matrix
+                K = np.eye(3)
+                K[0, 0] = self.log_data[log_type][dict_str][0]
+                K[1, 1] = self.log_data[log_type][dict_str][1]
+                K[0, 2] = self.log_data[log_type][dict_str][2]
+                K[1, 2] = self.log_data[log_type][dict_str][3]
+                self.log_data[log_type][dict_str] = K
+            elif dict_str == 'tf_cam_ego':
+                self.log_data[log_type][dict_str] = np.reshape(self.log_data[log_type][dict_str], (4, 4))
+            elif dict_str == '3d_bb_dims':
+                all_sizes = np.asarray(data[ind : ind + 4*len(self.log_data[log_type]['ado_names'])])
+                bb_3d_dict_all = {}
+                for k, name in enumerate(self.log_data[log_type]['ado_names']):
+                    bb_3d_dict_all[name] = all_sizes[4*k : 4*k+4]  # len|wid|hei|diam
+                self.log_data[log_type][dict_str] = bb_3d_dict_all
+
+
+
     def write_data_to_log(self, data, name, mode):
-        """ mode can be est, gt, ssp, or param"""
-        if (not self.b_ssp and not mode in ['est', 'gt', 'prms']) or (self.b_ssp and not mode == 'ssp'):
+        """ mode can be est, gt, ssp"""
+        if (not self.b_ssp and not mode in ['est', 'gt']) or (self.b_ssp and not mode == 'ssp'):
             raise RuntimeError("Mode {} not recognized".format(mode))
         save_el_shape = (len(self.save_elms[mode]), len(self.save_elms[mode][0]))
         num_to_write = np.sum(np.reshape([*zip(self.save_elms[mode])], save_el_shape)[:,2].astype(int)) 
@@ -107,43 +176,27 @@ class RaptorLogger:
                     pdb.set_trace()
             ind += count
         out[out>1e5] = np.nan
-        if mode == 'prms':
-            np.savetxt(self.fh[mode], X=out, fmt='%.6f')  # write to file
-        else:
-            np.savetxt(self.fh[mode][name], X=out, fmt='%.6f')  # write to file
+        np.savetxt(self.fh[mode][name], X=out, fmt='%.6f')  # write to file
 
 
     def read_logs(self, name):
         """
         Return a dict with keys being log type (est /gt /prms). Each of these is a dict with the various types of values in the log
         """
-        log_data = {}
         for log_type in self.fn:
             if not log_type in self.save_elms:
                 print("Warning: we are are missing the log file for {}".format(log_type))
-                continue  
-            log_data[log_type] = {}
+                continue
             ind = 0
-            if m == 'prms':
-                data = np.loadtxt(self.fn[log_type])
-            else:
-                data = np.loadtxt(self.fn[log_type][name])
+            data = np.loadtxt(self.fn[log_type][name])
             for i, (header_str, dict_str, count) in enumerate(self.save_elms[log_type]):
                 if len(data.shape) > 1:
-                    log_data[log_type][dict_str] = data[:, ind:(ind + count)]
+                    self.log_data[log_type][dict_str] = data[:, ind:(ind + count)]
                 else:
-                    log_data[log_type][dict_str] = data[ind:(ind + count)]
+                    self.log_data[log_type][dict_str] = data[ind:(ind + count)]
                 ind += count
-            
-                if log_type == 'prms' and dict_str == 'K': # Turn camera intrinsics back into a matrix
-                    K = np.eye(3)
-                    K[0, 0] = log_data[log_type][dict_str][0]
-                    K[1, 1] = log_data[log_type][dict_str][1]
-                    K[0, 2] = log_data[log_type][dict_str][2]
-                    K[1, 2] = log_data[log_type][dict_str][3]
-                    log_data[log_type][dict_str] = K
-        self.log_data = log_data
-        return log_data
+                
+        return self.log_data
         
 
     def close_files(self):
