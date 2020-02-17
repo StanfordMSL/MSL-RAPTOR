@@ -21,12 +21,13 @@ import yaml
 
 def run_execution_loop():
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb') 
+    b_verbose = rospy.get_param('~b_verbose') 
     detection_period_ros = rospy.get_param('~detection_period') # In seconds
     objects_sizes_yaml = rospy.get_param('~object_sizes_file')
     objects_used_path = rospy.get_param('~object_used_file')
     b_filter_meas = True
     
-    ros = ROS(b_use_gt_bb)  # create a ros interface object
+    ros = ROS(b_use_gt_bb,b_verbose)  # create a ros interface object
 
     if b_use_gt_bb:
         rospy.logwarn("\n\n\n------------- IN DEBUG MODE (Using Ground Truth Bounding Boxes) -------------\n\n\n")
@@ -36,7 +37,7 @@ def run_execution_loop():
         print('Waiting for first image')
         im = ros.get_first_image()
         print('initializing image segmentor!!!!!!')
-        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros)
+        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose)
         print('initializing DONE - PLAY BAG NOW!!!!!!')
         time.sleep(0.5)
     
@@ -91,7 +92,7 @@ def run_execution_loop():
             ukf = None
             if not obj_id in ukf_dict:  # New Object
                 print("new object (id = {}, type = {})".format(obj_id, class_str))
-                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id)
+                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id,verbose=b_verbose)
                 ukf_dict[obj_id].reinit_filter(abb, tf_w_ego)
                 continue
 
@@ -109,7 +110,8 @@ def run_execution_loop():
         ros.im_seg.ukf_dict = ukf_dict
 
         # ros.im_seg_mode = ros.TRACK
-        print("FULL END-TO-END time = {:4f}\n".format(time.time() - tic))
+        if b_verbose:
+            print("FULL END-TO-END time = {:4f}\n".format(time.time() - tic))
         rate.sleep()
         tic = time.time()
         loop_count += 1

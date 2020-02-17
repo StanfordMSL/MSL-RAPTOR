@@ -6,6 +6,7 @@
   <arg name="b_use_gt_bb"      default="false" />
   <arg name="b_enforce_0_yaw"  default="true" />
   <arg name="b_use_tensorrt"   default="true" />
+  <arg name="b_verbose"        default="false" />
   <arg name="detection_period" default="5" /> <!-- period to use to redo safety detection in seconds -->
   <arg name="b_rosbag"         default="false" />  <!-- boolean if we are reading data from a rosbag -->
   <arg name="shared_folder"    default="/mounted_folder" />  <!-- path to the mounted folder -->
@@ -35,6 +36,7 @@
     <param name="b_enforce_0_yaw"  value="$(arg b_enforce_0_yaw)"/> 
     <param name="detection_period"  value="$(arg detection_period)"/> 
     <param name="b_use_tensorrt"  value="$(arg b_use_tensorrt)"/>
+    <param name="b_verbose"  value="$(arg b_verbose)"/>
     <param name="object_sizes_file"  value="$(arg object_sizes_file)"/>
     <param name="object_used_file"  value="$(arg object_used_file)"/>
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />

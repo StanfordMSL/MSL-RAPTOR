@@ -22,9 +22,9 @@ from utils_msl_raptor.math_utils import *
 
 class UKF:
 
-    def __init__(self, camera, bb_3d, obj_width, init_time=0.0, b_use_gt_bb=False, class_str='mslquad', obj_id=0):
+    def __init__(self, camera, bb_3d, obj_width, init_time=0.0, b_use_gt_bb=False, class_str='mslquad', obj_id=0,verbose=False):
 
-        self.VERBOSE = True
+        self.verbose = verbose
 
         # Paramters #############################
         self.dim_state = 13
@@ -198,10 +198,11 @@ class UKF:
         self.itr += 1
         self.itr_time_prev = self.itr_time
         tic1 = time.time()
-        if not b_outer_only:
-            print("update_state: {:.4f}\nTOTAL time (with prints): {:.4f}".format(tic1 - tic, tic1 - tic0))
-        else:
-            print("TOTAL time (no prints): {:.4f}".format(tic1 - tic0))
+        if self.verbose:
+            if not b_outer_only:
+                print("update_state: {:.4f}\nTOTAL time (with prints): {:.4f}".format(tic1 - tic, tic1 - tic0))
+            else:
+                print("TOTAL time (no prints): {:.4f}".format(tic1 - tic0))
 
 
     def update_state(self, z, mu_bar, sig_bar, S, S_inv, S_xz, z_hat):
@@ -378,11 +379,11 @@ class UKF:
             raise RuntimeError('Unknown object type: {}'.format(self.class_str))    
             
         if self.b_enforce_0_roll:
-                next_states[6:10,:] = remove_yaw(quat_new).T
+            next_states[6:10,:] = remove_roll(quat_new).T
         if self.b_enforce_0_pitch:
             next_states[6:10,:] = remove_pitch(quat_new).T
         if self.b_enforce_0_yaw:
-            next_states[6:10,:] = remove_roll(quat_new).T
+            next_states[6:10,:] = remove_yaw(quat_new).T
         
         
 
