@@ -267,7 +267,7 @@ class rosbags_to_logs:
             elif name in self.ado_names_all and topic_name == 'pose' and topic_category == 'vision_pose': # ground truth
                 self.ado_names.add(name)
                 self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
-        
+
         self.t_est = np.sort(list(self.t_est))
         self.t0 = np.min(self.t_est)
         self.tf = np.max(self.t_est)
