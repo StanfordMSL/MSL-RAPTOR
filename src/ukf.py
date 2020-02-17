@@ -379,11 +379,11 @@ class UKF:
             raise RuntimeError('Unknown object type: {}'.format(self.class_str))    
             
         if self.b_enforce_0_roll:
-                next_states[6:10,:] = remove_yaw(quat_new).T
+            next_states[6:10,:] = remove_roll(quat_new).T
         if self.b_enforce_0_pitch:
             next_states[6:10,:] = remove_pitch(quat_new).T
         if self.b_enforce_0_yaw:
-            next_states[6:10,:] = remove_roll(quat_new).T
+            next_states[6:10,:] = remove_yaw(quat_new).T
         
         
 
