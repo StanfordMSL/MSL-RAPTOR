@@ -12,7 +12,14 @@ from scipy.spatial.transform import Rotation as R
 from ssp_utils import *
 
 class RaptorLogger:
+    """
+    This helper class writes to /reads from log files. 
 
+    * save_elms is a class var that defines what variables will be in the log files. There are different ones for estimation, ground truth, ssp, and params
+    * to write, the user will pass in an object name and a dict with keys corresponding to the second element of each tuple in save_elms
+    * to read the user gives the object name, and a dict is passed back
+    * params are treated slightly differently, with their own read/write functions
+    """
     def __init__(self, mode="write", names=None, base_path="./", b_ssp=False):
 
         self.names = names
@@ -156,7 +163,7 @@ class RaptorLogger:
                 for k, name in enumerate(self.log_data[log_type]['ado_names']):
                     bb_3d_dict_all[name] = all_sizes[4*k : 4*k+4]  # len|wid|hei|diam
                 self.log_data[log_type][dict_str] = bb_3d_dict_all
-
+    return self.log_data[log_type]
 
 
     def write_data_to_log(self, data, name, mode):
@@ -183,6 +190,9 @@ class RaptorLogger:
         """
         Return a dict with keys being log type (est /gt /prms). Each of these is a dict with the various types of values in the log
         """
+        if self.names is None:
+            self.log_data[log_type]
+
         for log_type in self.fn:
             if not log_type in self.save_elms:
                 print("Warning: we are are missing the log file for {}".format(log_type))
