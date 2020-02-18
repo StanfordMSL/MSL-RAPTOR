@@ -54,40 +54,52 @@ class PoseMetricTracker:
         self.proj_2d_pr = {}
 
 
-    def translation_error(self, name, t_gt, t_pr):
+    def translation_error(self, name, t_cam_ado_gt, t_cam_ado_pr):
         # Compute translation error
-        trans_dist = np.sqrt(np.sum(np.square(t_gt - t_pr)))
+        trans_dist = np.sqrt(np.sum(np.square(t_cam_ado_gt - t_cam_ado_pr)))
         self.errs_trans[name].append(trans_dist)
         return trans_dist
 
 
-    def angle_error(self, name, R_gt, R_pr):
+    def angle_error(self, name, R_cam_ado_gt, R_cam_ado_pr, tf_w_cam=None):
         # Compute angle error
-        angle_dist = calcAngularDistance(R_gt, R_pr)
+        if tf_w_cam is not None:
+            # do the calculation in world frame
+            R_w_ado_gt = tf_w_cam[0:3, 0:3] @ R_cam_ado_gt
+            R_w_ado_pr = tf_w_cam[0:3, 0:3] @ R_cam_ado_pr
+            angle_dist = calcAngularDistance(R_w_ado_gt, R_w_ado_pr)
+            # print(quat_to_ang(rotm_to_quat(R_w_ado_gt).reshape((1,4))))
+            # print(quat_to_ang(rotm_to_quat(R_w_ado_pr).reshape((1,4))))
+        else:
+            # do the calculation in camera frame... i dont think we want this but i will leave it here as an option
+            print('WARNING - angle error calculations are done in CAMERA frame (if any angles are "enforced" to 0 this will not be clear')
+            angle_dist = calcAngularDistance(R_cam_ado_gt, R_cam_ado_pr)
+            # print(quat_to_ang(rotm_to_quat(R_cam_ado_gt).reshape((1,4))))
+            # print(quat_to_ang(rotm_to_quat(R_cam_ado_pr).reshape((1,4))))
         self.errs_angle[name].append(angle_dist)
         return angle_dist
 
 
-    def pixel_error(self, name, vertices, K, Rt_gt=None, Rt_pr=None, R_gt=None, t_gt=None, R_pr=None, t_pr=None):
+    def pixel_error(self, name, vertices, K, Rt_cam_ado_gt=None, Rt_cam_ado_pr=None, R_cam_ado_gt=None, t_cam_ado_gt=None, R_cam_ado_pr=None, t_cam_ado_pr=None):
         # Compute pixel error
-        if Rt_gt is None:
-            if R_gt is None or t_gt is None:
-                raise RuntimeError("Either Rt_gt or both R_gt and t_gt must be provided for pixel error computation")
-            Rt_gt = np.concatenate((R_gt, t_gt), axis=1)
-        if Rt_pr is None:
-            if R_pr is None or t_pr is None:
-                raise RuntimeError("Either Rt_pr or both R_pr and t_pr must be provided for pixel error computation")
-            Rt_pr = np.concatenate((R_pr, t_pr), axis=1)
+        if Rt_cam_ado_gt is None:
+            if R_cam_ado_gt is None or t_cam_ado_gt is None:
+                raise RuntimeError("Either Rt_cam_ado_gt or both R_cam_ado_gt and t_cam_ado_gt must be provided for pixel error computation")
+            Rt_cam_ado_gt = np.concatenate((R_cam_ado_gt, t_cam_ado_gt), axis=1)
+        if Rt_cam_ado_pr is None:
+            if R_cam_ado_pr is None or t_cam_ado_pr is None:
+                raise RuntimeError("Either Rt_cam_ado_pr or both R_cam_ado_pr and t_cam_ado_pr must be provided for pixel error computation")
+            Rt_cam_ado_pr = np.concatenate((R_cam_ado_pr, t_cam_ado_pr), axis=1)
 
-        self.proj_2d_gt[name] = compute_projection(vertices, Rt_gt, K)
-        self.proj_2d_pr[name] = compute_projection(vertices, Rt_pr, K) 
+        self.proj_2d_gt[name] = compute_projection(vertices, Rt_cam_ado_gt, K)
+        self.proj_2d_pr[name] = compute_projection(vertices, Rt_cam_ado_pr, K) 
         norm         = np.linalg.norm(self.proj_2d_gt[name] - self.proj_2d_pr[name], axis=0)
         pixel_dist   = np.mean(norm)
         self.errs_2d[name].append(pixel_dist)
         return pixel_dist
 
 
-    def corner_2d_error(self, name, vertices=None, corners2D_gt=None, corners2D_pr=None, Rt_gt=None, Rt_pr=None, R_gt=None, t_gt=None, R_pr=None, t_pr=None, K=None):
+    def corner_2d_error(self, name, vertices=None, corners2D_gt=None, corners2D_pr=None, Rt_cam_ado_gt=None, Rt_cam_ado_pr=None, R_cam_ado_gt=None, t_cam_ado_gt=None, R_cam_ado_pr=None, t_cam_ado_pr=None, K=None):
         """
         Compute corner prediction error
         For gt / pr, provide either corners2D, or vertices & Rt & K, or vertices & R & t & K
@@ -95,24 +107,24 @@ class PoseMetricTracker:
         if corners2D_gt is not None:
             pass # we are all good, just use this
         elif vertices is not None or K is None:
-            if Rt_gt is not None:
-                corners2D_gt = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_gt, K).T
-            elif R_gt is not None and t_gt is not None:
-                Rt_gt = np.concatenate((R_gt, t_gt), axis=1)
-                corners2D_gt = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_gt, K).T
-                raise RuntimeError("If corners2D_gt not given, (Rt_gt & K) or (R_gt & t_gt & K) must be provided for 2d corner error computation")
+            if Rt_cam_ado_gt is not None:
+                corners2D_gt = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_cam_ado_gt, K).T
+            elif R_cam_ado_gt is not None and t_cam_ado_gt is not None:
+                Rt_cam_ado_gt = np.concatenate((R_cam_ado_gt, t_cam_ado_gt), axis=1)
+                corners2D_gt = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_cam_ado_gt, K).T
+                raise RuntimeError("If corners2D_gt not given, (Rt_cam_ado_gt & K) or (R_cam_ado_gt & t_cam_ado_gt & K) must be provided for 2d corner error computation")
         else:
             raise RuntimeError("Either corners2D_gt OR vertices & tf info must be provide for 2d corner error computation")
         
         if corners2D_pr is not None:
             pass # we are all good, just use this
         elif vertices is not None:
-            if Rt_pr is not None:
-                corners2D_pr = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_pr, K).T
-            elif R_pr is not None and t_pr is not None:
-                Rt_pr = np.concatenate((R_pr, t_pr), axis=1)
-                corners2D_pr = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_pr, K).T
-                raise RuntimeError("If corners2D_pr not given, (Rt_pr & K) or (R_pr & t_pr & K) must be provided for 2d corner error computation")
+            if Rt_cam_ado_pr is not None:
+                corners2D_pr = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_cam_ado_pr, K).T
+            elif R_cam_ado_pr is not None and t_cam_ado_pr is not None:
+                Rt_cam_ado_pr = np.concatenate((R_cam_ado_pr, t_cam_ado_pr), axis=1)
+                corners2D_pr = compute_projection(np.hstack((np.reshape([0,0,0,1], (4,1)), vertices)), Rt_cam_ado_pr, K).T
+                raise RuntimeError("If corners2D_pr not given, (Rt_cam_ado_pr & K) or (R_cam_ado_pr & t_cam_ado_pr & K) must be provided for 2d corner error computation")
         else:
             raise RuntimeError("Either corners2D_pr OR vertices & tf info must be provide for 2d corner error computation")
             
@@ -124,47 +136,47 @@ class PoseMetricTracker:
         return corner_dist
 
 
-    def corner_3d_error(self, name, vertices, Rt_gt=None, Rt_pr=None, R_gt=None, t_gt=None, R_pr=None, t_pr=None):
+    def corner_3d_error(self, name, vertices, Rt_cam_ado_gt=None, Rt_cam_ado_pr=None, R_cam_ado_gt=None, t_cam_ado_gt=None, R_cam_ado_pr=None, t_cam_ado_pr=None):
         # Compute 3D distances
-        if Rt_gt is None:
-            if R_gt is None or t_gt is None:
-                raise RuntimeError("Either Rt_gt or both R_gt and t_gt must be provided for 3d corner error computation")
-            Rt_gt = np.concatenate((R_gt, t_gt), axis=1)
-        if Rt_pr is None:
-            if R_pr is None or t_pr is None:
-                raise RuntimeError("Either Rt_pr or both R_pr and t_pr must be provided for 3d corner error computation")
-            Rt_pr = np.concatenate((R_pr, t_pr), axis=1)
-        transform_3d_gt   = compute_transformation(vertices, Rt_gt) 
-        transform_3d_pr = compute_transformation(vertices, Rt_pr)  
+        if Rt_cam_ado_gt is None:
+            if R_cam_ado_gt is None or t_cam_ado_gt is None:
+                raise RuntimeError("Either Rt_cam_ado_gt or both R_cam_ado_gt and t_cam_ado_gt must be provided for 3d corner error computation")
+            Rt_cam_ado_gt = np.concatenate((R_cam_ado_gt, t_cam_ado_gt), axis=1)
+        if Rt_cam_ado_pr is None:
+            if R_cam_ado_pr is None or t_cam_ado_pr is None:
+                raise RuntimeError("Either Rt_cam_ado_pr or both R_cam_ado_pr and t_cam_ado_pr must be provided for 3d corner error computation")
+            Rt_cam_ado_pr = np.concatenate((R_cam_ado_pr, t_cam_ado_pr), axis=1)
+        transform_3d_gt   = compute_transformation(vertices, Rt_cam_ado_gt) 
+        transform_3d_pr = compute_transformation(vertices, Rt_cam_ado_pr)  
         norm3d            = np.linalg.norm(transform_3d_gt - transform_3d_pr, axis=0)
         vertex_dist       = np.mean(norm3d)
         self.errs_3d[name].append(vertex_dist)
         return vertex_dist
 
 
-    def update_all_metrics(self, name, vertices, K, corners2D_gt=None, corners2D_pr=None, Rt_gt=None, Rt_pr=None, R_gt=None, t_gt=None, R_pr=None, t_pr=None):
+    def update_all_metrics(self, name, vertices, K, tf_w_cam, corners2D_gt=None, corners2D_pr=None, Rt_cam_ado_gt=None, Rt_cam_ado_pr=None, R_cam_ado_gt=None, t_cam_ado_gt=None, R_cam_ado_pr=None, t_cam_ado_pr=None):
         # Sum errors
-        if Rt_gt is not None:
-            R_gt = Rt_gt[0:3, 0:3]
-            t_gt = Rt_gt[0:3, 3]
-        elif R_gt is not None and t_gt is not None:
-            Rt_gt = np.concatenate((R_gt, t_gt), axis=1)
+        if Rt_cam_ado_gt is not None:
+            R_cam_ado_gt = Rt_cam_ado_gt[0:3, 0:3]
+            t_cam_ado_gt = Rt_cam_ado_gt[0:3, 3]
+        elif R_cam_ado_gt is not None and t_cam_ado_gt is not None:
+            Rt_cam_ado_gt = np.concatenate((R_cam_ado_gt, t_cam_ado_gt), axis=1)
         else:
-            raise RuntimeError("Must provide either Rt_gt or both R_gt and t_gt")
+            raise RuntimeError("Must provide either Rt_cam_ado_gt or both R_cam_ado_gt and t_cam_ado_gt")
 
-        if Rt_pr is not None:
-            R_pr = Rt_pr[0:3, 0:3]
-            t_pr = Rt_pr[0:3, 3]
-        elif R_pr is not None and t_pr is not None:
-            Rt_pr = np.concatenate((R_pr, t_pr), axis=1)
+        if Rt_cam_ado_pr is not None:
+            R_cam_ado_pr = Rt_cam_ado_pr[0:3, 0:3]
+            t_cam_ado_pr = Rt_cam_ado_pr[0:3, 3]
+        elif R_cam_ado_pr is not None and t_cam_ado_pr is not None:
+            Rt_cam_ado_pr = np.concatenate((R_cam_ado_pr, t_cam_ado_pr), axis=1)
         else:
-            raise RuntimeError("Must provide either Rt_pr or both R_pr and t_pr")
+            raise RuntimeError("Must provide either Rt_cam_ado_pr or both R_cam_ado_pr and t_cam_ado_pr")
 
-        self.testing_error_trans[name] += self.translation_error(name, t_gt, t_pr)
-        self.testing_error_angle[name] += self.angle_error(name, R_gt, R_pr)
-        self.corner_2d_error(name, vertices, Rt_gt=Rt_gt, Rt_pr=Rt_pr, K=K)
-        self.corner_3d_error(name, vertices, Rt_gt=Rt_gt, Rt_pr=Rt_pr)
-        self.testing_error_pixel[name] += self.pixel_error(name, vertices, K, Rt_gt, Rt_pr, R_gt, t_gt, R_pr, t_pr)
+        self.testing_error_trans[name] += self.translation_error(name, t_cam_ado_gt, t_cam_ado_pr)
+        self.testing_error_angle[name] += self.angle_error(name, R_cam_ado_gt, R_cam_ado_pr, tf_w_cam=tf_w_cam)
+        self.corner_2d_error(name, vertices, Rt_cam_ado_gt=Rt_cam_ado_gt, Rt_cam_ado_pr=Rt_cam_ado_pr, K=K)
+        self.corner_3d_error(name, vertices, Rt_cam_ado_gt=Rt_cam_ado_gt, Rt_cam_ado_pr=Rt_cam_ado_pr)
+        self.testing_error_pixel[name] += self.pixel_error(name, vertices, K, Rt_cam_ado_gt, Rt_cam_ado_pr, R_cam_ado_gt, t_cam_ado_gt, R_cam_ado_pr, t_cam_ado_pr)
         self.num_measurements[name]    += 1
 
 

@@ -211,20 +211,20 @@ class rosbags_to_logs:
                 tf_cam_ado_est = tf_cam_w @ tf_w_ado_est
                 tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
 
-                R_pr = tf_cam_ado_est[0:3, 0:3]
-                t_pr = tf_cam_ado_est[0:3, 3].reshape((3, 1))
+                R_cam_ado_pr = tf_cam_ado_est[0:3, 0:3]
+                t_cam_ado_pr = tf_cam_ado_est[0:3, 3].reshape((3, 1))
                 tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
-                R_gt = tf_cam_ado_gt[0:3, 0:3]
-                t_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
+                R_cam_ado_gt = tf_cam_ado_gt[0:3, 0:3]
+                t_cam_ado_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
                 
-                print("name = {}, i = {}, t_est = {}, t_gt = {}".format(name, i, t_est, calcAngularDistance(R_gt, R_pr)))
+                print("name = {}, i = {}, t_est = {}, t_gt = {}".format(name, i, t_est, calcAngularDistance(R_cam_ado_gt, R_cam_ado_pr)))
                 # angs_est = quat_to_ang(rotm_to_quat(tf_w_ado_est[0:3, 0:3]).reshape((1,4)))
                 # angs_gt = quat_to_ang(rotm_to_quat(tf_w_ado_gt[0:3, 0:3]).reshape((1,4)))
-                # pdb.set_trace()
+                # # pdb.set_trace()
                 ######################################################
                 
                 if self.raptor_metrics is not None:
-                    self.raptor_metrics.update_all_metrics(name=name, vertices=vertices, R_gt=R_gt, t_gt=t_gt, R_pr=R_pr, t_pr=t_pr, K=self.new_camera_matrix)
+                    self.raptor_metrics.update_all_metrics(name=name, vertices=vertices, tf_w_cam=tf_w_cam, R_cam_ado_gt=R_cam_ado_gt, t_cam_ado_gt=t_cam_ado_gt, R_cam_ado_pr=R_cam_ado_pr, t_cam_ado_pr=t_cam_ado_pr, K=self.new_camera_matrix)
 
                 # Write data to log file #############################
                 log_data['time'] = t_est
