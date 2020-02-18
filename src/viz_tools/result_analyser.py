@@ -247,11 +247,11 @@ class ResultAnalyser:
                 tf_cam_ado_est = tf_cam_w @ tf_w_ado_est
                 tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
 
-                R_pr = tf_cam_ado_est[0:3, 0:3]
-                t_pr = tf_cam_ado_est[0:3, 3].reshape((3, 1))
+                R_cam_ado_pr = tf_cam_ado_est[0:3, 0:3]
+                t_cam_ado_pr = tf_cam_ado_est[0:3, 3].reshape((3, 1))
                 tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
-                R_gt = tf_cam_ado_gt[0:3, 0:3]
-                t_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
+                R_cam_ado_gt = tf_cam_ado_gt[0:3, 0:3]
+                t_cam_ado_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
 
                 box_length, box_width, box_height, diam = self.bb_3d_dict_all[name]
                 vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
@@ -263,7 +263,7 @@ class ResultAnalyser:
                                     [-box_length/2, box_width/2,-box_height/2, 1.],
                                     [-box_length/2, box_width/2, box_height/2, 1.]]).T
                 
-                self.raptor_metrics.update_all_metrics(name=name, vertices=vertices, R_gt=R_gt, t_gt=t_gt, R_pr=R_pr, t_pr=t_pr, K=self.new_camera_matrix)
+                self.raptor_metrics.update_all_metrics(name=name, vertices=vertices, tf_w_cam=tf_w_cam, R_cam_ado_gt=R_cam_ado_gt, t_cam_ado_gt=t_cam_ado_gt, R_cam_ado_pr=R_cam_ado_pr, t_cam_ado_pr=t_cam_ado_pr, K=self.new_camera_matrix)
                 ######################################################
 
         self.raptor_metrics.calc_final_metrics()
