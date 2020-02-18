@@ -104,7 +104,7 @@ def run_execution_loop():
                 if b_use_gt_init:
                     approx_position = ukf_dict[obj_id].approx_position_from_bb(abb, tf_w_ego)
                     gt_pose = ros.get_closest_pose(class_str,approx_position)
-                    ukf_dict[obj_id].reinit_filter_from_gt(gt_pos,gt_orientation)
+                    ukf_dict[obj_id].reinit_filter_from_gt(gt_pose)
                 else:
                     ukf_dict[obj_id].reinit_filter_approx(abb, tf_w_ego)
                 continue
@@ -115,7 +115,6 @@ def run_execution_loop():
 
             if ukf_dict[obj_id] is not None:
                 ukf_dict[obj_id].step_ukf(abb, tf_ego_w, loop_time)  # update ukf
-        
         ros.publish_filter_state(obj_ids_tracked,ukf_dict)#, ukf_dict[obj_id].mu, ukf_dict[obj_id].itr_time, ukf_dict[obj_id].itr)  # send vector with time, iteration, state_est
         ros.publish_bb_msg(processed_image,im_seg_mode, loop_time)# obj_ids_tracked, abb, im_seg_mode, loop_time)
         
@@ -181,9 +180,9 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file):
                     elif obj_dict['class_str'] not in classes_used_names:
                         classes_used_names.append(obj_dict['class_str'])
                         classes_used_ids.append(classes_names.index(obj_dict['class_str']))
-                        objects_names_per_class[class_str] = [obj_dict['ns']]
+                        objects_names_per_class[obj_dict['class_str']] = [obj_dict['ns']]
                     else:
-                        objects_names_per_class[class_str].append(obj_dict['ns'])
+                        objects_names_per_class[obj_dict['class_str']].append(obj_dict['ns'])
 
 
         except yaml.YAMLError as exc:

@@ -416,16 +416,14 @@ class UKF:
         im_coor = z*np.array([bb[0],bb[1],1.0])
         pos = self.camera.new_camera_matrix_inv @ im_coor
         pos = tf_w_ego @ inv_tf(self.camera.tf_cam_ego) @ np.concatenate([pos, [1]])
-        return pos
+        return pos[:3]
 
-
-        self.init_filter_elements(mu)
 
     def reinit_filter_approx(self,bb,tf_w_ego):
         """
         Initialize a state with approximations using a single bounding box
         """
-        pos = approx_position_from_bb(bb,tf_w_ego)
+        pos = self.approx_position_from_bb(bb,tf_w_ego)
         mu = np.array([pos[0],pos[1],pos[2],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
         self.init_filter_elements(mu)
 
@@ -434,7 +432,7 @@ class UKF:
         """
         Initialize a state with groundtruth pose
         """
-        mu = np.array([pose[0],pose[1],pose[2],0.,0.,0.,pose[3],pose[4],pose[5],[6],0.,0.,0.])
+        mu = np.array([pose[0],pose[1],pose[2],0.,0.,0.,pose[3],pose[4],pose[5],pose[6],0.,0.,0.])
         self.init_filter_elements(mu)
 
 
