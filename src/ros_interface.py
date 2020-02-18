@@ -191,8 +191,10 @@ class ros_interface:
             pose_obj = pose_msg_to_array(self.latest_tracked_poses[obj_name])
             dist = np.linalg.norm(pos-pose_obj[:3])
             if dist < max_dist:
-                dist = max_dist
+                max_dist = dist
                 pose = pose_obj
+                obj_name_kept = obj_name
+        print("Initialized tracking based on "+obj_name_kept+' - dist '+str(dist))
         return pose
 
 
