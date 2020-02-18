@@ -13,7 +13,7 @@ import cv2
 # math
 import numpy as np
 import numpy.linalg as la
-import rospy
+
 # libs & utils
 from utils_msl_raptor.ukf_utils import *
 from utils_msl_raptor.ros_utils import *
@@ -408,19 +408,33 @@ class UKF:
         return mu_bar, sig_bar
 
 
-    def reinit_filter(self,bb,tf_w_ego):
+    def approx_position_from_bb(self,bb,tf_w_ego):
         """
         Initialize a state with approximations using a single bounding box
         """
         z = self.camera.new_camera_matrix[0,0]* self.obj_width /bb[2]
         im_coor = z*np.array([bb[0],bb[1],1.0])
         pos = self.camera.new_camera_matrix_inv @ im_coor
-
-        # NOT TESTED YET
         pos = tf_w_ego @ inv_tf(self.camera.tf_cam_ego) @ np.concatenate([pos, [1]])
-        mu = np.array([pos[0],pos[1],pos[2],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
-        # mu = np.array([pos[2],-pos[0],-pos[1],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
+        return pos
 
+
+        self.init_filter_elements(mu)
+
+    def reinit_filter_approx(self,bb,tf_w_ego):
+        """
+        Initialize a state with approximations using a single bounding box
+        """
+        pos = approx_position_from_bb(bb,tf_w_ego)
+        mu = np.array([pos[0],pos[1],pos[2],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
+        self.init_filter_elements(mu)
+
+
+    def reinit_filter_from_gt(self,pose):
+        """
+        Initialize a state with groundtruth pose
+        """
+        mu = np.array([pose[0],pose[1],pose[2],0.,0.,0.,pose[3],pose[4],pose[5],[6],0.,0.,0.])
         self.init_filter_elements(mu)
 
 

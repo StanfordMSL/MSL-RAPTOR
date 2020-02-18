@@ -20,7 +20,8 @@ from image_segmentor import ImageSegmentor
 import yaml
 
 def run_execution_loop():
-    b_use_gt_bb = rospy.get_param('~b_use_gt_bb') 
+    b_use_gt_bb = rospy.get_param('~b_use_gt_bb')
+    b_use_gt_init = rospy.get_param('~b_use_gt_init')  
     b_verbose = rospy.get_param('~b_verbose') 
     detection_period_ros = rospy.get_param('~detection_period') # In seconds
     objects_sizes_yaml = rospy.get_param('~object_sizes_file')
@@ -28,9 +29,11 @@ def run_execution_loop():
     classes_names_file = rospy.get_param('~classes_names_file')
     b_filter_meas = True
     
-    ros = ROS(b_use_gt_bb,b_verbose)  # create a ros interface object
+    ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_init)  # create a ros interface object
 
-    bb_3d, obj_width, classes_names, classes_ids = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file)  # Parse objects used and associated configurations
+    bb_3d, obj_width, classes_names, classes_ids, objects_names_per_class = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file)  # Parse objects used and associated configurations
+
+    ros.objects_names_per_class = objects_names_per_class
 
     if b_use_gt_bb:
         rospy.logwarn("\n\n\n------------- IN DEBUG MODE (Using Ground Truth Bounding Boxes) -------------\n\n\n")
@@ -98,7 +101,12 @@ def run_execution_loop():
             if not obj_id in ukf_dict:  # New Object
                 print("new object (id = {}, type = {})".format(obj_id, class_str))
                 ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id,verbose=b_verbose)
-                ukf_dict[obj_id].reinit_filter(abb, tf_w_ego)
+                if b_use_gt_init:
+                    approx_position = ukf_dict[obj_id].approx_position_from_bb(abb, tf_w_ego)
+                    gt_pose = ros.get_closest_pose(class_str,approx_position)
+                    ukf_dict[obj_id].reinit_filter_from_gt(gt_pos,gt_orientation)
+                else:
+                    ukf_dict[obj_id].reinit_filter_approx(abb, tf_w_ego)
                 continue
 
             obj_ids_tracked.append(obj_id)
@@ -146,6 +154,7 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file):
     classes_used_ids = []
     bb_3d = {}
     obj_width = {}
+    objects_names_per_class = {}
     with open(objects_sizes_yaml, 'r') as stream:
         try:
             obj_prms = list(yaml.load_all(stream))
@@ -172,11 +181,15 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file):
                     elif obj_dict['class_str'] not in classes_used_names:
                         classes_used_names.append(obj_dict['class_str'])
                         classes_used_ids.append(classes_names.index(obj_dict['class_str']))
+                        objects_names_per_class[class_str] = [obj_dict['ns']]
+                    else:
+                        objects_names_per_class[class_str].append(obj_dict['ns'])
+
 
         except yaml.YAMLError as exc:
             print(exc)
 
-    return bb_3d, obj_width, classes_used_names, classes_used_ids
+    return bb_3d, obj_width, classes_used_names, classes_used_ids,objects_names_per_class
 
 
 def wait_intil_ros_ready(ros, rate):

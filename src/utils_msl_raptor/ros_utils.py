@@ -16,6 +16,13 @@ try:
 except:
     from math_utils import *
 
+def pose_msg_to_array(pose):
+    """
+    returns [x,y,z,qw,qx,qy,qz]
+    """
+    return [pose.position.x, pose.position.y, pose.position.z, pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
+
+
 def pose_to_tf(pose):
     """
     tf_w_q (w:world, q:quad) s.t. if a point is in the quad frame (p_q) then

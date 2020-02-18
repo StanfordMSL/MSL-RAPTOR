@@ -19,7 +19,7 @@ import cv2
 
 class ros_interface:
 
-    def __init__(self, b_use_gt_bb=False,b_verbose=False):
+    def __init__(self, b_use_gt_bb=False,b_verbose=False,b_use_gt_init=False):
         
         self.verbose = b_verbose
 
@@ -45,7 +45,11 @@ class ros_interface:
             self.ado_pose_gt_rosmsg = None
             rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.ado_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
         ##########################
-    
+
+        # Just used for initializing from groundtruth
+        self.objects_names_per_class = None
+        self.b_use_gt_init  = b_use_gt_init
+
     def get_first_image(self):
         return self.bridge.imgmsg_to_cv2(rospy.wait_for_message(self.ns + '/camera/image_raw',Image), desired_encoding="bgr8")
 
@@ -56,6 +60,12 @@ class ros_interface:
         rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', TrackedObjects, queue_size=5)
         self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', AngledBboxes, queue_size=5)
+
+        if self.b_use_gt_init:
+            # Create dict to store pose for each object
+            self.latest_tracked_poses = {}
+            for obj_name in self.objects_names_per_class.values():
+                rospy.Subscriber(obj_name + '/mavros/vision_pose/pose', PoseStamped, self.tracked_objects_poses_cb, 'obj_name',queue_size=5)
         ####################################################################
 
     def ado_pose_gt_cb(self, msg):
@@ -168,3 +178,21 @@ class ros_interface:
             bb_list_msg.boxes.append(bb_msg)
 
         self.bb_data_pub.publish(bb_list_msg)
+
+    def tracked_objects_poses_cb(self, msg, obj_name):
+        self.latest_tracked_poses[obj_name] = msg.pose
+
+    def get_closest_pose(self,class_str,pos):
+        """
+        Finds the closest object of a specific class to a given position using its groundtruth pose
+        """
+        max_dist = np.inf
+        for obj_name in self.objects_names_per_class[class_str]:
+            pose_obj = pose_msg_to_array(self.latest_tracked_poses[obj_name])
+            dist = np.linalg.norm(pos-pose_obj[:3])
+            if dist < max_dist:
+                dist = max_dist
+                pose = pose_obj
+        return pose
+
+
