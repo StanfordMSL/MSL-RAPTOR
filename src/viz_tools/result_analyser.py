@@ -32,7 +32,7 @@ class ResultAnalyser:
 
     def __init__(self, log_identifier, source='raptor', ego_quad_ns="/quad7", ado_quad_ns="/quad4"):
         us_split = log_identifier.split("_")
-        if log_identifier[-4:] == '.bag' or "_".join(us_split[0:3]) == 'msl_raptor_output':
+        if log_identifier[-4:] == '.bag' or ("_".join(us_split[0:3]) == 'msl_raptor_output' or "_".join(us_split[0:4]) == 'rosbag_for_post_process'):
             # This means id is the source rosbag name for the log files
             if log_identifier[-4:] == '.bag':
                 log_base_name = "log_" + us_split[-1][:-4]
@@ -42,6 +42,7 @@ class ResultAnalyser:
             # we assume this is the log's name (w/o EST/GT/PARAMS etc)
             log_base_name = "_".join(us_split[:-1])
         else:
+            pdb.set_trace()
             raise RuntimeError("We do not recognize log file! {} not understood".format(log_identifier))
 
         log_in_dir = '/mounted_folder/' + source + '_logs'
@@ -293,6 +294,11 @@ class ResultAnalyser:
                     self.pitch_ssp[name] *= 180/np.pi
                     self.yaw_ssp[name] *= 180/np.pi
                 ang_type = 'deg'
+
+            self.yaw_gt[name][self.yaw_gt[name] < 0.0001] = 0
+            self.yaw_est[name][self.yaw_est[name] < 0.0001] = 0
+            if b_ssp:
+                self.yaw_ssp[name][self.yaw_ssp[name] < 0.0001] = 0
 
             self.x_gt_plt, = self.axes[0,0].plot(self.t_gt[name], self.x_gt[name], gt_line_style)
             self.x_est_plt, = self.axes[0,0].plot(self.t_est[name], self.x_est[name], est_line_style)
