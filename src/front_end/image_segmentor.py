@@ -14,7 +14,7 @@ class TrackedObject:
         self.latest_tracked_state = None
 
 class ImageSegmentor:
-    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_classes_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5,verbose=False):
+    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_classes_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5,verbose=False, b_axis_aligned_bb=False):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         print('Using classes '+str(detect_classes_names))
         if detector_name == 'yolov3':
@@ -42,6 +42,7 @@ class ImageSegmentor:
         self.TRACK = 2
 
         self.mode = self.DETECT
+        self.b_axis_aligned_bb = b_axis_aligned_bb
 
         # Pixels added around the bounding box used to initialize tracker
         # self.box_buffer = -10

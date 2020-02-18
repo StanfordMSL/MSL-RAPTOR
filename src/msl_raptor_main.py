@@ -27,6 +27,7 @@ def run_execution_loop():
     objects_used_path = rospy.get_param('~object_used_file')
     classes_names_file = rospy.get_param('~classes_names_file')
     b_filter_meas = True
+    b_axis_aligned_bb = True
     
     ros = ROS(b_use_gt_bb,b_verbose)  # create a ros interface object
 
@@ -40,7 +41,7 @@ def run_execution_loop():
         print('Waiting for first image')
         im = ros.get_first_image()
         print('initializing image segmentor!!!!!!')
-        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose,detect_classes_ids=classes_ids,detect_classes_names=classes_names)
+        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose,detect_classes_ids=classes_ids,detect_classes_names=classes_names, b_axis_aligned_bb=b_axis_aligned_bb)
         print('initializing DONE - PLAY BAG NOW!!!!!!')
         time.sleep(0.5)
     
@@ -97,7 +98,7 @@ def run_execution_loop():
             ukf = None
             if not obj_id in ukf_dict:  # New Object
                 print("new object (id = {}, type = {})".format(obj_id, class_str))
-                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id,verbose=b_verbose)
+                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id,verbose=b_verbose, b_axis_aligned_bb=b_axis_aligned_bb)
                 ukf_dict[obj_id].reinit_filter(abb, tf_w_ego)
                 continue
 

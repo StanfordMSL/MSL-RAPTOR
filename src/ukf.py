@@ -22,7 +22,7 @@ from utils_msl_raptor.math_utils import *
 
 class UKF:
 
-    def __init__(self, camera, bb_3d, obj_width, init_time=0.0, b_use_gt_bb=False, class_str='mslquad', obj_id=0,verbose=False):
+    def __init__(self, camera, bb_3d, obj_width, init_time=0.0, b_use_gt_bb=False, class_str='mslquad', obj_id=0,verbose=False,b_axis_aligned_bb=False):
 
         self.verbose = verbose
 
@@ -35,6 +35,7 @@ class UKF:
 
         self.class_str = class_str  # class name (string) e.g. 'person' or 'mslquad'
         self.obj_id = obj_id  # a unique int classifier
+        self.b_axis_aligned_bb = b_axis_aligned_bb
         
         if self.class_str == 'mslquad':
             yaml_file = "mslquad_ukf_params.yaml"
@@ -302,9 +303,23 @@ class UKF:
         # minAreaRect sometimes flips the w/h and angle from how we want the output to be
         # to fix this, we can use boxPoints to get the x,y of the bb rect, and use our function
         # to get the output in the form we want 
-        rect = cv2.minAreaRect(np.fliplr(bb_rc_list.astype('float32')))  # apparently float64s cause this function to fail
-        box = cv2.boxPoints(rect)
-        output = bb_corners_to_angled_bb(box, output_coord_type='xy')
+        if self.b_axis_aligned_bb:
+            print("WARNING - we are using axis-aligned bounding boxes!!")
+            output = np.zeros((5,))
+            max_x = np.max(bb_rc_list[:, 0])
+            min_x = np.min(bb_rc_list[:, 0])
+            max_y = np.max(bb_rc_list[:, 1])
+            min_y = np.min(bb_rc_list[:, 1])
+            output[0] = np.mean([max_x, min_x])
+            output[1] = np.mean([max_y, min_y])
+            output[2] = max_x - min_x
+            output[3] = max_y - min_y
+            print(bb_rc_list)
+            print(output)
+        else:
+            rect = cv2.minAreaRect(np.fliplr(bb_rc_list.astype('float32')))  # apparently float64s cause this function to fail
+            box = cv2.boxPoints(rect)
+            output = bb_corners_to_angled_bb(box, output_coord_type='xy')
         return output
 
 
