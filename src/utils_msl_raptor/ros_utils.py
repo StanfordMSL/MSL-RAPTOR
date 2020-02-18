@@ -70,6 +70,12 @@ def find_closest_by_time(time_to_match, time_list, message_list=None):
         return message_list[0], 0
     if pos == len(time_list):
         return message_list[-1], len(message_list) - 1
+
+    if pos - 1 < 0:
+        return message_list[0], 0
+    elif pos - 1 >= len(time_list):
+        return time_list[-1], len(time_list)
+        
     before = time_list[pos - 1]
     after = time_list[pos]
     if after - time_to_match < time_to_match - before:
