@@ -64,8 +64,8 @@ class ros_interface:
         if self.b_use_gt_init:
             # Create dict to store pose for each object
             self.latest_tracked_poses = {}
-            for obj_name in self.objects_names_per_class.values():
-                rospy.Subscriber(obj_name + '/mavros/vision_pose/pose', PoseStamped, self.tracked_objects_poses_cb, 'obj_name',queue_size=5)
+            for obj_name in sum(self.objects_names_per_class.values(),[]):
+                rospy.Subscriber(obj_name + '/mavros/vision_pose/pose', PoseStamped, self.tracked_objects_poses_cb, obj_name,queue_size=5)
         ####################################################################
 
     def ado_pose_gt_cb(self, msg):
@@ -191,8 +191,10 @@ class ros_interface:
             pose_obj = pose_msg_to_array(self.latest_tracked_poses[obj_name])
             dist = np.linalg.norm(pos-pose_obj[:3])
             if dist < max_dist:
-                dist = max_dist
+                max_dist = dist
                 pose = pose_obj
+                obj_name_kept = obj_name
+        print("Initialized tracking based on "+obj_name_kept+' - dist '+str(dist))
         return pose
 
 
