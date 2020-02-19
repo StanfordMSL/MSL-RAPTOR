@@ -310,7 +310,7 @@ class UKF:
             else:
                 alt_ang = output[-1] + np.pi/2
             alt_box = (output[0], output[1], output[3], output[2], alt_ang)
-            if la.norm(measurement[0:3] - output[0:3]) > la.norm(measurement[0:3] - alt_box[0:3]):
+            if la.norm(measurement[0:4] - output[0:4]) > la.norm(measurement[0:4] - alt_box[0:4]):
                 output = alt_box
         return output
 
