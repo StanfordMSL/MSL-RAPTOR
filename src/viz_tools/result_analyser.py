@@ -34,19 +34,21 @@ class ResultAnalyser:
         us_split = log_identifier.split("_")
         if log_identifier[-4:] == '.bag' or ("_".join(us_split[0:3]) == 'msl_raptor_output' or "_".join(us_split[0:4]) == 'rosbag_for_post_process'):
             # This means id is the source rosbag name for the log files
-            if log_identifier[-4:] == '.bag':
-                log_base_name = "log_" + us_split[-1][:-4]
+            if "_".join(us_split[0:3]) == 'msl_raptor_output':
+                log_base_name = "log_" + "_".join(us_split[5:7])
             else:
-                log_base_name = "log_" + us_split[-1]
+                log_base_name = "log_" + "_".join(us_split[6:8])
         elif log_identifier[0:3] == 'log':
             # we assume this is the log's name (w/o EST/GT/PARAMS etc)
-            log_base_name = "_".join(us_split[:-1])
+            log_base_name = "_".join(us_split[0:2])
         else:
             pdb.set_trace()
             raise RuntimeError("We do not recognize log file! {} not understood".format(log_identifier))
 
         log_in_dir = '/mounted_folder/' + source + '_logs'
         base_path = log_in_dir + "/" + log_base_name
+        pdb.set_trace()
+
         self.logger = RaptorLogger(mode="read", base_path=base_path, b_ssp=False)
         self.b_degrees = True  # use degrees or radians
 
