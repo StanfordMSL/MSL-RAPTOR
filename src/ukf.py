@@ -303,7 +303,8 @@ class UKF:
         box = cv2.boxPoints(rect)
         output = bb_corners_to_angled_bb(box, output_coord_type='xy')
 
-        if measurement is not None and np.abs(output[-1] - measurement[-1]):
+        ang_thesh = np.deg2rad(20)  # angle threshold for considering alternative box rotation
+        if measurement is not None and np.abs(output[-1] - measurement[-1]) > ang_thesh:
             alt_ang = -np.sign(output[-1]) * (np.pi - output[-1])  # negative complement of angle
             if abs(alt_ang - measurement[-1]) < abs(alt_ang - measurement[-1]):
                 print("itr {}: using alt box!".format(self.itr))
