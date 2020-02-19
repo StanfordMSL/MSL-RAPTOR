@@ -1,0 +1,82 @@
+<launch>
+  <arg name="id"                  default="7" />
+  <arg name="robot_type"          default="quad" />
+  <arg name="ns"                  value="/$(arg robot_type)$(arg id)" />
+  <arg name="b_camera"            default="false" />
+  <arg name="b_use_gt_bb"         default="false" />
+  <arg name="b_use_gt_init"       default="true" />
+  <arg name="b_enforce_0_yaw"     default="false" />
+  <arg name="b_use_tensorrt"      default="false" />
+  <arg name="b_verbose"           default="false" />
+  <arg name="detection_period"    default="5" /> <!-- period to use to redo safety detection in seconds -->
+  <arg name="b_rosbag"            default="true" />  <!-- boolean if we are reading data from a rosbag -->
+  <arg name="shared_folder"       default="/mounted_folder" />  <!-- path to the mounted folder -->
+  <arg name="rb_path_in"          default="$(arg shared_folder)/nocs/train" />  <!-- path to the rosbag -->
+  <arg name="rb_path_out"         default="$(arg shared_folder)/raptor_processed_bags" />  <!-- path to the rosbag -->
+  <arg name="rb_name"             default="scene_1" /> <!-- name of the rosbag -->
+  <arg name="b_record"            default="true" />  <!-- boolean if we are recording data in rosbag -->
+  <arg name="rb_start_delay"      default="2.0" /> <!-- how long to delay the start of the rosbag -->
+  <arg name="classes_names_file"  default="$(find msl_raptor)/params/classes.names" /> <!-- yaml file containing all the object sizes -->
+  <arg name="object_sizes_file"   default="$(find msl_raptor)/params/all_obs.yaml" /> <!-- yaml file containing all the object sizes -->
+  <arg name="object_used_path"    default="$(find msl_raptor)/params/objects_used/" /> <!-- yaml file containing the names of objects used -->
+  <arg name="object_used_file"    default="objects_used_nocs_1.txt" /> <!-- yaml file containing the names of objects used -->
+
+  <group if="$(arg b_rosbag)">
+    <param name="use_sim_time" value="true" />   <!--use the rosbag time instead of the computer's time. If using this use clock option in rosbag-->
+  </group>
+  <group unless="$(arg b_rosbag)">
+    <param name="use_sim_time" value="false" />
+  </group>
+  
+  <node pkg="tf" type="static_transform_publisher" name="trans_pub_map_world"
+        args="0 0 0 0 0 0 /map /world 10"> 
+  </node>
+
+  <!-- Launch our main node -->
+  <node name="MSL_RAPTOR" pkg="msl_raptor" type="msl_raptor_main.py" output="screen">
+    <param name="ns"  value="$(arg ns)"/> 
+    <param name="b_use_gt_bb"  value="$(arg b_use_gt_bb)"/> 
+    <param name="b_use_gt_init"  value="$(arg b_use_gt_init)"/> 
+    <param name="b_enforce_0_yaw"  value="$(arg b_enforce_0_yaw)"/> 
+    <param name="detection_period"  value="$(arg detection_period)"/> 
+    <param name="b_use_tensorrt"  value="$(arg b_use_tensorrt)"/>
+    <param name="b_verbose"  value="$(arg b_verbose)"/>
+    <param name="object_sizes_file"  value="$(arg object_sizes_file)"/>
+    <param name="object_used_file"  value="$(arg object_used_path)$(arg object_used_file)"/>
+    <param name="classes_names_file"  value="$(arg classes_names_file)"/>
+    <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id)_nocs.yaml" />
+
+  </node>
+
+  <!-- IF using camera, launch our node -->
+  <group unless="$(arg b_rosbag)">
+    <group if="$(arg b_camera)">
+      <group ns="$(arg ns)">
+        <include file="$(find ocam_msl)/launch/ocam_ros.launch" >
+            <arg name="resolution"       value="0"/> <!-- These are the default cropping configurations from Ocam:  resolution: 0: 1280x960, 1: 1280x720, 2: 640x480, 3: 640x360    frame_rate: USB3.0 - 1280x960@45fps, 1280x720@60fps, 640x480@80fps, 320x240@160fps   USB2.0 - 1280x960@22.5fps, 1280x720@30fps, 640x480@80fps, 320x240@160fps -->
+            <arg name="frame_rate"       value="22.5"/>
+            <arg name="image_width"      value="640"/>
+            <arg name="image_height"     value="480" />
+            <arg name="camera_frame_id"  value="$(arg ns)/camera" />
+        </include>
+      </group>
+    </group>
+  </group>
+
+  <!-- IF using rosbag, launch our node then play the rosbag (using a delay to ensure msl_raptor starts first) -->
+  <group if="$(arg b_rosbag)">
+    <node pkg="rosbag" type="play" name="player" args="--clock $(arg rb_path_in)/$(arg rb_name).bag" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
+  </group>
+
+  <!-- IF we should record a rosbag of results -->
+  <group if="$(arg b_record)">
+    <group if="$(arg b_record)">
+      <!-- if FROM a rosbag (i.e. post-processed), then use the name of the source rosbag to name the newly output bag -->
+      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-O $(arg rb_path_out)/msl_raptor_output_from_bag_$(arg rb_name) -a"/>
+    </group>
+    <group unless="$(arg b_rosbag)">
+      <!-- if NOT from a rosbag (i.e. live), then use the current timestamp to name the bag -->
+      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ -a"/>
+  </group>
+  </group>
+</launch>
