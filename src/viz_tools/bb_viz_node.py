@@ -36,7 +36,7 @@ class bb_viz_node:
 
         self.bridge = CvBridge()
         self.img_buffer = ([], [])
-        self.img_rosmesg_buffer_len = 50
+        self.img_rosmesg_buffer_len = 500
 
         self.ns = rospy.get_param('~ns')  # robot namespace
         self.overlaid_img = None
