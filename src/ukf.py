@@ -168,7 +168,7 @@ class UKF:
             tic = time.time()
         pred_meas = np.zeros((self.dim_meas, sps.shape[1]))
         for sp_ind in range(sps.shape[1]):
-            pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], tf_ego_w)
+            pred_meas[:, sp_ind] = self.predict_measurement(sps_recalc[:, sp_ind], tf_ego_w, measurement=measurement)
         if not b_outer_only:
             print("pred_meas: {:.4f}".format(time.time() - tic))
 
@@ -275,20 +275,17 @@ class UKF:
         return z_hat, S, S_inv
 
 
-    def predict_measurement(self, state, tf_ego_w):
+    def predict_measurement(self, state, tf_ego_w, measurement=None):
         """
         OUTPUT: (col[x], row[y], width, height, angle[RADIANS])
         use camera model & relative states to predict the angled 2d 
         bounding box seen by the ego drone 
+        Pass in actual measurement to help resolve 90deg box rotation ambiguities 
         """
 
         # get relative transform from camera to quad
         tf_w_quad = state_to_tf(state)
         tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
-        # tf_cam_quad = np.array([[-0.0956 ,  -0.9951  ,  0.0258 ,  -0.1867],
-        #                          [   0.0593,   -0.0316,   -0.9977,    0.6696],
-        #                          [   0.9936 ,  -0.0939 ,   0.0620,    4.7865],
-        #                          [       0  ,       0 ,        0 ,   1.0000]])
 
         # tranform 3d bounding box from quad frame to camera frame
         bb_3d_cam = (tf_cam_quad @ self.bb_3d.T).T[:, 0:3]
@@ -305,6 +302,16 @@ class UKF:
         rect = cv2.minAreaRect(np.fliplr(bb_rc_list.astype('float32')))  # apparently float64s cause this function to fail
         box = cv2.boxPoints(rect)
         output = bb_corners_to_angled_bb(box, output_coord_type='xy')
+        
+        ang_thesh = np.deg2rad(35)  # angle threshold for considering alternative box rotation
+        if np.abs(output[-1]) > ang_thesh or (measurement is not None and np.abs(measurement[-1]) > ang_thesh):
+            if output[-1] < 0:
+                alt_ang = output[-1] + np.pi/2
+            else:
+                alt_ang = output[-1] + np.pi/2
+            alt_box = (output[0], output[1], output[3], output[2], alt_ang)
+            if la.norm(measurement[0:3] - output[0:3]) > la.norm(measurement[0:3] - alt_box[0:3]):
+                output = alt_box
         return output
 
 
