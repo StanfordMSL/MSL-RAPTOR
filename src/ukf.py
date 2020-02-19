@@ -305,17 +305,18 @@ class UKF:
 
         ang_thesh = np.deg2rad(20)  # angle threshold for considering alternative box rotation
         if measurement is not None and np.abs(output[-1] - measurement[-1]) > ang_thesh:
+            print("considering swapping box angle")
             alt_ang = -np.sign(output[-1]) * (np.pi - output[-1])  # negative complement of angle
             if abs(alt_ang - measurement[-1]) < abs(alt_ang - measurement[-1]):
                 print("itr {}: using alt box!".format(self.itr))
                 print(measurement)
                 print(output)
-                print(alt_box)
+                print(alt_ang)
                 output[-1] = alt_ang 
                 w = output[2]
                 h = output[3]
                 output[2] = h
-                output[1] = w
+                output[3] = w
 
         return output
 
