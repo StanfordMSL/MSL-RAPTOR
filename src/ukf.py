@@ -304,14 +304,18 @@ class UKF:
         output = bb_corners_to_angled_bb(box, output_coord_type='xy')
 
         if measurement is not None and np.abs(output[-1] - measurement[-1]):
-            alt_ang = -sign(output[-1]) * (np.pi - output[-1])  # negative complement of angle
+            alt_ang = -np.sign(output[-1]) * (np.pi - output[-1])  # negative complement of angle
             if abs(alt_ang - measurement[-1]) < abs(alt_ang - measurement[-1]):
+                print("itr {}: using alt box!".format(self.itr))
+                print(measurement)
+                print(output)
+                print(alt_box)
                 output[-1] = alt_ang 
                 w = output[2]
                 h = output[3]
                 output[2] = h
                 output[1] = w
-                
+
         return output
 
 
