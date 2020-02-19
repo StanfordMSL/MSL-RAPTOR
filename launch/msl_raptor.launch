@@ -13,7 +13,7 @@
   <arg name="shared_folder"       default="/mounted_folder" />  <!-- path to the mounted folder -->
   <arg name="rb_path_in"          default="$(arg shared_folder)/rosbags_for_post_process" />  <!-- path to the rosbag -->
   <arg name="rb_path_out"         default="$(arg shared_folder)/raptor_processed_bags" />  <!-- path to the rosbag -->
-  <arg name="rb_name"             default="rosbag_for_post_process_2019-11-13-13-30-13" /> <!-- name of the rosbag -->
+  <arg name="rb_name"             default="rosbag_for_post_process_2019-12-18-15-19-48" /> <!-- name of the rosbag -->
   <arg name="b_record"            default="false" />  <!-- boolean if we are recording data in rosbag -->
   <arg name="rb_start_delay"      default="2.0" /> <!-- how long to delay the start of the rosbag -->
   <arg name="classes_names_file"  default="$(find msl_raptor)/params/classes.names" /> <!-- yaml file containing all the object sizes -->
