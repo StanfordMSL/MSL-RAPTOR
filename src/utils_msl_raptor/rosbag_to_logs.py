@@ -78,7 +78,7 @@ class rosbags_to_logs:
         self.ado_names_all = []  # all names we could possibly recognize
         self.bb_3d_dict_all = defaultdict(list)  # turns the name into the len, width, height, and diam of the object
         self.tf_cam_ego = None
-        self.obj_name_to_class_str_dict = {}
+        self.class_str_to_name_dict = defaultdict(list)
         self.b_enforce_0_dict = {}
         self.fixed_vals = {}
         self.read_yaml()
@@ -129,7 +129,7 @@ class rosbags_to_logs:
         self.logger.close_files()
 
 
-    def find_closest_pose_est_by_class_and_time(self, tf_w_ado_gt, candidate_poses, close_cutoff=0.5):
+    def find_closest_pose_est_by_class_and_time(self, tf_w_ado_gt_dict, candidate_poses, candidate_object_names, close_cutoff=0.5):
         """
         first narrow the field by distance, then once things are "close" start using angle also
         """
@@ -174,37 +174,54 @@ class rosbags_to_logs:
         ###################################
 
         print("Post-processing data now")
-        for name in self.ado_names:
-            print("--------------- {}  ----------------".format(name))
-            log_data = {}
-            box_length, box_width, box_height, diam = self.bb_3d_dict_all[name]
-            vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
-                                 [ box_length/2, box_width/2,-box_height/2, 1.],
-                                 [ box_length/2,-box_width/2,-box_height/2, 1.],
-                                 [ box_length/2,-box_width/2, box_height/2, 1.],
-                                 [-box_length/2,-box_width/2, box_height/2, 1.],
-                                 [-box_length/2,-box_width/2,-box_height/2, 1.],
-                                 [-box_length/2, box_width/2,-box_height/2, 1.],
-                                 [-box_length/2, box_width/2, box_height/2, 1.]]).T
-            for i, t_est in enumerate(self.t_est):
-                if t_est < 0:
+        for i, t_est in enumerate(self.t_est):
+            if t_est < 0:
+                continue
+
+            # at a given time, look at what classes were seen. compile all objects of these classes into a list
+            candidate_name_class = []
+            classes_seen_this_itr = self.ado_est_pose_BY_TIME_BY_CLASS[t_est].keys()
+            for class_str in classes_seen_this_itr:
+                for name in self.class_str_to_name_dict[class_str]:
+                    candidate_name_class.append((name, class_str))
+
+            # for each object seen, find the closest ground truth pose
+            corespondences = []
+            for name, class_str in candidate_name_class:
+                candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
+                if candidate_poses is None or len(candidate_poses) == 0 or not name in self.t_gt:
                     continue
-                # extract data in form for logging
                 t_gt, gt_ind = find_closest_by_time(t_est, self.t_gt[name])
+                tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[name][gt_ind])
+
+                # try each candidate pose
+                min_dist_err = 1e10
+                for ado_pose in candidate_poses:
+                    tf_w_ado_est = pose_to_tf(ado_pose)
+                    dist_err = la.norm(tf_w_ado_est[0:3, 3] - tf_w_ado_gt[0:3, 3])
+                    if dist_err < min_dist_err:
+                        min_dist_err = dist_err
+                        best_corr = (tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt)
+                corespondences.append(best_corr)
+                
+            if len(corespondences) == 0:
+                continue
+            for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt in corespondences:
+                log_data = {}
+                box_length, box_width, box_height, diam = self.bb_3d_dict_all[name]
+                vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
+                                     [ box_length/2, box_width/2,-box_height/2, 1.],
+                                     [ box_length/2,-box_width/2,-box_height/2, 1.],
+                                     [ box_length/2,-box_width/2, box_height/2, 1.],
+                                     [-box_length/2,-box_width/2, box_height/2, 1.],
+                                     [-box_length/2,-box_width/2,-box_height/2, 1.],
+                                     [-box_length/2, box_width/2,-box_height/2, 1.],
+                                     [-box_length/2, box_width/2, box_height/2, 1.]]).T
+                
                 tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[gt_ind])
 
                 pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
                 tf_w_ego_est = pose_to_tf(pose_msg)
-                
-                tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[name][gt_ind])
-
-                class_str = self.obj_name_to_class_str_dict[name]
-                if class_str not in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
-                    continue  # this means we didnt see this object at this time... i think...
-                candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
-                tf_w_ado_est = self.find_closest_pose_est_by_class_and_time(tf_w_ado_gt, candidate_poses)
-                if tf_w_ado_est is None:
-                    continue  # there was no plausible candidate
 
                 tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
                 tf_cam_w = inv_tf(tf_w_cam)
@@ -311,11 +328,12 @@ class rosbags_to_logs:
                         R_delta = R_deltax @ R_deltay @ R_deltaz
                         self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
                     else:
+                        class_str = obj_dict['class_str']
                         self.ado_names_all.append(name)
                         l = float(obj_dict['bound_box_l']) 
                         w = float(obj_dict['bound_box_w'])
                         h = float(obj_dict['bound_box_h'])
-                        self.obj_name_to_class_str_dict[name] = obj_dict['class_str']
+                        self.class_str_to_name_dict[class_str].append(name)
                         if 'diam' in obj_dict:
                             d = obj_dict['diam']
                         else:
@@ -375,6 +393,7 @@ class rosbags_to_logs:
             self.t_gt[name].append(msg.header.stamp.to_sec())
         else:
             self.t_gt[name].append(t)
+        
         pose = enforce_constraints_pose(msg.pose, self.b_enforce_0_dict[name], self.fixed_vals[name])
         self.ado_gt_pose[name].append(pose)
 
