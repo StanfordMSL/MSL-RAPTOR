@@ -304,7 +304,7 @@ class UKF:
         output = bb_corners_to_angled_bb(box, output_coord_type='xy')
 
         ang_thesh = np.deg2rad(20)  # angle threshold for considering alternative box rotation
-        if measurement is not None and np.abs(output[-1] - measurement[-1]) > ang_thesh:
+        if measurement is not None and (np.abs(output[-1]) > ang_thesh or np.abs(measurement[-1]) > ang_thesh):
             print("considering swapping box angle")
             alt_ang = -np.sign(output[-1]) * (np.pi - output[-1])  # negative complement of angle
             if abs(alt_ang - measurement[-1]) < abs(alt_ang - measurement[-1]):
