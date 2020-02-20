@@ -30,7 +30,7 @@ from pose_metrics import *
 
 class ResultAnalyser:
 
-    def __init__(self, log_identifier, source='raptor', ego_quad_ns="/quad7", ado_quad_ns="/quad4"):
+    def __init__(self, log_identifier, source='raptor', ego_quad_ns="/quad7", ado_quad_ns="/quad4", b_ssp=False):
         us_split = log_identifier.split("_")
         if log_identifier[-4:] == '.bag' or ("_".join(us_split[0:3]) == 'msl_raptor_output' or "_".join(us_split[0:4]) == 'rosbag_for_post_process'):
             # This means id is the source rosbag name for the log files
@@ -47,9 +47,12 @@ class ResultAnalyser:
 
         log_in_dir = '/mounted_folder/' + source + '_logs'
         base_path = log_in_dir + "/" + log_base_name
-        pdb.set_trace()
+        base_path_ssp = '/mounted_folder/ssp_logs/' + log_base_name
 
         self.logger = RaptorLogger(mode="read", base_path=base_path, b_ssp=False)
+        self.logger_ssp = None
+        if os.path.isfile(base_path_ssp + '_quad4_ssp.log'):
+            self.logger_ssp = RaptorLogger(mode="read", base_path=base_path_ssp, b_ssp=True)
         self.b_degrees = True  # use degrees or radians
 
         self.fig = None
@@ -204,23 +207,26 @@ class ResultAnalyser:
                 self.ego_est_pose[name] = np.concatenate((self.ego_est_pose[name], np.reshape([0,0,0,1]*n, (n,1,4))), axis=1)
 
             
-            # extract ssp
-            if 'ssp' in log_data:
-                self.ssp_data[name] = log_data['ssp']
-                self.t_ssp[name] = self.ssp_data[name]['time']
-                ssp_ado_state_est_mat = self.ssp_data[name]['state_est']
-                self.x_ssp[name] = ssp_ado_state_est_mat[:, 0]
-                self.y_ssp[name] = ssp_ado_state_est_mat[:, 1]
-                self.z_ssp[name] = ssp_ado_state_est_mat[:, 2]
-                rpy_mat = quat_to_ang(ssp_ado_state_est_mat[:, 6:10])
-                self.roll_ssp[name] = rpy_mat[:, 0]
-                self.pitch_ssp[name] = rpy_mat[:, 1]
-                self.yaw_ssp[name] = rpy_mat[:, 2]
-                
-                n = len(ssp_ado_state_est_mat)
-                self.ssp_ado_est_pose[name] = np.concatenate((quat_to_rotm(ssp_ado_state_est_mat[:, 6:10]), 
-                                                            np.expand_dims(ssp_ado_state_est_mat[:, 0:3], axis=2)), axis=2)
-                self.ssp_ado_est_pose[name] = list(np.concatenate((self.ssp_ado_est_pose[name], np.reshape([0,0,0,1]*n, (n,1,4))), axis=1))
+        # extract ssp
+        if self.logger_ssp is not None:
+            name = 'quad4'
+            pdb.set_trace()
+
+            self.ssp_data[name] = self.logger_ssp.read_logs(name=name)['ssp']
+            self.t_ssp[name] = self.ssp_data[name]['time']
+            ssp_ado_state_est_mat = self.ssp_data[name]['state_est']
+            self.x_ssp[name] = ssp_ado_state_est_mat[:, 0]
+            self.y_ssp[name] = ssp_ado_state_est_mat[:, 1]
+            self.z_ssp[name] = ssp_ado_state_est_mat[:, 2]
+            rpy_mat = quat_to_ang(ssp_ado_state_est_mat[:, 6:10])
+            self.roll_ssp[name] = rpy_mat[:, 0]
+            self.pitch_ssp[name] = rpy_mat[:, 1]
+            self.yaw_ssp[name] = rpy_mat[:, 2]
+            
+            n = len(ssp_ado_state_est_mat)
+            self.ssp_ado_est_pose[name] = np.concatenate((quat_to_rotm(ssp_ado_state_est_mat[:, 6:10]), 
+                                                        np.expand_dims(ssp_ado_state_est_mat[:, 0:3], axis=2)), axis=2)
+            self.ssp_ado_est_pose[name] = list(np.concatenate((self.ssp_ado_est_pose[name], np.reshape([0,0,0,1]*n, (n,1,4))), axis=1))
 
 
     def quant_eval(self):
@@ -360,13 +366,19 @@ if __name__ == '__main__':
         elif len(sys.argv) == 2:
             my_log_identifier = sys.argv[1]
             my_data_source = "raptor"
+            my_b_ssp = False
         elif len(sys.argv) == 3:
             my_log_identifier = sys.argv[1]
             my_data_source = sys.argv[2]
-        elif len(sys.argv) > 3:
+            my_b_ssp = False
+        elif len(sys.argv) == 4:
+            my_log_identifier = sys.argv[1]
+            my_data_source = sys.argv[2]
+            my_b_ssp = bool(sys.argv[2])
+        elif len(sys.argv) > 4:
             raise RuntimeError("too many arguments, only pass in the rosbag name or source rosbag name (w/ or w/o .bag)")
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
-        program = ResultAnalyser(log_identifier=my_log_identifier, source=my_data_source)
+        program = ResultAnalyser(log_identifier=my_log_identifier, source=my_data_source, b_ssp=my_b_ssp)
         input("\nPress enter to close program\n")
         
     except:
