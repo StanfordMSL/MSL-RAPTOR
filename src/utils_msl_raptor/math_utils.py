@@ -185,3 +185,10 @@ def condensed_to_square(k, n):
     i = calc_row_idx(k, n)
     j = calc_col_idx(k, i, n)
     return i, j
+
+def corners_to_aligned_bb(corners):
+    top_l_x = min(corners[:,0])
+    top_l_y = min(corners[:,1])
+    w = max(corners[:,0]) - top_l_x
+    h = max(corners[:,1]) - top_l_y
+    return(top_l_x,top_l_y,w,h)

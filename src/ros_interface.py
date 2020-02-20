@@ -48,6 +48,7 @@ class ros_interface:
 
         # Just used for initializing from groundtruth
         self.objects_names_per_class = None
+        self.bb_3d = None
         self.b_use_gt_pose_init  = b_use_gt_pose_init
         self.b_use_gt_detect_bb = b_use_gt_detect_bb
 
@@ -206,10 +207,14 @@ class ros_interface:
         return pose
 
 
-    # def get_gt_boxes(self):
-    #     gt_boxes = []
-    #     for class_str, obj_name in self.objects_names_per_class:
-    #         (x,y,w,h) = ...pose_msg_to_array(self.latest_tracked_poses[obj_name])
-    #         gt_boxes.append((x,y,w,h,1.,1.,self.im_seg.class_str_to_id[class_str]))
-    #     return gt_boxes
+    def get_gt_boxes(self):
+        gt_boxes = []
+        for class_str, obj_name in self.objects_names_per_class:
+            pose = pose_msg_to_array(self.latest_tracked_poses[obj_name])
+            tf_w_ado = quat_to_tf(pose[3:])
+            tf_w_ado[:,3] = pose[:3]
+            proj_corners = pose_to_3d_bb_proj(tf_w_ado,self.tf_w_ego,self.bb[class_str],self.camera)
+            (x,y,w,h) = corners_to_aligned_bb(proj_corners)
+            gt_boxes.append((x,y,w,h,1.,1.,self.im_seg.class_str_to_id[class_str]))
+        return gt_boxes
 

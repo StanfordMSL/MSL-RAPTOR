@@ -38,6 +38,7 @@ def run_execution_loop():
     bb_3d, obj_width, classes_names, classes_ids, objects_names_per_class = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file)  # Parse objects used and associated configurations
 
     ros.objects_names_per_class = objects_names_per_class
+    ros.bb_3d = bb_3d
 
     if b_use_gt_bb:
         rospy.logwarn("\n\n\n------------- IN DEBUG MODE (Using Ground Truth Bounding Boxes) -------------\n\n\n")
