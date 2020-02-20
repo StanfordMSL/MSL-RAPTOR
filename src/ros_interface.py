@@ -19,7 +19,7 @@ import cv2
 
 class ros_interface:
 
-    def __init__(self, b_use_gt_bb=False,b_verbose=False,b_use_gt_init=False):
+    def __init__(self, b_use_gt_bb=False,b_verbose=False,b_use_gt_pose_init=False,b_use_gt_detect_bb=False):
         
         self.verbose = b_verbose
 
@@ -48,7 +48,8 @@ class ros_interface:
 
         # Just used for initializing from groundtruth
         self.objects_names_per_class = None
-        self.b_use_gt_init  = b_use_gt_init
+        self.b_use_gt_pose_init  = b_use_gt_pose_init
+        self.b_use_gt_detect_bb = b_use_gt_detect_bb
 
     def get_first_image(self):
         return self.bridge.imgmsg_to_cv2(rospy.wait_for_message(self.ns + '/camera/image_raw',Image), desired_encoding="bgr8")
@@ -61,7 +62,7 @@ class ros_interface:
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', TrackedObjects, queue_size=5)
         self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', AngledBboxes, queue_size=5)
 
-        if self.b_use_gt_init:
+        if self.b_use_gt_pose_init or self.b_use_gt_detect_bb:
             # Create dict to store pose for each object
             self.latest_tracked_poses = {}
             for obj_name in sum(self.objects_names_per_class.values(),[]):
@@ -116,8 +117,11 @@ class ros_interface:
             image = cv2.undistort(image, self.camera.K, self.camera.dist_coefs, None, self.camera.new_camera_matrix)
         
         self.latest_bb_method = self.im_seg.mode
-        self.im_process_output = self.im_seg.process_image(image,my_time)
-
+        if self.b_use_gt_detect_bb:
+            gt_bbs = self.get_gt_boxes()
+            self.im_process_output = self.im_seg.process_image(image,my_time,gt_bbs)
+        else:
+            self.im_process_output = self.im_seg.process_image(image,my_time)
         self.latest_img_time = my_time  # DO THIS LAST
         # self.img_seg_mode = self.IGNORE
         if self.verbose:
@@ -197,4 +201,11 @@ class ros_interface:
         print("Initialized tracking based on "+obj_name_kept+' - dist '+str(dist))
         return pose
 
+
+    # def get_gt_boxes(self):
+    #     gt_boxes = []
+    #     for class_str, obj_name in self.objects_names_per_class:
+    #         (x,y,w,h) = ...pose_msg_to_array(self.latest_tracked_poses[obj_name])
+    #         gt_boxes.append((x,y,w,h,1.,1.,self.im_seg.class_str_to_id[class_str]))
+    #     return gt_boxes
 

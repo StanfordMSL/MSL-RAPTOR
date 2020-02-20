@@ -302,16 +302,16 @@ class UKF:
         rect = cv2.minAreaRect(np.fliplr(bb_rc_list.astype('float32')))  # apparently float64s cause this function to fail
         box = cv2.boxPoints(rect)
         output = bb_corners_to_angled_bb(box, output_coord_type='xy')
-
-        ang_thesh = np.deg2rad(20)  # angle threshold for considering alternative box rotation
-        alt_ang = -np.sign(output[-1]) * (np.pi/2 - np.abs(output[-1]))  # negative complement of angle
-        
-        if (abs(alt_ang - measurement[-1]) < abs(output[-1] - measurement[-1])) and np.abs((np.abs(measurement[-1] - output[-1]) - np.pi/2)) < ang_thesh:
-            output[-1] = alt_ang 
-            w = output[2]
-            h = output[3]
-            output[2] = h
-            output[3] = w
+        if measurement is not None:
+            ang_thesh = np.deg2rad(20)  # angle threshold for considering alternative box rotation
+            alt_ang = -np.sign(output[-1]) * (np.pi/2 - np.abs(output[-1]))  # negative complement of angle
+            
+            if (abs(alt_ang - measurement[-1]) < abs(output[-1] - measurement[-1])) and np.abs((np.abs(measurement[-1] - output[-1]) - np.pi/2)) < ang_thesh:
+                output[-1] = alt_ang 
+                w = output[2]
+                h = output[3]
+                output[2] = h
+                output[3] = w
         return output
 
 

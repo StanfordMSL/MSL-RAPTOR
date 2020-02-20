@@ -14,7 +14,7 @@ class TrackedObject:
         self.latest_tracked_state = None
 
 class ImageSegmentor:
-    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_classes_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5,verbose=False):
+    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_classes_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5,verbose=False, use_track_checks=True, use_gt_detect_bb=False):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         print('Using classes '+str(detect_classes_names))
         if detector_name == 'yolov3':
@@ -28,7 +28,8 @@ class ImageSegmentor:
             raise RuntimeError("Tracker chosen not implemented")
 
 
-        self.class_map = dict(zip(detect_classes_ids, detect_classes_names))
+        self.class_id_to_str = dict(zip(detect_classes_ids, detect_classes_names))
+        self.class_str_to_id = dict(zip(detect_classes_names,detect_classes_ids))
 
         self.active_objects_ids_per_class = {}
         self.tracked_objects = []
@@ -70,6 +71,8 @@ class ImageSegmentor:
         self.min_square_pix_dist_other_objs = 16
 
         self.verbose = verbose
+        self.use_track_checks = use_track_checks
+        self.use_gt_detect_bb = use_gt_detect_bb
 
     def stop_tracking_lost_objects(self):
         # Remove objects that triggered detection and were not matched to new detections
@@ -80,27 +83,60 @@ class ImageSegmentor:
         self.last_lost_objects = []
 
 
-    def process_image(self,image,time):
+    def process_image(self,image,time,gt_boxes=None):
+        '''
+        Process an image by running detection and/or tracking and returning the bouding box, according to the state of the image segmentor.
+        The gt_boxes is an optional argument which is used when using ground-truth for the detected boxes
+        gt_boxes format: list of tuples: [(x,y,w,h,class_conf,obj_conf,class_id),...] where x and y are top left corner positions.
+        ''' 
         if self.mode == self.DETECT:
-            bbs_no_angle = self.detect(image)  # returns a list of tuples: [(bb, class conf, object conf, class_id), ...]
+            if self.use_gt_detect_bb:
+                if not gt_boxes:
+                    RuntimeError('Trying to use groundtruth boxes for detection, but none were given')
+                bbs_no_angle = gt_boxes
+            else:
+                bbs_no_angle = self.detect(image)  # returns a list of tuples: [(bb, class conf, object conf, class_id), ...]
             self.last_detection_time = time
             # No detections
             if len(bbs_no_angle) == 0:
                 print("Did not detect object")
                 self.stop_tracking_lost_objects()
-                return self.track(image)
+                self.track(image)
+            
             # Add buffer around detections
             bbs_no_angle[:,2:4] += self.box_buffer
             # Detections to reinit tracker
             self.reinit_tracker(bbs_no_angle, image)
+            output = self.track(image)
             self.mode = self.TRACK
-            return self.track(image)
+            return output
         elif self.mode == self.TRACK:
-            self.check_periodic_detection(time)
+            if self.use_track_checks:
+                self.check_periodic_detection(time)
             return self.track(image)
-            
-        
+
     def track(self,image):
+        if self.use_track_checks:
+            return self.track_with_checks(image)
+        else:
+            return self.track_without_checks(image)
+
+    def track_without_checks(self,image):
+        tic = time.time()
+        output = {}
+        # Go over each active tracked object
+        for obj_id in sum(self.active_objects_ids_per_class.values(),[]):
+            self.tracked_objects[obj_id].latest_tracked_state, abb, mask = self.tracker.track(image,self.tracked_objects[obj_id].latest_tracked_state)
+            abb = bb_corners_to_angled_bb(abb.reshape(-1,2))
+           
+            output[obj_id] = [abb,self.tracked_objects[obj_id].class_str, valid]
+
+        tic2 = time.time()
+        if self.verbose:
+            print("track time = {:.4f}".format(tic2- tic))
+        return output
+
+    def track_with_checks(self,image):
         tic = time.time()
         output = {}
         prev_positions = []
@@ -108,8 +144,6 @@ class ImageSegmentor:
         obj_ids = []
         # Go over each active tracked object
         for obj_id in sum(self.active_objects_ids_per_class.values(),[]):
-            
-
             prev_pos= self.tracked_objects[obj_id].latest_tracked_state['target_pos']
             self.tracked_objects[obj_id].latest_tracked_state, abb, mask = self.tracker.track(image,self.tracked_objects[obj_id].latest_tracked_state)
             abb = bb_corners_to_angled_bb(abb.reshape(-1,2))
@@ -156,10 +190,11 @@ class ImageSegmentor:
         return obj_id
 
 
+
     def reinit_tracker(self,new_boxes,image):
         new_active_objects_ids = []
         for new_box in new_boxes:
-            class_str = self.class_map[new_box[-1]]
+            class_str = self.class_id_to_str[new_box[-1]]
             if class_str not in self.active_objects_ids_per_class or len(self.active_objects_ids_per_class[class_str]) == 0:
                 # No active objects of this class
                 obj_id = self.new_tracked_object(class_str)
@@ -232,7 +267,7 @@ class ImageSegmentor:
 
     def valid_detection(self, detection):
         bb = detection[:4]
-        class_str = self.class_map[detection[-1]]
+        class_str = self.class_id_to_str[detection[-1]]
         # Left side in image
         if (bb[0]) < self.min_pix_from_edge:
             return False

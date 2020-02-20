@@ -4,7 +4,9 @@
   <arg name="ns"                  value="/$(arg robot_type)$(arg id)" />
   <arg name="b_camera"            default="false" />
   <arg name="b_use_gt_bb"         default="false" />
-  <arg name="b_use_gt_init"       default="true" />
+  <arg name="b_use_gt_pose_init"  default="true" />
+  <arg name="b_use_gt_detect_bb"    default="true" />
+  <arg name="b_use_track_checks"  default="false" />
   <arg name="b_enforce_0_yaw"     default="false" />
   <arg name="b_use_tensorrt"      default="false" />
   <arg name="b_verbose"           default="false" />
@@ -36,7 +38,9 @@
   <node name="MSL_RAPTOR" pkg="msl_raptor" type="msl_raptor_main.py" output="screen">
     <param name="ns"  value="$(arg ns)"/> 
     <param name="b_use_gt_bb"  value="$(arg b_use_gt_bb)"/> 
-    <param name="b_use_gt_init"  value="$(arg b_use_gt_init)"/> 
+    <param name="b_use_gt_pose_init"  value="$(arg b_use_gt_pose_init)"/> 
+    <param name="b_use_gt_detect_bb"  value="$(arg b_use_gt_detect_bb)"/> 
+    <param name="b_use_track_checks"  value="$(arg b_use_track_checks)"/> 
     <param name="b_enforce_0_yaw"  value="$(arg b_enforce_0_yaw)"/> 
     <param name="detection_period"  value="$(arg detection_period)"/> 
     <param name="b_use_tensorrt"  value="$(arg b_use_tensorrt)"/>

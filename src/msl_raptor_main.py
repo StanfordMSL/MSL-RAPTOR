@@ -21,7 +21,9 @@ import yaml
 
 def run_execution_loop():
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb')
-    b_use_gt_init = rospy.get_param('~b_use_gt_init')  
+    b_use_gt_pose_init = rospy.get_param('~b_use_gt_pose_init')  
+    b_use_gt_detect_bb = rospy.get_param('~b_use_gt_detect_bb')  
+    b_use_track_checks = rospy.get_param('~b_use_track_checks')  
     b_verbose = rospy.get_param('~b_verbose') 
     detection_period_ros = rospy.get_param('~detection_period') # In seconds
     objects_sizes_yaml = rospy.get_param('~object_sizes_file')
@@ -29,7 +31,7 @@ def run_execution_loop():
     classes_names_file = rospy.get_param('~classes_names_file')
     b_filter_meas = True
     
-    ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_init)  # create a ros interface object
+    ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb  # create a ros interface object
 
     bb_3d, obj_width, classes_names, classes_ids, objects_names_per_class = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file)  # Parse objects used and associated configurations
 
@@ -43,7 +45,7 @@ def run_execution_loop():
         print('Waiting for first image')
         im = ros.get_first_image()
         print('initializing image segmentor!!!!!!')
-        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose,detect_classes_ids=classes_ids,detect_classes_names=classes_names)
+        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose,detect_classes_ids=classes_ids,detect_classes_names=classes_names, use_track_checks=b_use_track_checks, use_gt_detect_bb=b_use_gt_detect_bb)
         print('initializing DONE - PLAY BAG NOW!!!!!!')
         time.sleep(0.5)
     
@@ -101,7 +103,7 @@ def run_execution_loop():
             if not obj_id in ukf_dict:  # New Object
                 print("new object (id = {}, type = {})".format(obj_id, class_str))
                 ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id,verbose=b_verbose)
-                if b_use_gt_init:
+                if b_use_gt_pose_init:
                     approx_position = ukf_dict[obj_id].approx_position_from_bb(abb, tf_w_ego)
                     gt_pose = ros.get_closest_pose(class_str,approx_position)
                     ukf_dict[obj_id].reinit_filter_from_gt(gt_pose)
