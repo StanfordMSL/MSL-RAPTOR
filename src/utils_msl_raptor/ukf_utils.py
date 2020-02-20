@@ -196,3 +196,15 @@ def enforce_constraints_pose(pose, b_enforce_0_dict, fixed_vals):
     return pose
 
 
+def pose_to_3d_bb_proj(tf_w_ado, tf_w_ego, vertices_ado, camera):
+    """
+    vertices_ado (ado frame) is a N x 4 where the 4 [x, y, z, 1; ...] matrix
+    """
+    N = vertices_ado.shape[0]
+    tf_cam_ado = camera.tf_cam_ego @ inv_tf(tf_w_ego) @ tf_w_ado
+    vertices_cam = tf_cam_ado @ vertices_ado.T
+    projected_vertices = np.zeros((N, 2))
+    for i, bb_vert in enumerate(vertices_cam.T):
+        projected_vertices[i, :] = camera.pnt3d_to_pix(bb_vert)
+
+    return projected_vertices

@@ -35,6 +35,7 @@ class UKF:
 
         self.class_str = class_str  # class name (string) e.g. 'person' or 'mslquad'
         self.obj_id = obj_id  # a unique int classifier
+        self.projected_3d_bb = None  # r, c of projection of the estimated 3d bounding box
         
         if self.class_str == 'mslquad':
             yaml_file = "mslquad_ukf_params.yaml"
@@ -88,14 +89,14 @@ class UKF:
         if self.ukf_prms is not None:
             # if True:  # this is for DEBUGGING (its easier to try different values)
             self.sigma = np.diag([float(self.ukf_prms['dp_sigma'][0]), float(self.ukf_prms['dp_sigma'][1]), float(self.ukf_prms['dp_sigma'][2]), \
-                                    float(self.ukf_prms['dv_sigma'][0]), float(self.ukf_prms['dv_sigma'][1]), float(self.ukf_prms['dv_sigma'][2]), \
-                                    float(self.ukf_prms['dq_sigma'][0]), float(self.ukf_prms['dq_sigma'][1]), float(self.ukf_prms['dq_sigma'][2]), \
-                                    float(self.ukf_prms['dw_sigma'][0]), float(self.ukf_prms['dw_sigma'][1]), float(self.ukf_prms['dw_sigma'][2])])
+                                  float(self.ukf_prms['dv_sigma'][0]), float(self.ukf_prms['dv_sigma'][1]), float(self.ukf_prms['dv_sigma'][2]), \
+                                  float(self.ukf_prms['dq_sigma'][0]), float(self.ukf_prms['dq_sigma'][1]), float(self.ukf_prms['dq_sigma'][2]), \
+                                  float(self.ukf_prms['dw_sigma'][0]), float(self.ukf_prms['dw_sigma'][1]), float(self.ukf_prms['dw_sigma'][2])])
             # self.Q = self.sigma / float(self.ukf_prms['Q_div_fact'])  # Process Noise
             self.Q = np.diag([float(self.ukf_prms['dp_q'][0]), float(self.ukf_prms['dp_q'][1]), float(self.ukf_prms['dp_q'][2]), \
-                                    float(self.ukf_prms['dv_q'][0]), float(self.ukf_prms['dv_q'][1]), float(self.ukf_prms['dv_q'][2]), \
-                                    float(self.ukf_prms['dq_q'][0]), float(self.ukf_prms['dq_q'][1]), float(self.ukf_prms['dq_q'][2]), \
-                                    float(self.ukf_prms['dw_q'][0]), float(self.ukf_prms['dw_q'][1]), float(self.ukf_prms['dw_q'][2])])
+                              float(self.ukf_prms['dv_q'][0]), float(self.ukf_prms['dv_q'][1]), float(self.ukf_prms['dv_q'][2]), \
+                              float(self.ukf_prms['dq_q'][0]), float(self.ukf_prms['dq_q'][1]), float(self.ukf_prms['dq_q'][2]), \
+                              float(self.ukf_prms['dw_q'][0]), float(self.ukf_prms['dw_q'][1]), float(self.ukf_prms['dw_q'][2])])
             self.R = np.diag(self.ukf_prms['R'])  # Measurement Noise
             # else:
             #     self.sigma = np.asarray(self.ukf_prms['simga0'])
@@ -216,6 +217,14 @@ class UKF:
         mu_out[6:10] = enforce_quat_format(quat_mul(axang_to_quat(innovation[6:9]), mu_bar[6:10]))
         mu_out[10:13] += innovation[9:12]
 
+
+        # print("mu: {}".format(self.mu))
+        # print("mu_out: {}".format(mu_out))
+        # print("z: {}   z_hat = {}".format(z, z_hat))
+        # print("z - z_hat: {}".format(z - z_hat))
+        # print("K: {}".format(k))
+        # print("innovation: {}".format(innovation))
+
         if self.b_enforce_0_roll:
             mu_out[6:10] = remove_roll(mu_out[6:10])
         if self.b_enforce_0_pitch:
@@ -263,11 +272,7 @@ class UKF:
 
         # calculate covariance
         z_hat_2d = np.expand_dims(z_hat, axis=1)
-        S = self.w0 * (sps_meas[:, 0:1] - z_hat_2d) @ (sps_meas[:, 0:1] - z_hat_2d).T
-        dim_covar = self.dim_sig
-        w_arr = np.ones(sps_meas.shape[1])*self.wi
-        w_arr[0] = self.w0
-        S = w_arr*(sps_meas - z_hat_2d) @ (sps_meas - z_hat_2d).T
+        S = self.w_arr*(sps_meas - z_hat_2d) @ (sps_meas - z_hat_2d).T
 
         S += self.R  # add measurement noise
         S = enforce_pos_def_sym_mat(S) # project S to pos. def. cone to avoid numeric issues
@@ -284,17 +289,13 @@ class UKF:
         """
 
         # get relative transform from camera to quad
-        tf_w_quad = state_to_tf(state)
-        tf_cam_quad = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_quad
+        tf_w_ado = state_to_tf(state)
+        tf_cam_ado = self.camera.tf_cam_ego @ tf_ego_w @ tf_w_ado
 
         # tranform 3d bounding box from quad frame to camera frame
-        bb_3d_cam = (tf_cam_quad @ self.bb_3d.T).T[:, 0:3]
+        bb_3d_cam = (tf_cam_ado @ self.bb_3d.T).T[:, 0:3]
 
-        # transform each 3d point to a 2d pixel (row, col)
-        bb_rc_list = np.zeros((bb_3d_cam.shape[0], 2))
-        for i, bb_vert in enumerate(bb_3d_cam):
-            bb_rc_list[i, :] = self.camera.pnt3d_to_pix(bb_vert)
-
+        bb_rc_list = pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), self.bb_3d, self.camera)
         # construct sensor output
         # minAreaRect sometimes flips the w/h and angle from how we want the output to be
         # to fix this, we can use boxPoints to get the x,y of the bb rect, and use our function
@@ -305,7 +306,6 @@ class UKF:
 
         ang_thesh = np.deg2rad(20)  # angle threshold for considering alternative box rotation
         alt_ang = -np.sign(output[-1]) * (np.pi/2 - np.abs(output[-1]))  # negative complement of angle
-        
         if (abs(alt_ang - measurement[-1]) < abs(output[-1] - measurement[-1])) and np.abs((np.abs(measurement[-1] - output[-1]) - np.pi/2)) < ang_thesh:
             output[-1] = alt_ang 
             w = output[2]
@@ -391,7 +391,6 @@ class UKF:
             next_states[6:10,:] = remove_pitch(quat_new).T
         if self.b_enforce_0_yaw:
             next_states[6:10,:] = remove_yaw(quat_new).T
-        
         
 
         return next_states
