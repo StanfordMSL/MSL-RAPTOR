@@ -21,6 +21,8 @@
   <arg name="classes_names_file"  default="$(find msl_raptor)/params/classes.names" /> <!-- yaml file containing all the object sizes -->
   <arg name="object_sizes_file"   default="$(find msl_raptor)/params/all_obs.yaml" /> <!-- yaml file containing all the object sizes -->
   <arg name="object_used_file"    default="$(find msl_raptor)/params/objects_used/objects_used.txt" /> <!-- yaml file containing the names of objects used -->
+  <arg name="b_pub_3d_bb_proj"    default="false" />
+
 
   <group if="$(arg b_rosbag)">
     <param name="use_sim_time" value="true" />   <!--use the rosbag time instead of the computer's time. If using this use clock option in rosbag-->
@@ -47,6 +49,7 @@
     <param name="object_sizes_file"  value="$(arg object_sizes_file)"/>
     <param name="object_used_file"  value="$(arg object_used_file)"/>
     <param name="classes_names_file"  value="$(arg classes_names_file)"/>
+    <param name="b_pub_3d_bb_proj"  value="$(arg b_pub_3d_bb_proj)"/>
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
 
   </node>

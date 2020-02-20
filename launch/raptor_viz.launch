@@ -16,6 +16,7 @@
   <!-- Launch poses viz node -->
   <node name="poses_viz_node_$(arg robot_type)$(arg id)" pkg="msl_raptor" type="poses_viz_node.py" output="screen">
     <param name="ns"  value="$(arg ns)"/> 
+    <param name="b_overlay" value="$(arg b_overlay)"/> 
   </node>
   
 </launch>
