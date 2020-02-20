@@ -85,8 +85,6 @@ class poses_viz_node:
             
             image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="bgr8")
             image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
-        else:
-            image = copy(self.all_white_image)
 
         for tracked_obj in tracked_objects_msg.tracked_objects:
             pose_arr.poses.append(tracked_obj.pose.pose)
