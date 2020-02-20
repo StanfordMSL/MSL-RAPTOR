@@ -33,7 +33,7 @@ def run_execution_loop():
     b_pub_3d_bb_proj = rospy.get_param('~b_pub_3d_bb_proj')
     b_filter_meas = True
     
-    ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb  # create a ros interface object
+    ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb,b_pub_3d_bb_proj)  # create a ros interface object
 
     bb_3d, obj_width, classes_names, classes_ids, objects_names_per_class = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file)  # Parse objects used and associated configurations
 

@@ -19,7 +19,7 @@ import cv2
 
 class ros_interface:
 
-    def __init__(self, b_use_gt_bb=False,b_verbose=False,b_use_gt_pose_init=False,b_use_gt_detect_bb=False):
+    def __init__(self, b_use_gt_bb=False,b_verbose=False,b_use_gt_pose_init=False,b_use_gt_detect_bb=False,b_pub_3d_bb_proj=False):
         
         self.verbose = b_verbose
 
@@ -51,7 +51,7 @@ class ros_interface:
         self.bb_3d = None
         self.b_use_gt_pose_init  = b_use_gt_pose_init
         self.b_use_gt_detect_bb = b_use_gt_detect_bb
-
+        self.b_pub_3d_bb_proj = b_pub_3d_bb_proj
     def get_first_image(self):
         return self.bridge.imgmsg_to_cv2(rospy.wait_for_message(self.ns + '/camera/image_raw',Image), desired_encoding="bgr8")
 
@@ -154,9 +154,12 @@ class ros_interface:
             obj.pose = pose_msg
             obj.class_str = ukf_dict[id].class_str
 
-            tmp = ukf_dict[id].projected_3d_bb
-            tmp = tmp.reshape((tmp.size, ))
-            obj.projected_3d_bb = tmp
+            if self.b_pub_3d_bb_proj:
+                tmp = ukf_dict[id].projected_3d_bb
+                tmp = tmp.reshape((tmp.size, ))
+                obj.projected_3d_bb = tmp
+            # else:
+            #     obj.projected_3d_bb = [0]
             obj.id = id
 
             tracked_objects.append(obj)
@@ -209,12 +212,13 @@ class ros_interface:
 
     def get_gt_boxes(self):
         gt_boxes = []
-        for class_str, obj_name in self.objects_names_per_class:
-            pose = pose_msg_to_array(self.latest_tracked_poses[obj_name])
-            tf_w_ado = quat_to_tf(pose[3:])
-            tf_w_ado[:,3] = pose[:3]
-            proj_corners = pose_to_3d_bb_proj(tf_w_ado,self.tf_w_ego,self.bb[class_str],self.camera)
-            (x,y,w,h) = corners_to_aligned_bb(proj_corners)
-            gt_boxes.append((x,y,w,h,1.,1.,self.im_seg.class_str_to_id[class_str]))
-        return gt_boxes
+        for class_str, obj_names in self.objects_names_per_class.items():
+            for obj_name in obj_names:
+                pose = pose_msg_to_array(self.latest_tracked_poses[obj_name])
+                tf_w_ado = quat_to_tf(pose[3:])
+                tf_w_ado[:3,3] = pose[:3]
+                proj_corners = pose_to_3d_bb_proj(tf_w_ado,self.tf_w_ego,self.bb_3d[class_str],self.camera)
+                (x,y,w,h) = corners_to_aligned_bb(proj_corners)
+                gt_boxes.append([x,y,w,h,1.,1.,self.im_seg.class_str_to_id[class_str]])
+        return np.array(gt_boxes)
 

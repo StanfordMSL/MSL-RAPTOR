@@ -91,7 +91,7 @@ class ImageSegmentor:
         ''' 
         if self.mode == self.DETECT:
             if self.use_gt_detect_bb:
-                if not gt_boxes:
+                if gt_boxes is None:
                     RuntimeError('Trying to use groundtruth boxes for detection, but none were given')
                 bbs_no_angle = gt_boxes
             else:
@@ -128,8 +128,8 @@ class ImageSegmentor:
         for obj_id in sum(self.active_objects_ids_per_class.values(),[]):
             self.tracked_objects[obj_id].latest_tracked_state, abb, mask = self.tracker.track(image,self.tracked_objects[obj_id].latest_tracked_state)
             abb = bb_corners_to_angled_bb(abb.reshape(-1,2))
-           
-            output[obj_id] = [abb,self.tracked_objects[obj_id].class_str, valid]
+            
+            output[obj_id] = [abb,self.tracked_objects[obj_id].class_str, True]
 
         tic2 = time.time()
         if self.verbose:
