@@ -15,6 +15,7 @@ from ukf import UKF
 # libs & utils
 from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.math_utils import *
+from utils_msl_raptor.ukf_utils import state_to_tf, pose_to_3d_bb_proj
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/src/front_end')
 from image_segmentor import ImageSegmentor
 import yaml
@@ -29,6 +30,7 @@ def run_execution_loop():
     objects_sizes_yaml = rospy.get_param('~object_sizes_file')
     objects_used_path = rospy.get_param('~object_used_file')
     classes_names_file = rospy.get_param('~classes_names_file')
+    b_pub_3d_bb_proj = rospy.get_param('~b_pub_3d_bb_proj')
     b_filter_meas = True
     
     ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb  # create a ros interface object
@@ -117,6 +119,10 @@ def run_execution_loop():
 
             if ukf_dict[obj_id] is not None:
                 ukf_dict[obj_id].step_ukf(abb, tf_ego_w, loop_time)  # update ukf
+                if b_pub_3d_bb_proj:
+                    tf_w_ado = state_to_tf(ukf_dict[obj_id].mu)
+                    ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
+
         ros.publish_filter_state(obj_ids_tracked,ukf_dict)#, ukf_dict[obj_id].mu, ukf_dict[obj_id].itr_time, ukf_dict[obj_id].itr)  # send vector with time, iteration, state_est
         ros.publish_bb_msg(processed_image,im_seg_mode, loop_time)# obj_ids_tracked, abb, im_seg_mode, loop_time)
         
@@ -166,13 +172,13 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file):
                     half_height = float(obj_dict['bound_box_h']) /2
                     
                     bb_3d[obj_dict['class_str']] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
-                          [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
-                          [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
-                          [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
-                          [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
-                          [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
-                          [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
-                          [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
+                                                             [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
+                                                             [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
+                                                             [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
+                                                             [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
+                                                             [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
+                                                             [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
+                                                             [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
                     obj_width[obj_dict['class_str']] = 2*half_width
 

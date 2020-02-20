@@ -29,6 +29,7 @@ class bb_viz_node:
 
     def __init__(self):
         rospy.init_node('bb_viz_node', anonymous=True)
+        self.itr = 0
         self.DETECT = 1
         self.TRACK = 2
         self.FAKED_BB = 3
@@ -42,14 +43,15 @@ class bb_viz_node:
         self.overlaid_img = None
 
         self.b_overlay = rospy.get_param('~b_overlay')
-
+        
+        camera_info = rospy.wait_for_message(self.ns + '/camera/camera_info', CameraInfo, 30)
+        self.K = np.reshape(camera_info.K, (3, 3))
+        
         if self.b_overlay:
            rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1, buff_size=2**21)
         self.bb_data_sub = rospy.Subscriber(self.ns + '/bb_data', AngledBboxes, self.bb_viz_cb, queue_size=5)
         self.img_overlay_pub = rospy.Publisher(self.ns + '/image_bb_overlay', Image, queue_size=5)
-        self.itr = 0
-        camera_info = rospy.wait_for_message(self.ns + '/camera/camera_info', CameraInfo, 30)
-        self.K = np.reshape(camera_info.K, (3, 3))
+
         if len(camera_info.D) == 5:
             self.dist_coefs = np.reshape(camera_info.D, (5,))
             self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))

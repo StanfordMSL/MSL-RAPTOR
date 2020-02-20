@@ -41,7 +41,7 @@ class ros_interface:
         self.camera = None
 
         # DEBUGGGGGGGGG
-        if b_use_gt_bb:
+        if True or b_use_gt_bb:
             self.ado_pose_gt_rosmsg = None
             rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.ado_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
         ##########################
@@ -152,6 +152,10 @@ class ros_interface:
 
             obj.pose = pose_msg
             obj.class_str = ukf_dict[id].class_str
+
+            tmp = ukf_dict[id].projected_3d_bb
+            tmp = tmp.reshape((tmp.size, ))
+            obj.projected_3d_bb = tmp
             obj.id = id
 
             tracked_objects.append(obj)
