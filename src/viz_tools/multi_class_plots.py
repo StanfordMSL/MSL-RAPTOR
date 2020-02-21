@@ -41,14 +41,16 @@ class MultiObjectPlotGenerator:
 
 
         nx = 20  # number of ticks on x axis
-        dist_thresh = np.linspace(0, 4,nx)
+        dist_thresh = np.linspace(0, 3,nx)
         ang_thresh = np.linspace(0, 90,nx)
         thresh_list = list(zip(dist_thresh, ang_thresh)) # [(m thesh, deg thresh)]
         show_every_nth_label = 4
+        fig_ind = 0
 
 
         # distance plot ##########################################################################
-        plt.figure(0)
+        plt.figure(fig_ind)
+        fig_ind += 1
         success_count = {}
         total_count = {}
         pcnt = {}
@@ -72,19 +74,19 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=1)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        # plt.xticks(range(nx), ["({:.2f} m, {:.1f} deg)".format(d, a) for (d, a) in thresh_list], size='small')
         x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
         ax.set_xlabel("error metric")
-        ax.set_ylabel("% within distance threshold")
-        ax.set_title("Distance")
+        ax.set_ylabel("% within translation threshold")
+        ax.set_title("Translation Error")
         plt.legend(leg_hands, leg_str)
         plt.show(block=False)
         ##########################################################################
 
 
         # angle plot ##########################################################################
-        plt.figure(1)
+        plt.figure(fig_ind)
+        fig_ind += 1
         success_count = {}
         total_count = {}
         pcnt = {}
@@ -113,7 +115,79 @@ class MultiObjectPlotGenerator:
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
         ax.set_xlabel("error metric")
         ax.set_ylabel("% within angle threshold")
-        ax.set_title("Angle")
+        ax.set_title("Rotation Error")
+        plt.legend(leg_hands, leg_str)
+        plt.show(block=False)
+        ##########################################################################
+
+
+        # in plane translation err plot ##########################################################################
+        plt.figure(fig_ind)
+        fig_ind += 1
+        success_count = {}
+        total_count = {}
+        pcnt = {}
+        leg_hands = []
+        leg_str = []
+
+        for i, cl in enumerate(err_log_dict):
+            success_count[cl] = np.zeros((nx))
+            total_count[cl] = np.zeros((nx))
+            pcnt[cl] = np.zeros((nx))
+            err_log_list = err_log_dict[cl]
+            for err_log in err_log_list:
+                for thresh_ind, (dist_thresh, ang_thresh) in enumerate(thresh_list):
+                    for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
+                        dist_err = la.norm([y_err, z_err])
+                        total_count[cl][thresh_ind] += 1
+                        if np.abs(dist_err) < dist_thresh:
+                            success_count[cl][thresh_ind] += 1
+            pcnt[cl] = np.array([s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
+            plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
+            leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=1)[0])
+            leg_str.append(cl)
+        ax = plt.gca()
+        x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
+        plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        ax.set_xlabel("error metric")
+        ax.set_ylabel("% within distance threshold")
+        ax.set_title("In-Plane Translation Error")
+        plt.legend(leg_hands, leg_str)
+        plt.show(block=False)
+        ##########################################################################
+
+
+        # depth translation err plot ##########################################################################
+        plt.figure(fig_ind)
+        fig_ind += 1
+        success_count = {}
+        total_count = {}
+        pcnt = {}
+        leg_hands = []
+        leg_str = []
+
+        for i, cl in enumerate(err_log_dict):
+            success_count[cl] = np.zeros((nx))
+            total_count[cl] = np.zeros((nx))
+            pcnt[cl] = np.zeros((nx))
+            err_log_list = err_log_dict[cl]
+            for err_log in err_log_list:
+                for thresh_ind, (dist_thresh, ang_thresh) in enumerate(thresh_list):
+                    for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
+                        dist_err = la.norm([x_err])
+                        total_count[cl][thresh_ind] += 1
+                        if np.abs(dist_err) < dist_thresh:
+                            success_count[cl][thresh_ind] += 1
+            pcnt[cl] = np.array([s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
+            plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
+            leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=1)[0])
+            leg_str.append(cl)
+        ax = plt.gca()
+        x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
+        plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        ax.set_xlabel("error metric")
+        ax.set_ylabel("% within distance threshold")
+        ax.set_title("Depth Translation Error")
         plt.legend(leg_hands, leg_str)
         plt.show(block=False)
         ##########################################################################
