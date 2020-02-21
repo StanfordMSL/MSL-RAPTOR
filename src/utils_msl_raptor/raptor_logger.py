@@ -51,7 +51,8 @@ class RaptorLogger:
                                  ('y err', 'y_err', 1),
                                  ('z err', 'z_err', 1),
                                  ('ang err (deg)', 'ang_err', 1),
-                                 ('3d projection pix norm err', 'pix_err', 1)]
+                                 ('3d projection pix norm err', 'pix_err', 1),
+                                 ('Distance camera to ado', 'measurement_dist', 1)]
         self.save_elms['ssp'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
                                  ('Ado State GT', 'state_gt', 13), 
                                  ('Ado State Est', 'state_est', 13), 
@@ -107,6 +108,8 @@ class RaptorLogger:
         self.read_params()
         self.fn = defaultdict(dict)
         for m in self.modes:
+            if self.names is None:
+                return
             for n in self.names:
                 self.fn[m][n] = self.base_path + '_' + n + '_'+ m + '.log'
 
@@ -139,6 +142,9 @@ class RaptorLogger:
     
     def read_params(self, log_type='prms'):
         # get header
+        if not os.path.isfile(self.prm_fn):
+            print("WARNING: NOT READING PARAMS")
+            return
         f = open(self.prm_fn)
         header_str = f.readline()
         self.log_data[log_type]['ado_names'] = header_str.split('[')[1].split(']')[0].split(' ')
@@ -196,9 +202,6 @@ class RaptorLogger:
         """
         Return a dict with keys being log type (est /gt /prms). Each of these is a dict with the various types of values in the log
         """
-        if self.names is None:
-            self.log_data[log_type]
-
         for log_type in self.fn:
             if not log_type in self.save_elms:
                 print("Warning: we are are missing the log file for {}".format(log_type))
@@ -213,6 +216,26 @@ class RaptorLogger:
                 ind += count
                 
         return self.log_data
+
+
+    def read_err_logs(self, log_path):
+        """
+        Return a dict with keys being error type
+        """
+        err_log_dict = {}
+
+        ind = 0
+        f = open(log_path)
+        header_str = f.readline()
+        data = np.loadtxt(f)
+        for i, (header_str, dict_str, count) in enumerate(self.save_elms["err"]):
+            if len(data.shape) > 1:
+                err_log_dict[dict_str] = data[:, ind:(ind + count)]
+            else:
+                err_log_dict[dict_str] = data[ind:(ind + count)]
+            ind += count
+                
+        return err_log_dict
         
 
     def close_files(self):
