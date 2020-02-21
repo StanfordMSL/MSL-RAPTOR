@@ -101,7 +101,7 @@ class ImageSegmentor:
             if len(bbs_no_angle) == 0:
                 print("Did not detect object")
                 self.stop_tracking_lost_objects()
-                self.track(image)
+                return self.track(image)
             
             # Add buffer around detections
             bbs_no_angle[:,2:4] += self.box_buffer
