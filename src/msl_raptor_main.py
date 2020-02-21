@@ -232,6 +232,20 @@ class camera:
         self.tf_cam_ego = np.eye(4)
         self.tf_cam_ego[0:3, 3] = np.asarray(rospy.get_param('~t_cam_ego'))
         self.tf_cam_ego[0:3, 0:3] = np.reshape(rospy.get_param('~R_cam_ego'), (3, 3))
+        Angle_x = float(rospy.get_param('~dx'))
+        Angle_y = float(rospy.get_param('~dy'))
+        Angle_z = float(rospy.get_param('~dz'))
+        R_deltax = np.array([[ 1.             , 0.             , 0.              ],
+                                [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
+                                [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
+        R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
+                                [ 0.             , 1.             , 0               ],
+                                [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
+        R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
+                                [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
+                                [ 0.             , 0.             , 1.              ]])
+        R_delta = R_deltax @ R_deltay @ R_deltaz
+        self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
         (self.fov_horz, self.fov_vert), self.fov_lim_per_depth = self.calc_fov()
 
     def b_is_pnt_in_fov(self, pnt_c, buffer=0):
