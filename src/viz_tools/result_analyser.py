@@ -51,7 +51,7 @@ class ResultAnalyser:
 
         self.logger = RaptorLogger(mode="read", base_path=base_path, b_ssp=False)
         self.logger_ssp = None
-        if os.path.isfile(base_path_ssp + '_quad4_ssp.log'):
+        if b_ssp and os.path.isfile(base_path_ssp + '_quad4_ssp.log'):
             self.logger_ssp = RaptorLogger(mode="read", base_path=base_path_ssp, b_ssp=True)
         self.b_degrees = True  # use degrees or radians
 
@@ -210,7 +210,6 @@ class ResultAnalyser:
         # extract ssp
         if self.logger_ssp is not None:
             name = 'quad4'
-            pdb.set_trace()
 
             self.ssp_data[name] = self.logger_ssp.read_logs(name=name)['ssp']
             self.t_ssp[name] = self.ssp_data[name]['time']
@@ -287,7 +286,8 @@ class ResultAnalyser:
             self.fig, self.axes = plt.subplots(3, 2, clear=True)
             est_line_style = 'r-'
             gt_line_style  = 'b-'
-            ssp_line_style = 'm-'
+            # ssp_line_style = 'm-'
+            ssp_line_style = 'm.'
             ang_type = 'rad'
             b_ssp = len(self.ssp_data[name]) > 0
             if self.b_degrees:

@@ -35,7 +35,7 @@ class rosbags_to_logs:
     The code currently also runs the quantitative metric analysis in the processes, but this is optional and will be done 
     again in the result_analyser. 
     """
-    def __init__(self, rb_name=None, data_source='raptor', ego_quad_ns="/quad7"):
+    def __init__(self, rb_name=None, data_source='raptor', ego_quad_ns="/quad7", ego_yaml="quad7", ado_yaml="all_obj"):
         # Parse rb_name
         us_split = rb_name.split("_")
         if rb_name[-4:] == '.bag' or "_".join(us_split[0:3]) == 'msl_raptor_output':
@@ -81,7 +81,7 @@ class rosbags_to_logs:
         self.class_str_to_name_dict = defaultdict(list)
         self.b_enforce_0_dict = {}
         self.fixed_vals = {}
-        self.read_yaml()
+        self.read_yaml(ego_yaml=ego_yaml, ado_yaml=ado_yaml)
         ####################################
 
         self.fig = None
@@ -99,7 +99,6 @@ class rosbags_to_logs:
         self.ado_gt_pose = defaultdict(list)
 
         self.ado_est_pose_BY_TIME_BY_CLASS = defaultdict(dict)
-        # self.ado_est_pose = defaultdict(list)
         self.ado_est_state = defaultdict(list)
 
         self.DETECT = 1
@@ -109,8 +108,6 @@ class rosbags_to_logs:
         self.detect_time = []
         self.detect_mode = []
         
-        # self.detect_times = {}
-        # self.detect_end = None
         self.abb_list = defaultdict(list)
         self.abb_time_list = defaultdict(list)
 
@@ -298,52 +295,58 @@ class rosbags_to_logs:
         # self.detect_times[n] = np.asarray(self.detect_times) - self.t0
 
 
-    def read_yaml(self, yaml_path="/root/msl_raptor_ws/src/msl_raptor/params/all_obs.yaml"):
-        with open(yaml_path, 'r') as stream:
+    def read_yaml(self, ego_yaml="quad7", ado_yaml="all_obs"):
+        yaml_path="/root/msl_raptor_ws/src/msl_raptor/params/"
+        with open(yaml_path + ego_yaml + '.yaml', 'r') as stream:
+            try:
+                # this means its the ego robot, dont add it to ado (but get its camera params)
+                obj_prms = yaml.safe_load(stream)
+                self.ego_name = obj_prms['ns']
+                self.tf_cam_ego = np.eye(4)
+                self.tf_cam_ego[0:3, 3] = np.asarray(obj_prms['t_cam_ego'])
+                self.tf_cam_ego[0:3, 0:3] = np.reshape(obj_prms['R_cam_ego'], (3, 3))
+                Angle_x = obj_prms['dx']
+                Angle_y = obj_prms['dy']
+                Angle_z = obj_prms['dz']
+                R_deltax = np.array([[ 1.             , 0.             , 0.              ],
+                                        [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
+                                        [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
+                R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
+                                        [ 0.             , 1.             , 0               ],
+                                        [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
+                R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
+                                        [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
+                                        [ 0.             , 0.             , 1.              ]])
+                R_delta = R_deltax @ R_deltay @ R_deltaz
+                self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
+            except yaml.YAMLError as exc:
+                print(exc)
+
+
+        with open(yaml_path + ado_yaml + '.yaml', 'r') as stream:
             try:
                 obj_prms = list(yaml.load_all(stream))
                 for obj_dict in obj_prms:
                     name = obj_dict['ns']
                     self.b_enforce_0_dict[name] = defaultdict(bool)  # false by default
                     self.fixed_vals[name] = defaultdict(dict)
-                    if obj_dict['id'] < 0 or obj_dict['ns'] == self.ego_gt_topic.split("/")[0][1:]: 
-                        # this means its the ego robot, dont add it to ado (but get its camera params)
-                        self.ego_name = name
-                        self.tf_cam_ego = np.eye(4)
-                        self.tf_cam_ego[0:3, 3] = np.asarray(obj_dict['t_cam_ego'])
-                        self.tf_cam_ego[0:3, 0:3] = np.reshape(obj_dict['R_cam_ego'], (3, 3))
-                        # Correct Rotation w/ Manual Calibration
-                        Angle_x = 8./180. 
-                        Angle_y = 8./180.
-                        Angle_z = 0./180. 
-                        R_deltax = np.array([[ 1.             , 0.             , 0.              ],
-                                             [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
-                                             [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
-                        R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
-                                             [ 0.             , 1.             , 0               ],
-                                             [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
-                        R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
-                                             [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
-                                             [ 0.             , 0.             , 1.              ]])
-                        R_delta = R_deltax @ R_deltay @ R_deltaz
-                        self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
+                    
+                    class_str = obj_dict['class_str']
+                    self.ado_names_all.append(name)
+                    l = float(obj_dict['bound_box_l']) 
+                    w = float(obj_dict['bound_box_w'])
+                    h = float(obj_dict['bound_box_h'])
+                    self.class_str_to_name_dict[class_str].append(name)
+                    if 'diam' in obj_dict:
+                        d = obj_dict['diam']
                     else:
-                        class_str = obj_dict['class_str']
-                        self.ado_names_all.append(name)
-                        l = float(obj_dict['bound_box_l']) 
-                        w = float(obj_dict['bound_box_w'])
-                        h = float(obj_dict['bound_box_h'])
-                        self.class_str_to_name_dict[class_str].append(name)
-                        if 'diam' in obj_dict:
-                            d = obj_dict['diam']
-                        else:
-                            d = la.norm([l, w, h])
-                        self.bb_3d_dict_all[name] = np.array([l, w, h, d])
-                        for el in obj_dict['b_enforce_0']:
-                            self.b_enforce_0_dict[name][el] = True
-                            additional_key = 'fixed_' + el
-                            if additional_key in obj_dict:
-                                self.fixed_vals[name][el] = obj_dict[additional_key]
+                        d = la.norm([l, w, h])
+                    self.bb_3d_dict_all[name] = np.array([l, w, h, d])
+                    for el in obj_dict['b_enforce_0']:
+                        self.b_enforce_0_dict[name][el] = True
+                        additional_key = 'fixed_' + el
+                        if additional_key in obj_dict:
+                            self.fixed_vals[name][el] = obj_dict[additional_key]
 
             except yaml.YAMLError as exc:
                 print(exc)
@@ -402,8 +405,7 @@ class rosbags_to_logs:
         """
         record optitrack poses of tracked quad
         """
-        pose = enforce_constraints_pose(msg.pose, self.b_enforce_0_dict[self.ego_name], self.fixed_vals[self.ego_name])
-        self.ego_gt_pose.append(pose)
+        self.ego_gt_pose.append(msg.pose)
         self.ego_gt_time_pose.append(msg.header.stamp.to_sec())
 
         
@@ -411,8 +413,7 @@ class rosbags_to_logs:
         """
         record optitrack poses of tracked quad
         """
-        pose = enforce_constraints_pose(msg.pose, self.b_enforce_0_dict[self.ego_name], self.fixed_vals[self.ego_name])
-        self.ego_est_pose.append(pose)
+        self.ego_est_pose.append(msg.pose)
         self.ego_est_time_pose.append(msg.header.stamp.to_sec())
 
 
@@ -421,50 +422,24 @@ class rosbags_to_logs:
         record times of detect
         note message is custom MSL-RAPTOR angled bounding box
         """
-        # msg = msg.boxes[0]
         for msg in msg.boxes:
             name = msg.class_str
             t = msg.header.stamp.to_sec()
-            # if msg.im_seg_mode == self.DETECT:
-            #     self.detect_time[name].append(t)
-
             self.abb_list[name].append(([msg.x, msg.y, msg.width, msg.height, msg.angle*180./np.pi], msg.im_seg_mode))
             self.abb_time_list[name].append(t)
-            ######
-            # eps = 0.1 # min width of line
-            # if msg.im_seg_mode == self.DETECT:  # we are detecting now
-            #     if not self.detect_times[name]:  # first run - init list
-            #         self.detect_times[name] = [[t]]
-            #         self.detect_end[name] = np.nan
-            #     elif len(self.detect_times[name][-1]) == 2: # we are starting a new run
-            #         self.detect_times[name].append([t])
-            #         self.detect_end[name] = np.nan
-            #     else: # len(self.detect_times[-1]) = 1: # we are currently still on a streak of detects
-            #         self.detect_end[name] = t
-            # else: # not detecting
-            #     if not self.detect_times[name] or len(self.detect_times[name][-1]) == 2: # we are still not detecting (we were not Detecting previously)
-            #         pass
-            #     else: # self.detect_times[-1][1]: # we were just tracking
-            #         self.detect_times[name][-1].append(self.detect_end[name])
-            #         self.detect_end[name] = np.nan
-
-            # self.detect_mode[name].append(msg.im_seg_mode)
 
 
 if __name__ == '__main__':
     try:
-        if len(sys.argv) == 1:
-            raise RuntimeError("not enough arguments, must pass in the rosbag name (w/ or w/o .bag)")
-        elif len(sys.argv) == 2:
-            my_rb_name = sys.argv[1]
-            my_data_source = "raptor"
-        elif len(sys.argv) == 3:
+        if len(sys.argv) == 5:
             my_rb_name = sys.argv[1]
             my_data_source = sys.argv[2]
-        elif len(sys.argv) > 3:
-            raise RuntimeError("too many arguments, only pass in the rosbag name (w/ or w/o .bag)")
+            my_ego_yaml = sys.argv[3]
+            my_ado_yaml = sys.argv[4]
+        else:
+            raise RuntimeError("Incorrect arguments! needs <rosbag_name> <data_source> <ego_yaml> <ado_yaml> (leave off .bag and .yaml extensions)")
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
-        program = rosbags_to_logs(rb_name=my_rb_name, data_source=my_data_source)
+        program = rosbags_to_logs(rb_name=my_rb_name, data_source=my_data_source, ego_yaml=my_ego_yaml, ado_yaml=my_ado_yaml)
         
     except:
         import traceback
