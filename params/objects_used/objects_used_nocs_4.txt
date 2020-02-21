@@ -1,4 +1,0 @@
-camera_anastasia_norm
-laptop_air_0_norm
-mug_vignesh_norm
-mug_white_green_norm

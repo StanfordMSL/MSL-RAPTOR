@@ -1,5 +1,0 @@
-bottle3_scene5_norm
-bowl_brown_ikea_norm
-mug2_scene3_norm
-bottle_blue_google_norm
-can_milk_wangwang_norm

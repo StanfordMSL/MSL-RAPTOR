@@ -41,11 +41,11 @@ class MultiObjectPlotGenerator:
             raise RuntimeError("need to add more colors to color string list!! too many classes..")
 
 
-        nx = 20  # number of ticks on x axis
-        dist_thresh = np.linspace(0, 3,nx)
-        ang_thresh = np.linspace(0, 20,nx)
+        nx = 100  # number of ticks on x axis
+        dist_thresh = np.linspace(0, 0.2,nx)
+        ang_thresh = np.linspace(0, 60,nx)
         thresh_list = list(zip(dist_thresh, ang_thresh)) # [(m thesh, deg thresh)]
-        show_every_nth_label = 4
+        show_every_nth_label = 10
         fig_ind = 0
 
 
@@ -57,6 +57,7 @@ class MultiObjectPlotGenerator:
         pcnt = {}
         leg_hands = []
         leg_str = []
+        all_dist_err = []
 
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
@@ -67,6 +68,7 @@ class MultiObjectPlotGenerator:
                 for thresh_ind, (dist_thresh, ang_thresh) in enumerate(thresh_list):
                     for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
                         dist_err = la.norm([x_err, y_err, z_err])
+                        all_dist_err.append(dist_err)
                         total_count[cl][thresh_ind] += 1
                         if np.abs(dist_err) < dist_thresh:
                             success_count[cl][thresh_ind] += 1
@@ -82,6 +84,8 @@ class MultiObjectPlotGenerator:
         ax.set_title("Translation Error")
         plt.legend(leg_hands, leg_str)
         plt.show(block=False)
+
+        print("Avg translation error: "+str(np.mean(all_dist_err))+" m")
         ##########################################################################
 
 
@@ -94,6 +98,8 @@ class MultiObjectPlotGenerator:
         leg_hands = []
         leg_str = []
 
+        all_ang_err = []
+
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
             total_count[cl] = np.zeros((nx))
@@ -102,7 +108,8 @@ class MultiObjectPlotGenerator:
             for err_log in err_log_list:
                 for thresh_ind, (dist_thresh, ang_thresh) in enumerate(thresh_list):
                     for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
-                        dist_err = la.norm([x_err, y_err, z_err])
+                        # dist_err = la.norm([x_err, y_err, z_err])
+                        all_ang_err.append(ang_err)
                         total_count[cl][thresh_ind] += 1
                         if np.abs(ang_err) < ang_thresh:
                             success_count[cl][thresh_ind] += 1
@@ -119,6 +126,9 @@ class MultiObjectPlotGenerator:
         ax.set_title("Rotation Error")
         plt.legend(leg_hands, leg_str)
         plt.show(block=False)
+        
+        print("Avg rotation error: "+str(np.mean(all_ang_err))+" deg")
+
         ##########################################################################
 
 
@@ -131,6 +141,8 @@ class MultiObjectPlotGenerator:
         leg_hands = []
         leg_str = []
 
+        all_ip_trans_err = []
+
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
             total_count[cl] = np.zeros((nx))
@@ -140,6 +152,7 @@ class MultiObjectPlotGenerator:
                 for thresh_ind, (dist_thresh, ang_thresh) in enumerate(thresh_list):
                     for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
                         dist_err = la.norm([y_err, z_err])
+                        all_ip_trans_err.append(dist_err)
                         total_count[cl][thresh_ind] += 1
                         if np.abs(dist_err) < dist_thresh:
                             success_count[cl][thresh_ind] += 1
@@ -155,6 +168,9 @@ class MultiObjectPlotGenerator:
         ax.set_title("In-Plane Translation Error")
         plt.legend(leg_hands, leg_str)
         plt.show(block=False)
+
+        print("Avg in-plane translation error: "+str(np.mean(all_ip_trans_err))+" m")
+
         ##########################################################################
 
 
@@ -167,6 +183,8 @@ class MultiObjectPlotGenerator:
         leg_hands = []
         leg_str = []
 
+        all_depth_err = []
+
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
             total_count[cl] = np.zeros((nx))
@@ -176,6 +194,7 @@ class MultiObjectPlotGenerator:
                 for thresh_ind, (dist_thresh, ang_thresh) in enumerate(thresh_list):
                     for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
                         dist_err = la.norm([x_err])
+                        all_depth_err.append(dist_err)
                         total_count[cl][thresh_ind] += 1
                         if np.abs(dist_err) < dist_thresh:
                             success_count[cl][thresh_ind] += 1
@@ -191,6 +210,9 @@ class MultiObjectPlotGenerator:
         ax.set_title("Depth Translation Error")
         plt.legend(leg_hands, leg_str)
         plt.show(block=False)
+
+        print("Avg depth translation error: "+str(np.mean(all_depth_err))+" m")
+
         ##########################################################################
 
 

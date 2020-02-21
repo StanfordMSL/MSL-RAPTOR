@@ -1,0 +1,6 @@
+bottle_shampoo_norm
+bottle_shengjun_norm
+bowl_white_small_norm
+camera_canon_wo_len_norm
+camera_shengjun_norm
+laptop_alienware_norm

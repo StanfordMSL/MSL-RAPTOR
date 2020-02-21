@@ -1,0 +1,5 @@
+bowl_white_small_norm
+camera_canon_len_norm
+can_arizona_tea_norm
+laptop_air_xin_norm
+mug_daniel_norm
