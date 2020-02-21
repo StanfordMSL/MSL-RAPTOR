@@ -46,6 +46,12 @@ class RaptorLogger:
                                 ('Corner 2D Projections GT (r|c)', 'proj_corners_gt', 8*2), 
                                 ('Angled BB (r|c|w|h|ang_deg)', 'abb', 5),
                                 ('Image Segmentation Mode', 'im_seg_mode', 1)]
+        self.save_elms['err'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
+                                 ('x err', 'x_err', 1),
+                                 ('y err', 'y_err', 1),
+                                 ('x err', 'z_err', 1),
+                                 ('ang err (deg)', 'ang_err', 1),
+                                 ('3d projection pix norm err', 'pix_err', 1)]
         self.save_elms['ssp'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
                                  ('Ado State GT', 'state_gt', 13), 
                                  ('Ado State Est', 'state_est', 13), 
@@ -57,7 +63,7 @@ class RaptorLogger:
                                  ('Corner 2D Projections GT (r|c)', 'proj_corners_gt', 8*2)]
 
         if not b_ssp:
-            self.modes = ['est', 'gt']
+            self.modes = ['est', 'gt', 'err']
         else:
             self.modes = ['ssp']
 
@@ -168,8 +174,8 @@ class RaptorLogger:
 
     def write_data_to_log(self, data, name, mode):
         """ mode can be est, gt, ssp"""
-        if (not self.b_ssp and not mode in ['est', 'gt']) or (self.b_ssp and not mode == 'ssp'):
-            raise RuntimeError("Mode {} not recognized".format(mode))
+        if not self.b_ssp and not mode in self.modes:
+            raise RuntimeError("Mode {} not recognized. Available modes are {}".format(mode, self.modes))
         save_el_shape = (len(self.save_elms[mode]), len(self.save_elms[mode][0]))
         num_to_write = np.sum(np.reshape([*zip(self.save_elms[mode])], save_el_shape)[:,2].astype(int)) 
         out = np.ones((1, num_to_write)) * 1e10

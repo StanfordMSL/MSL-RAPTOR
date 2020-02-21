@@ -237,8 +237,7 @@ class rosbags_to_logs:
                 # # pdb.set_trace()
                 ######################################################
                 
-                if self.raptor_metrics is not None:
-                    self.raptor_metrics.update_all_metrics(name=name, vertices=vertices, tf_w_cam=tf_w_cam, R_cam_ado_gt=R_cam_ado_gt, t_cam_ado_gt=t_cam_ado_gt, R_cam_ado_pr=R_cam_ado_pr, t_cam_ado_pr=t_cam_ado_pr, K=self.new_camera_matrix)
+                self.raptor_metrics.update_all_metrics(name=name, vertices=vertices, tf_w_cam=tf_w_cam, R_cam_ado_gt=R_cam_ado_gt, t_cam_ado_gt=t_cam_ado_gt, R_cam_ado_pr=R_cam_ado_pr, t_cam_ado_pr=t_cam_ado_pr, K=self.new_camera_matrix)
 
                 # Write data to log file #############################
                 log_data['time'] = t_est
@@ -253,12 +252,19 @@ class rosbags_to_logs:
                 log_data['proj_corners_est'] = np.reshape(self.raptor_metrics.proj_2d_pr[name].T, (self.raptor_metrics.proj_2d_pr[name].size,))
                 log_data['proj_corners_gt'] = np.reshape(self.raptor_metrics.proj_2d_gt[name].T, (self.raptor_metrics.proj_2d_gt[name].size,))
 
+                log_data['x_err'] = tf_w_ado_est[0, 3] - tf_w_ado_gt[0, 3]
+                log_data['y_err'] = tf_w_ado_est[1, 3] - tf_w_ado_gt[1, 3]
+                log_data['z_err'] = tf_w_ado_est[2, 3] - tf_w_ado_gt[2, 3]
+                log_data['ang_err'] = calcAngularDistance(tf_w_ado_est[0:3, 0:3], tf_w_ado_gt[0:3, 0:3])
+                log_data['pix_err'] = np.mean(la.norm(self.raptor_metrics.proj_2d_pr[name] - self.raptor_metrics.proj_2d_gt[name], axis=0))
+
                 if len(self.abb_time_list[name]) > 0:
                     (abb, im_seg_mode), _ = find_closest_by_time(t_est, self.abb_time_list[name], message_list=self.abb_list[name])
                     log_data['abb'] = abb
                     log_data['im_seg_mode'] = im_seg_mode
                 self.logger.write_data_to_log(log_data, name, mode='est')
                 self.logger.write_data_to_log(log_data, name, mode='gt')
+                self.logger.write_data_to_log(log_data, name, mode='err')
                 ######################################################
 
         if self.raptor_metrics is not None:
