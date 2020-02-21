@@ -1,0 +1,6 @@
+bowl_blue_white_chinese_norm
+bowl_white_small_norm
+can_lotte_milk_norm
+laptop_alienware_norm
+mug_anastasia_norm
+mug_brown_starbucks_norm
