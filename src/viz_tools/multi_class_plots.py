@@ -29,6 +29,7 @@ class MultiObjectPlotGenerator:
         for cl in self.class_labels:
             sub_dir = self.base_dir + cl
             err_logs_list = glob.glob(sub_dir + "/*_err.log")
+            err_logs_list.extend(glob.glob(sub_dir + "/*_ssperr.log"))
             for log_path in err_logs_list:
                 logs = logger.read_err_logs(log_path=log_path)
                 err_log_dict[cl].append(logs)
@@ -42,7 +43,7 @@ class MultiObjectPlotGenerator:
 
         nx = 20  # number of ticks on x axis
         dist_thresh = np.linspace(0, 3,nx)
-        ang_thresh = np.linspace(0, 90,nx)
+        ang_thresh = np.linspace(0, 20,nx)
         thresh_list = list(zip(dist_thresh, ang_thresh)) # [(m thesh, deg thresh)]
         show_every_nth_label = 4
         fig_ind = 0
