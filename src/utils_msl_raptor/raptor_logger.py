@@ -49,7 +49,7 @@ class RaptorLogger:
         self.save_elms['err'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
                                  ('x err', 'x_err', 1),
                                  ('y err', 'y_err', 1),
-                                 ('x err', 'z_err', 1),
+                                 ('z err', 'z_err', 1),
                                  ('ang err (deg)', 'ang_err', 1),
                                  ('3d projection pix norm err', 'pix_err', 1)]
         self.save_elms['ssp'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
