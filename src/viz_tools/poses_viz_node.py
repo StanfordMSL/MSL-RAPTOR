@@ -88,7 +88,7 @@ class poses_viz_node:
 
         for tracked_obj in tracked_objects_msg.tracked_objects:
             pose_arr.poses.append(tracked_obj.pose.pose)
-            if self.b_overlay:
+            if self.b_overlay and not len(tracked_obj.projected_3d_bb) == 0:
                 proj_3d_bb = np.reshape(tracked_obj.projected_3d_bb, (int(len(tracked_obj.projected_3d_bb)/2), 2) )
                 image = self.draw_2d_proj_of_3D_bounding_box(image, corners2D_pr=proj_3d_bb)
             
