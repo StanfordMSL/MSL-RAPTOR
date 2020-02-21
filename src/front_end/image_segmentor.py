@@ -63,7 +63,7 @@ class ImageSegmentor:
         self.min_aspect_ratio = {'person':0.1,'mslquad':1,'bowl':0.5,'cup':0.2,'laptop':0.3,'bottle':0.1}
         self.max_aspect_ratio = {'person':0.4,'mslquad':5,'bowl':2,'cup':1.3,'laptop':3,'bottle':1.0}
 
-        self.F_005 = 161.4476
+        self.chi2_03 = 6.06
         self.im_width = im_width
         self.im_height = im_height
 
@@ -201,7 +201,7 @@ class ImageSegmentor:
                 self.active_objects_ids_per_class[class_str] = [obj_id]
             else:
                 # There exist some active objects of this class, check if they match
-                best_t = self.F_005
+                best_t = self.chi2_03
                 obj_id = None
                 # Go through active candidate objects
                 for id in self.active_objects_ids_per_class[class_str]:
@@ -210,7 +210,7 @@ class ImageSegmentor:
                         continue
                     # Probabilistic check of if the measurement matches the ukf prediction
                     abb = np.concatenate([new_box[:4],[0]])
-                    t = self.score_state_consistent_measurement(self.ukf_dict[id],abb)
+                    t = self.compute_mahalanobis_dist(self.ukf_dict[id],abb)
                 
                     # Found an acceptable match
                     if t < best_t:
@@ -256,9 +256,9 @@ class ImageSegmentor:
         return detections
 
 
-    def score_state_consistent_measurement(self,ukf,abb):
+    def compute_mahalanobis_dist(self,ukf,abb):
         # Check if new measurement is too far from distribution of previous measurement
-        # Hotelling's t-squared statistic
+        # Mahalanobis distance
         if not hasattr(ukf,'mu_obs'):
             return np.inf
         return math.sqrt((abb-ukf.mu_obs)@ la.inv(ukf.S_obs) @ (abb-ukf.mu_obs).T)
@@ -322,8 +322,8 @@ class ImageSegmentor:
             return False
 
 
-        t = self.score_state_consistent_measurement(ukf,abb)
-        if t > self.F_005:
+        t = self.compute_mahalanobis_dist(ukf,abb)
+        if t > self.chi2_03:
             print("Rejected measurement too far from distribution: F={}".format(t))
             return False
 
