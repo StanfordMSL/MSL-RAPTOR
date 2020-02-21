@@ -79,7 +79,7 @@ class MultiObjectPlotGenerator:
         ax = plt.gca()
         x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        ax.set_xlabel("error metric")
+        ax.set_xlabel("threshold")
         ax.set_ylabel("% within translation threshold")
         ax.set_title("Translation Error")
         plt.legend(leg_hands, leg_str)
@@ -121,7 +121,7 @@ class MultiObjectPlotGenerator:
         # plt.xticks(range(nx), ["({:.2f} m, {:.1f} deg)".format(d, a) for (d, a) in thresh_list], size='small')
         x_tick_strs = ["{:d} deg".format(np.round(a).astype(int)) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        ax.set_xlabel("error metric")
+        ax.set_xlabel("threshold")
         ax.set_ylabel("% within angle threshold")
         ax.set_title("Rotation Error")
         plt.legend(leg_hands, leg_str)
@@ -163,7 +163,7 @@ class MultiObjectPlotGenerator:
         ax = plt.gca()
         x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        ax.set_xlabel("error metric")
+        ax.set_xlabel("threshold")
         ax.set_ylabel("% within distance threshold")
         ax.set_title("In-Plane Translation Error")
         plt.legend(leg_hands, leg_str)
@@ -205,7 +205,7 @@ class MultiObjectPlotGenerator:
         ax = plt.gca()
         x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        ax.set_xlabel("error metric")
+        ax.set_xlabel("threshold")
         ax.set_ylabel("% within distance threshold")
         ax.set_title("Depth Translation Error")
         plt.legend(leg_hands, leg_str)
@@ -214,7 +214,42 @@ class MultiObjectPlotGenerator:
         print("Avg depth translation error: "+str(np.mean(all_depth_err))+" m")
 
         ##########################################################################
+        
+        
+        # trans error / distance to target plot ##########################################################################
+        plt.figure(fig_ind)
+        fig_ind += 1
+        success_count = {}
+        total_count = {}
+        pcnt = {}
+        leg_hands = []
+        leg_str = []
 
+        for i, cl in enumerate(err_log_dict):
+            success_count[cl] = np.zeros((nx))
+            total_count[cl] = np.zeros((nx))
+            pcnt[cl] = np.zeros((nx))
+            err_log_list = err_log_dict[cl]
+            for err_log in err_log_list:
+                for thresh_ind, (dist_thresh, ang_thresh) in enumerate(thresh_list):
+                    for (x_err, y_err, z_err, ang_err, meas_dist) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err'], err_log["measurement_dist"]):
+                        dist_err = la.norm([x_err, y_err, z_err])
+                        total_count[cl][thresh_ind] += 1
+                        if np.abs(dist_err)/meas_dist < dist_thresh:
+                            success_count[cl][thresh_ind] += 1
+            pcnt[cl] = np.array([s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
+            plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
+            leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=1)[0])
+            leg_str.append(cl)
+        ax = plt.gca()
+        x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
+        plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        ax.set_xlabel("threshold")
+        ax.set_ylabel("% within threshold")
+        ax.set_title("Translation Error / Distance to Object")
+        plt.legend(leg_hands, leg_str)
+        plt.show(block=False)
+        ##########################################################################
 
 
 if __name__ == '__main__':
