@@ -12,6 +12,7 @@ from scipy.spatial.transform import Rotation as R
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as mfm
+import matplotlib.ticker as ticker
 # Utils
 sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor')
 from raptor_logger import *
@@ -37,26 +38,30 @@ class MultiObjectPlotGenerator:
         # prrl_symbol = '||'  
         prrl_symbol = u'\u2225'
 
-        font = {'weight' : text_weight,
+        font = {'family': 'STIXGeneral',
+                'weight' : text_weight,
                 'size'   : fontsize}
         # pdb.set_trace()
         matplotlib.rc('font', **font)
 
-        show_every_nth_label = 5
         if b_nocs:
             nx = 100  # number of ticks on x axis
+            show_every_nth_label = 20
             d_max = 0.2
             a_max = 60
             p_max = 50
-            # x_dist_labels_to_show = np.linspace(0, d_max, 5)
-            # x_ang_labels_to_show = np.linspace(0, a_max, 5)
+            x_dist_labels_to_show = np.linspace(0, d_max, show_every_nth_label)
+            x_ang_labels_to_show = np.linspace(0, a_max, show_every_nth_label)
+            x_pix_labels_to_show = np.linspace(0, p_max, show_every_nth_label)
         else:
             nx = 20  # number of ticks on x axis
+            show_every_nth_label = 5
             d_max = 3
             a_max = 30
             p_max = 50
-            # x_dist_labels_to_show = np.linspace(0, d_max, 5)
-            # x_ang_labels_to_show = np.linspace(0, a_max, 5)
+            x_dist_labels_to_show = np.linspace(0, d_max, show_every_nth_label)
+            x_ang_labels_to_show = np.linspace(0, a_max, show_every_nth_label)
+            x_pix_labels_to_show = np.linspace(0, p_max, show_every_nth_label)
         dist_thresh = np.linspace(0, d_max, nx)
         ang_thresh = np.linspace(0, a_max, nx)
         pix_thresh = np.linspace(0, p_max, nx)
@@ -115,9 +120,12 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        x_tick_strs = ["{:.2f} m".format(d) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        # plt.xticks(x_dist_labels_to_show, ["{:.2} m".format(f) for f in x_dist_labels_to_show], size='small')
+        # x_tick_strs = ["{:.2f} m".format(d) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
+        # plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        # ax.xaxis.set_major_locator(ticker.MultipleLocator(show_every_nth_label))
+        # pdb.set_trace()
+        # plt.xticks(plt.xticks()[0], x_dist_labels_to_show, size='small')
+        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_dist_labels_to_show, size='small')
         ax.set_xlabel("distance threshold", fontsize=fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
@@ -160,9 +168,11 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        x_tick_strs = ["{:d} deg".format(np.round(a).astype(int)) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        # plt.xticks(x_dist_labels_to_show, ["{:d} deg".format(np.round(f).astype(int)) for f in x_ang_labels_to_show], size='small')
+        # x_tick_strs = ["{:d} deg".format(np.round(a).astype(int)) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
+        # plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        # plt.xticks(plt.xticks()[0], x_ang_labels_to_show, size='small')
+        # ax.xaxis.set_major_locator(ticker.MultipleLocator(show_every_nth_label))
+        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_ang_labels_to_show, size='small')
         ax.set_xlabel("angle threshold", fontsize=fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
@@ -218,9 +228,11 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt2[cl], color_strs[i] + '--', linewidth=linewidth)[0])
             leg_str.append(prrl_symbol + ' ' + cl)
         ax = plt.gca()
-        x_tick_strs = ["{:.2f} m".format(d) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        # plt.xticks(x_dist_labels_to_show, ["{:.2} m".format(f) for f in x_dist_labels_to_show], size='small')
+        # x_tick_strs = ["{:.2f} m".format(d) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
+        # plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        # plt.xticks(plt.xticks()[0], x_dist_labels_to_show, size='small')
+        # ax.xaxis.set_major_locator(ticker.MultipleLocator(show_every_nth_label))
+        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_dist_labels_to_show, size='small')
         ax.set_xlabel("distance threshold", fontsize=fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
@@ -262,9 +274,11 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        x_tick_strs = ["{:.2f} m".format(d) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        # plt.xticks(x_dist_labels_to_show, ["{:.2}".format(f) for f in x_dist_labels_to_show], size='small')
+        # x_tick_strs = ["{:.2f} m".format(d) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
+        # plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        # plt.xticks(plt.xticks()[0], x_dist_labels_to_show, size='small')
+        # ax.xaxis.set_major_locator(ticker.MultipleLocator(show_every_nth_label))
+        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_dist_labels_to_show, size='small')
         ax.set_xlabel("distance threshold", fontsize=fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
@@ -300,9 +314,11 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        x_tick_strs = ["{:d} pix".format(int(p)) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        # plt.xticks(x_dist_labels_to_show, ["{:.2}".format(f) for f in x_dist_labels_to_show], size='small')
+        # x_tick_strs = ["{:d} pix".format(int(p)) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
+        # plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        # plt.xticks(plt.xticks()[0], x_pix_labels_to_show, size='small')
+        # ax.xaxis.set_major_locator(ticker.MultipleLocator(show_every_nth_label))
+        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_pix_labels_to_show, size='small')
         ax.set_xlabel("pixel threshold", fontsize=fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
