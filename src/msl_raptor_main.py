@@ -172,9 +172,9 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
             obj_prms = list(yaml.load_all(stream))
             for obj_dict in obj_prms:
                 if obj_dict['ns'] in objects_used:
-                    half_length = float(obj_dict['bound_box_l']) /2 + category_params[obj_dict['class_str']].offset_bb_l
-                    half_width = float(obj_dict['bound_box_w']) /2 + category_params[obj_dict['class_str']].offset_bb_w
-                    half_height = float(obj_dict['bound_box_h']) /2 + category_params[obj_dict['class_str']].offset_bb_h
+                    half_length = (float(obj_dict['bound_box_l']) + category_params[obj_dict['class_str']]['offset_bb_l']) /2
+                    half_width = (float(obj_dict['bound_box_w']) + category_params[obj_dict['class_str']]['offset_bb_w']) /2 
+                    half_height = (float(obj_dict['bound_box_h']) + category_params[obj_dict['class_str']]['offset_bb_h'])/2
                     
                     bb_3d[obj_dict['class_str']] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
                                                              [ half_length, half_width,-half_height, 1.],  # 2 front, right, up

@@ -12,6 +12,7 @@ try:
 except:
     from math_utils import *
 from os import listdir
+import yaml 
 
 def state_to_tf(state):
     """ returns tf_w_quad given the state vector """
@@ -213,11 +214,11 @@ def load_category_params():
     params = {}
     for f in listdir("/root/msl_raptor_ws/src/msl_raptor/params/category_params"):
         class_str = f.split('_')[0]
-        yaml_file = cl+class_str+'_ukf_params.yaml'
+        yaml_file = class_str+'_ukf_params.yaml'
 
         with open( "/root/msl_raptor_ws/src/msl_raptor/params/category_params/"+ f) as stream:
             try:
-                params.append(yaml.safe_load(stream))
+                params[class_str] = yaml.safe_load(stream)
             except yaml.YAMLError as exc:
                 print(exc)
 
