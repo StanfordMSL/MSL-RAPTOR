@@ -15,7 +15,7 @@ from ukf import UKF
 # libs & utils
 from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.math_utils import *
-from utils_msl_raptor.ukf_utils import state_to_tf, pose_to_3d_bb_proj
+from utils_msl_raptor.ukf_utils import state_to_tf, pose_to_3d_bb_proj, load_category_params
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/src/front_end')
 from image_segmentor import ImageSegmentor
 import yaml
@@ -35,7 +35,11 @@ def run_execution_loop():
     
     ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb,b_pub_3d_bb_proj)  # create a ros interface object
 
-    bb_3d, obj_width, classes_names, classes_ids, objects_names_per_class = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file)  # Parse objects used and associated configurations
+    # Returns dict of params per class name
+    category_params = load_category_params()
+
+    bb_3d, obj_width, classes_names, classes_ids, objects_names_per_class = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,category_params)  # Parse objects used and associated configurations
+
 
     ros.objects_names_per_class = objects_names_per_class
     ros.bb_3d = bb_3d
@@ -105,7 +109,7 @@ def run_execution_loop():
             ukf = None
             if not obj_id in ukf_dict:  # New Object
                 print("new object (id = {}, type = {})".format(obj_id, class_str))
-                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id,verbose=b_verbose)
+                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str],ukf_prms=category_params[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id,verbose=b_verbose)
                 if b_use_gt_pose_init:
                     approx_position = ukf_dict[obj_id].approx_position_from_bb(abb, tf_w_ego)
                     gt_pose = ros.get_closest_pose(class_str,approx_position)
@@ -146,7 +150,7 @@ def init_state_from_gt(ros, ukf):
     ukf.mu[0:3] += np.array([-2, .5, .5]) 
 
 
-def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file):
+def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,category_params):
     # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
 
     with open(objects_used_path) as f:
@@ -168,9 +172,9 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file):
             obj_prms = list(yaml.load_all(stream))
             for obj_dict in obj_prms:
                 if obj_dict['ns'] in objects_used:
-                    half_length = float(obj_dict['bound_box_l']) /2
-                    half_width = float(obj_dict['bound_box_w']) /2
-                    half_height = float(obj_dict['bound_box_h']) /2
+                    half_length = (float(obj_dict['bound_box_l']) + category_params[obj_dict['class_str']]['offset_bb_l']) /2
+                    half_width = (float(obj_dict['bound_box_w']) + category_params[obj_dict['class_str']]['offset_bb_w']) /2 
+                    half_height = (float(obj_dict['bound_box_h']) + category_params[obj_dict['class_str']]['offset_bb_h'])/2
                     
                     bb_3d[obj_dict['class_str']] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
                                                              [ half_length, half_width,-half_height, 1.],  # 2 front, right, up

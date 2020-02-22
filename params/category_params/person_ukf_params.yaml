@@ -12,3 +12,7 @@ dv_q: [0.015,0.015,0.0]
 dq_q: [0.0,0.0,0.1]
 dw_q: [0.0,0.0,0.1]
 R: [10, 10, 100, 100, 10000.0]
+# Offsets in meters for length, width and height of the bounding box
+offset_bb_l: 0.0
+offset_bb_w: 0.0
+offset_bb_h: 0.0
