@@ -11,6 +11,7 @@ from scipy.spatial.transform import Rotation as R
 # plots
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as mfm
 # Utils
 sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor')
 from raptor_logger import *
@@ -22,16 +23,21 @@ class MultiObjectPlotGenerator:
         # PLOT OPTIONS ###################################
         b_nocs = False
         color_strs = ['r', 'b', 'm', 'k', 'c', 'g']
-        fontsize = 16
+        fontsize = 26
         linewidth = 3
         text_weight = 'bold'  # 'normal' or 'bold'
+        font_file = '/usr/local/lib/python3.6/dist-packages/matplotlib/mpl-data/fonts/ttf/DejaVuSansMono-Bold.ttf'
         self.plot_scale = 1.5 # make plots bigger so there is space for legend
         b_capitalize_names = True
         b_show_dots = False
         b_plot_titles = False
+        prop = mfm.FontProperties(fname=font_file, weight=text_weight, size=fontsize)
+        perp_symbol = u'\u27c2'
+        prrl_symbol = '||'  # prrl_symbol = u'\u2225'
 
         font = {'weight' : text_weight,
                 'size'   : fontsize}
+        # pdb.set_trace()
         matplotlib.rc('font', **font)
 
         show_every_nth_label = 5
@@ -114,7 +120,7 @@ class MultiObjectPlotGenerator:
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error")
-        plt.legend(leg_hands, leg_str)
+        plt.legend(leg_hands, leg_str, prop=prop)
         plt.show(block=False)
 
         print("Avg translation error: "+str(np.mean(all_dist_err))+" m")
@@ -159,7 +165,7 @@ class MultiObjectPlotGenerator:
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Rotation Error")
-        plt.legend(leg_hands, leg_str)
+        plt.legend(leg_hands, leg_str, prop=prop)
         plt.show(block=False)
         
         print("Avg rotation error: "+str(np.mean(all_ang_err))+" deg")
@@ -206,9 +212,9 @@ class MultiObjectPlotGenerator:
                 plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
                 plt.plot(range(nx), pcnt2[cl], color_strs[i] + '.', markersize=4)
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
-            leg_str.append(cl + ' (in-plane)')
+            leg_str.append(perp_symbol + ' ' + cl)
             leg_hands.append(plt.plot(range(nx), pcnt2[cl], color_strs[i] + '--', linewidth=linewidth)[0])
-            leg_str.append(cl + ' (depth)')
+            leg_str.append(prrl_symbol + ' ' + cl)
         ax = plt.gca()
         x_tick_strs = ["{:.2f} m".format(d) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
@@ -217,7 +223,7 @@ class MultiObjectPlotGenerator:
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error (In-Plane vs. Depth)")
-        plt.legend(leg_hands, leg_str)
+        plt.legend(leg_hands, leg_str, prop=prop)
         plt.show(block=False)
 
         print("Avg in-plane translation error: "+str(np.mean(all_ip_trans_err))+" m")
@@ -261,7 +267,7 @@ class MultiObjectPlotGenerator:
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error / Distance to Object")
-        plt.legend(leg_hands, leg_str)
+        plt.legend(leg_hands, leg_str, prop=prop)
         plt.show(block=False)
         ##########################################################################
         
@@ -299,7 +305,7 @@ class MultiObjectPlotGenerator:
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Pixel Error")
-        plt.legend(leg_hands, leg_str)
+        plt.legend(leg_hands, leg_str, prop=prop)
         plt.show(block=False)
         ##########################################################################
 
