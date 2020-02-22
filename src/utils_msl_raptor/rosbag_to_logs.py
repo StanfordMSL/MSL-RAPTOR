@@ -180,6 +180,9 @@ class rosbags_to_logs:
             if t_est < 0:
                 continue
 
+            if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_est > 34:
+                continue
+
             # at a given time, look at what classes were seen. compile all objects of these classes into a list
             candidate_name_class = []
             classes_seen_this_itr = self.ado_est_pose_BY_TIME_BY_CLASS[t_est].keys()
@@ -292,7 +295,7 @@ class rosbags_to_logs:
 
     def process_rb(self):
         print("Processing {}".format(self.rb_name))
-        for topic, msg, t in self.bag.read_messages():
+        for i, (topic, msg, t) in enumerate(self.bag.read_messages()):
             t_split = topic.split("/")
             name = t_split[1]
             topic_name = t_split[-1]
