@@ -20,7 +20,26 @@ class MultiObjectPlotGenerator:
     def __init__(self, base_directory, class_labels):
 
         # PLOT OPTIONS ###################################
+        b_nocs = False
+        color_strs = ['r', 'b', 'm', 'k', 'c', 'g']
         b_capitalize_names = True
+        b_show_dots = False
+
+        show_every_nth_label = 5
+        if b_nocs:
+            nx = 100  # number of ticks on x axis
+            d_max = 0.2
+            a_max = 60
+            # x_dist_labels_to_show = np.linspace(0, d_max, 5)
+            # x_ang_labels_to_show = np.linspace(0, a_max, 5)
+        else:
+            nx = 20  # number of ticks on x axis
+            d_max = 3
+            a_max = 30
+            # x_dist_labels_to_show = np.linspace(0, d_max, 5)
+            # x_ang_labels_to_show = np.linspace(0, a_max, 5)
+        dist_thresh = np.linspace(0, d_max, nx)
+        ang_thresh = np.linspace(0, a_max, nx)
         ###################################
 
 
@@ -40,18 +59,12 @@ class MultiObjectPlotGenerator:
                 else:
                     err_log_dict[cl].append(logs)
         # make plot with varying thresholds
-        self.fig = None
-        self.axes = None
-        color_strs = ['r', 'b', 'm', 'k', 'c', 'g']
         if len(err_log_dict) > len(color_strs):
             raise RuntimeError("need to add more colors to color string list!! too many classes..")
 
 
-        nx = 20  # number of ticks on x axis
-        dist_thresh = np.linspace(0, 3,nx)
-        ang_thresh = np.linspace(0, 30,nx)
+
         thresh_list = list(zip(dist_thresh, ang_thresh)) # [(m thesh, deg thresh)]
-        show_every_nth_label = 5
         fig_ind = 0
 
 
@@ -79,12 +92,14 @@ class MultiObjectPlotGenerator:
                         if np.abs(dist_err) < dist_thresh:
                             success_count[cl][thresh_ind] += 1
             pcnt[cl] = np.array([s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
-            plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
+            if b_show_dots:
+                plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=1)[0])
             leg_str.append(cl)
         ax = plt.gca()
         x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        # plt.xticks(x_dist_labels_to_show, ["{:.2} m".format(f) for f in x_dist_labels_to_show], size='small')
         ax.set_xlabel("threshold")
         ax.set_ylabel("% within translation threshold")
         ax.set_title("Translation Error")
@@ -120,13 +135,14 @@ class MultiObjectPlotGenerator:
                         if np.abs(ang_err) < ang_thresh:
                             success_count[cl][thresh_ind] += 1
             pcnt[cl] = np.array([s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
-            plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
+            if b_show_dots:
+                plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=1)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        # plt.xticks(range(nx), ["({:.2f} m, {:.1f} deg)".format(d, a) for (d, a) in thresh_list], size='small')
         x_tick_strs = ["{:d} deg".format(np.round(a).astype(int)) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        # plt.xticks(x_dist_labels_to_show, ["{:d} deg".format(np.round(f).astype(int)) for f in x_ang_labels_to_show], size='small')
         ax.set_xlabel("threshold")
         ax.set_ylabel("% within angle threshold")
         ax.set_title("Rotation Error")
@@ -171,19 +187,21 @@ class MultiObjectPlotGenerator:
                         if np.abs(dist_err_depth) < dist_thresh:
                             success_count2[cl][thresh_ind] += 1
             pcnt[cl] = np.array([s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
-            plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
             pcnt2[cl] = np.array([s/t for s, t in zip(success_count2[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
-            plt.plot(range(nx), pcnt2[cl], color_strs[i] + '.', markersize=4)
+            if b_show_dots:
+                plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
+                plt.plot(range(nx), pcnt2[cl], color_strs[i] + '.', markersize=4)
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=1)[0])
-            leg_str.append(cl + ' (inp-lane)')
+            leg_str.append(cl + ' (in-plane)')
             leg_hands.append(plt.plot(range(nx), pcnt2[cl], color_strs[i] + '--', linewidth=1)[0])
             leg_str.append(cl + ' (depth)')
         ax = plt.gca()
         x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        # plt.xticks(x_dist_labels_to_show, ["{:.2} m".format(f) for f in x_dist_labels_to_show], size='small')
         ax.set_xlabel("threshold")
         ax.set_ylabel("% within distance threshold")
-        ax.set_title("Translation Error (In-Plane vs Depth)")
+        ax.set_title("Translation Error (In-Plane vs. Depth)")
         plt.legend(leg_hands, leg_str)
         plt.show(block=False)
 
@@ -215,12 +233,14 @@ class MultiObjectPlotGenerator:
                         if np.abs(dist_err)/meas_dist < dist_thresh:
                             success_count[cl][thresh_ind] += 1
             pcnt[cl] = np.array([s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
-            plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
+            if b_show_dots:
+                plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=1)[0])
             leg_str.append(cl)
         ax = plt.gca()
         x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
+        # plt.xticks(x_dist_labels_to_show, ["{:.2}".format(f) for f in x_dist_labels_to_show], size='small')
         ax.set_xlabel("threshold")
         ax.set_ylabel("% within threshold")
         ax.set_title("Translation Error / Distance to Object")
