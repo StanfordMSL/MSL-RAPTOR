@@ -26,14 +26,16 @@ class MultiObjectPlotGenerator:
         fontsize = 26
         linewidth = 3
         text_weight = 'bold'  # 'normal' or 'bold'
-        font_file = '/usr/local/lib/python3.6/dist-packages/matplotlib/mpl-data/fonts/ttf/DejaVuSansMono-Bold.ttf'
+        # font_path = '/usr/local/lib/python3.6/dist-packages/matplotlib/mpl-data/fonts/ttf/DejaVuSansMono-Bold.ttf'  # this one has bold
+        font_path = '/usr/local/lib/python3.6/dist-packages/matplotlib/mpl-data/fonts/ttf/STIXGeneral.ttf'  # this one does not...
         self.plot_scale = 1.5 # make plots bigger so there is space for legend
         b_capitalize_names = True
         b_show_dots = False
         b_plot_titles = False
-        prop = mfm.FontProperties(fname=font_file, weight=text_weight, size=fontsize)
+        leg_font_props = mfm.FontProperties(fname=font_path, weight=text_weight, size=fontsize-2)
         perp_symbol = u'\u27c2'
-        prrl_symbol = '||'  # prrl_symbol = u'\u2225'
+        # prrl_symbol = '||'  
+        prrl_symbol = u'\u2225'
 
         font = {'weight' : text_weight,
                 'size'   : fontsize}
@@ -120,7 +122,7 @@ class MultiObjectPlotGenerator:
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error")
-        plt.legend(leg_hands, leg_str, prop=prop)
+        plt.legend(leg_hands, leg_str, prop=leg_font_props)
         plt.show(block=False)
 
         print("Avg translation error: "+str(np.mean(all_dist_err))+" m")
@@ -165,7 +167,7 @@ class MultiObjectPlotGenerator:
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Rotation Error")
-        plt.legend(leg_hands, leg_str, prop=prop)
+        plt.legend(leg_hands, leg_str, prop=leg_font_props)
         plt.show(block=False)
         
         print("Avg rotation error: "+str(np.mean(all_ang_err))+" deg")
@@ -223,7 +225,7 @@ class MultiObjectPlotGenerator:
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error (In-Plane vs. Depth)")
-        plt.legend(leg_hands, leg_str, prop=prop)
+        plt.legend(leg_hands, leg_str, prop=leg_font_props)
         plt.show(block=False)
 
         print("Avg in-plane translation error: "+str(np.mean(all_ip_trans_err))+" m")
@@ -267,7 +269,7 @@ class MultiObjectPlotGenerator:
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error / Distance to Object")
-        plt.legend(leg_hands, leg_str, prop=prop)
+        plt.legend(leg_hands, leg_str, prop=leg_font_props)
         plt.show(block=False)
         ##########################################################################
         
@@ -305,7 +307,7 @@ class MultiObjectPlotGenerator:
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Pixel Error")
-        plt.legend(leg_hands, leg_str, prop=prop)
+        plt.legend(leg_hands, leg_str, prop=leg_font_props)
         plt.show(block=False)
         ##########################################################################
 
