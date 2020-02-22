@@ -19,8 +19,11 @@ class MultiObjectPlotGenerator:
 
     def __init__(self, base_directory, class_labels):
 
-        # class_names = glob.glob(base_directory)
-        # all_sub_folders = os.listdir(base_directory)
+        # PLOT OPTIONS ###################################
+        b_capitalize_names = True
+        ###################################
+
+
         self.class_labels = class_labels
         self.base_dir = base_directory
 
@@ -32,7 +35,10 @@ class MultiObjectPlotGenerator:
             err_logs_list.extend(glob.glob(sub_dir + "/*_ssperr.log"))
             for log_path in err_logs_list:
                 logs = logger.read_err_logs(log_path=log_path)
-                err_log_dict[cl].append(logs)
+                if b_capitalize_names:
+                    err_log_dict[cl.upper()].append(logs)
+                else:
+                    err_log_dict[cl].append(logs)
         # make plot with varying thresholds
         self.fig = None
         self.axes = None
@@ -41,11 +47,11 @@ class MultiObjectPlotGenerator:
             raise RuntimeError("need to add more colors to color string list!! too many classes..")
 
 
-        nx = 100  # number of ticks on x axis
-        dist_thresh = np.linspace(0, 0.2,nx)
-        ang_thresh = np.linspace(0, 60,nx)
+        nx = 20  # number of ticks on x axis
+        dist_thresh = np.linspace(0, 3,nx)
+        ang_thresh = np.linspace(0, 30,nx)
         thresh_list = list(zip(dist_thresh, ang_thresh)) # [(m thesh, deg thresh)]
-        show_every_nth_label = 10
+        show_every_nth_label = 5
         fig_ind = 0
 
 
@@ -132,85 +138,56 @@ class MultiObjectPlotGenerator:
         ##########################################################################
 
 
-        # in plane translation err plot ##########################################################################
+        # in plane vs depth translation err plot ##########################################################################
         plt.figure(fig_ind)
         fig_ind += 1
         success_count = {}
         total_count = {}
         pcnt = {}
+        success_count2 = {}
+        pcnt2 = {}
         leg_hands = []
         leg_str = []
 
         all_ip_trans_err = []
-
-        for i, cl in enumerate(err_log_dict):
-            success_count[cl] = np.zeros((nx))
-            total_count[cl] = np.zeros((nx))
-            pcnt[cl] = np.zeros((nx))
-            err_log_list = err_log_dict[cl]
-            for err_log in err_log_list:
-                for thresh_ind, (dist_thresh, ang_thresh) in enumerate(thresh_list):
-                    for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
-                        dist_err = la.norm([y_err, z_err])
-                        all_ip_trans_err.append(dist_err)
-                        total_count[cl][thresh_ind] += 1
-                        if np.abs(dist_err) < dist_thresh:
-                            success_count[cl][thresh_ind] += 1
-            pcnt[cl] = np.array([s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
-            plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
-            leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=1)[0])
-            leg_str.append(cl)
-        ax = plt.gca()
-        x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        ax.set_xlabel("threshold")
-        ax.set_ylabel("% within distance threshold")
-        ax.set_title("In-Plane Translation Error")
-        plt.legend(leg_hands, leg_str)
-        plt.show(block=False)
-
-        print("Avg in-plane translation error: "+str(np.mean(all_ip_trans_err))+" m")
-
-        ##########################################################################
-
-
-        # depth translation err plot ##########################################################################
-        plt.figure(fig_ind)
-        fig_ind += 1
-        success_count = {}
-        total_count = {}
-        pcnt = {}
-        leg_hands = []
-        leg_str = []
-
         all_depth_err = []
 
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
+            success_count2[cl] = np.zeros((nx))
             total_count[cl] = np.zeros((nx))
             pcnt[cl] = np.zeros((nx))
             err_log_list = err_log_dict[cl]
             for err_log in err_log_list:
                 for thresh_ind, (dist_thresh, ang_thresh) in enumerate(thresh_list):
                     for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
-                        dist_err = la.norm([x_err])
-                        all_depth_err.append(dist_err)
+                        dist_err_inplane = la.norm([y_err, z_err])
+                        dist_err_depth = la.norm([x_err])
+                        all_ip_trans_err.append(dist_err_inplane)
+                        all_depth_err.append(dist_err_depth)
                         total_count[cl][thresh_ind] += 1
-                        if np.abs(dist_err) < dist_thresh:
+                        if np.abs(dist_err_inplane) < dist_thresh:
                             success_count[cl][thresh_ind] += 1
+                        if np.abs(dist_err_depth) < dist_thresh:
+                            success_count2[cl][thresh_ind] += 1
             pcnt[cl] = np.array([s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
             plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
+            pcnt2[cl] = np.array([s/t for s, t in zip(success_count2[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
+            plt.plot(range(nx), pcnt2[cl], color_strs[i] + '.', markersize=4)
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=1)[0])
-            leg_str.append(cl)
+            leg_str.append(cl + ' (inp-lane)')
+            leg_hands.append(plt.plot(range(nx), pcnt2[cl], color_strs[i] + '--', linewidth=1)[0])
+            leg_str.append(cl + ' (depth)')
         ax = plt.gca()
         x_tick_strs = ["{:.2f} m".format(d) for i, (d, a) in enumerate(thresh_list) if i % show_every_nth_label == 0]
         plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
         ax.set_xlabel("threshold")
         ax.set_ylabel("% within distance threshold")
-        ax.set_title("Depth Translation Error")
+        ax.set_title("Translation Error (In-Plane vs Depth)")
         plt.legend(leg_hands, leg_str)
         plt.show(block=False)
 
+        print("Avg in-plane translation error: "+str(np.mean(all_ip_trans_err))+" m")
         print("Avg depth translation error: "+str(np.mean(all_depth_err))+" m")
 
         ##########################################################################
