@@ -42,7 +42,7 @@ class MultiObjectPlotGenerator:
         ang_thresh = np.linspace(0, a_max, nx)
         ###################################
 
-
+        self.eps = 1e-5
         self.class_labels = class_labels
         self.base_dir = base_directory
 
@@ -80,7 +80,7 @@ class MultiObjectPlotGenerator:
 
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
-            total_count[cl] = np.zeros((nx))
+            total_count[cl] = np.ones((nx))*self.eps
             pcnt[cl] = np.zeros((nx))
             err_log_list = err_log_dict[cl]
             for err_log in err_log_list:
@@ -123,7 +123,7 @@ class MultiObjectPlotGenerator:
 
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
-            total_count[cl] = np.zeros((nx))
+            total_count[cl] = np.ones((nx))*self.eps
             pcnt[cl] = np.zeros((nx))
             err_log_list = err_log_dict[cl]
             for err_log in err_log_list:
@@ -171,7 +171,7 @@ class MultiObjectPlotGenerator:
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
             success_count2[cl] = np.zeros((nx))
-            total_count[cl] = np.zeros((nx))
+            total_count[cl] = np.ones((nx))*self.eps
             pcnt[cl] = np.zeros((nx))
             err_log_list = err_log_dict[cl]
             for err_log in err_log_list:
@@ -222,7 +222,7 @@ class MultiObjectPlotGenerator:
 
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
-            total_count[cl] = np.zeros((nx))
+            total_count[cl] = np.ones((nx))*self.eps
             pcnt[cl] = np.zeros((nx))
             err_log_list = err_log_dict[cl]
             for err_log in err_log_list:
