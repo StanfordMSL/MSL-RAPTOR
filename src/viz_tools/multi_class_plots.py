@@ -35,34 +35,34 @@ class MultiObjectPlotGenerator:
         b_plot_titles = False
         leg_font_props = mfm.FontProperties(fname=font_path, weight=text_weight, size=fontsize-2)
         perp_symbol = u'\u27c2'
-        # prrl_symbol = '||'  
-        prrl_symbol = u'\u2225'
+        prrl_symbol = u'\u2225' # prrl_symbol = '||'  
 
         font = {'family': 'STIXGeneral',
                 'weight' : text_weight,
                 'size'   : fontsize}
-        # pdb.set_trace()
         matplotlib.rc('font', **font)
 
         if b_nocs:
             nx = 100  # number of ticks on x axis
             show_every_nth_label = 20
-            d_max = 0.2
-            a_max = 60
-            p_max = 50
-            x_dist_labels_to_show = np.linspace(0, d_max, show_every_nth_label)
-            x_ang_labels_to_show = np.linspace(0, a_max, show_every_nth_label)
-            x_pix_labels_to_show = np.linspace(0, p_max, show_every_nth_label)
+            d_max = 0.2  # max trans err thresh
+            d_unitless_max = 0.1  # max trans error / distance thresh
+            a_max = 60  # max angle thresh
+            p_max = 50  # max pixel thresh
         else:
             nx = 20  # number of ticks on x axis
             show_every_nth_label = 5
             d_max = 3
+            d_unitless_max = 1.5
             a_max = 30
             p_max = 50
-            x_dist_labels_to_show = np.linspace(0, d_max, show_every_nth_label)
-            x_ang_labels_to_show = np.linspace(0, a_max, show_every_nth_label)
-            x_pix_labels_to_show = np.linspace(0, p_max, show_every_nth_label)
+
+        x_dist_labels_to_show = np.linspace(0, d_max, show_every_nth_label)
+        x_dist_unitless_labels_to_show = np.linspace(0, d_unitless_max, show_every_nth_label)
+        x_ang_labels_to_show = np.linspace(0, a_max, show_every_nth_label).astype(int)
+        x_pix_labels_to_show = np.linspace(0, p_max, show_every_nth_label).astype(int)
         dist_thresh = np.linspace(0, d_max, nx)
+        dist_unitless_thresh = np.linspace(0, d_unitless_max, nx)
         ang_thresh = np.linspace(0, a_max, nx)
         pix_thresh = np.linspace(0, p_max, nx)
         ###################################
@@ -120,13 +120,8 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        # x_tick_strs = ["{:.2f} m".format(d) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        # plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        # ax.xaxis.set_major_locator(ticker.MultipleLocator(show_every_nth_label))
-        # pdb.set_trace()
-        # plt.xticks(plt.xticks()[0], x_dist_labels_to_show, size='small')
         plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_dist_labels_to_show, size='small')
-        ax.set_xlabel("distance threshold", fontsize=fontsize, weight=text_weight)
+        ax.set_xlabel("translation error threshold (m)", fontsize=fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error")
@@ -146,7 +141,6 @@ class MultiObjectPlotGenerator:
         pcnt = {}
         leg_hands = []
         leg_str = []
-
         all_ang_err = []
 
         for i, cl in enumerate(err_log_dict):
@@ -157,7 +151,6 @@ class MultiObjectPlotGenerator:
             for err_log in err_log_list:
                 for thresh_ind, (dist_thresh, ang_thresh, pix_thresh) in enumerate(thresh_list):
                     for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
-                        # dist_err = la.norm([x_err, y_err, z_err])
                         all_ang_err.append(ang_err)
                         total_count[cl][thresh_ind] += 1
                         if np.abs(ang_err) < ang_thresh:
@@ -168,12 +161,8 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        # x_tick_strs = ["{:d} deg".format(np.round(a).astype(int)) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        # plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        # plt.xticks(plt.xticks()[0], x_ang_labels_to_show, size='small')
-        # ax.xaxis.set_major_locator(ticker.MultipleLocator(show_every_nth_label))
         plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_ang_labels_to_show, size='small')
-        ax.set_xlabel("angle threshold", fontsize=fontsize, weight=text_weight)
+        ax.set_xlabel("angle threshold (deg)", fontsize=fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Rotation Error")
@@ -196,7 +185,6 @@ class MultiObjectPlotGenerator:
         pcnt2 = {}
         leg_hands = []
         leg_str = []
-
         all_ip_trans_err = []
         all_depth_err = []
 
@@ -228,12 +216,8 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt2[cl], color_strs[i] + '--', linewidth=linewidth)[0])
             leg_str.append(prrl_symbol + ' ' + cl)
         ax = plt.gca()
-        # x_tick_strs = ["{:.2f} m".format(d) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        # plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        # plt.xticks(plt.xticks()[0], x_dist_labels_to_show, size='small')
-        # ax.xaxis.set_major_locator(ticker.MultipleLocator(show_every_nth_label))
         plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_dist_labels_to_show, size='small')
-        ax.set_xlabel("distance threshold", fontsize=fontsize, weight=text_weight)
+        ax.set_xlabel("translation error threshold (m)", fontsize=fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error (In-Plane vs. Depth)")
@@ -262,11 +246,11 @@ class MultiObjectPlotGenerator:
             pcnt[cl] = np.zeros((nx))
             err_log_list = err_log_dict[cl]
             for err_log in err_log_list:
-                for thresh_ind, (dist_thresh, ang_thresh, pix_thresh) in enumerate(thresh_list):
+                for thresh_ind, (unitless_thresh) in enumerate(dist_unitless_thresh):
                     for (x_err, y_err, z_err, ang_err, meas_dist) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err'], err_log["measurement_dist"]):
                         dist_err = la.norm([x_err, y_err, z_err])
                         total_count[cl][thresh_ind] += 1
-                        if np.abs(dist_err)/meas_dist < dist_thresh:
+                        if np.abs(dist_err)/meas_dist < unitless_thresh:
                             success_count[cl][thresh_ind] += 1
             pcnt[cl] = np.array([100*s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
             if b_show_dots:
@@ -274,12 +258,8 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        # x_tick_strs = ["{:.2f} m".format(d) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        # plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        # plt.xticks(plt.xticks()[0], x_dist_labels_to_show, size='small')
-        # ax.xaxis.set_major_locator(ticker.MultipleLocator(show_every_nth_label))
-        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_dist_labels_to_show, size='small')
-        ax.set_xlabel("distance threshold", fontsize=fontsize, weight=text_weight)
+        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_dist_unitless_labels_to_show, size='small')
+        ax.set_xlabel("translation error / distance threshold (m/m)", fontsize=fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error / Distance to Object")
@@ -314,12 +294,8 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        # x_tick_strs = ["{:d} pix".format(int(p)) for i, (d, a, p) in enumerate(thresh_list) if i % show_every_nth_label == 0]
-        # plt.xticks(range(0, len(thresh_list), show_every_nth_label), x_tick_strs, size='small')
-        # plt.xticks(plt.xticks()[0], x_pix_labels_to_show, size='small')
-        # ax.xaxis.set_major_locator(ticker.MultipleLocator(show_every_nth_label))
         plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_pix_labels_to_show, size='small')
-        ax.set_xlabel("pixel threshold", fontsize=fontsize, weight=text_weight)
+        ax.set_xlabel("pixel threshold (pix)", fontsize=fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Pixel Error")
