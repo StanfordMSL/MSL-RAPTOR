@@ -176,11 +176,9 @@ class rosbags_to_logs:
         add_errs = []
         R_errs = []
         t_errs = []
+        tms = []
         for i, t_est in enumerate(self.t_est):
             if t_est < 0:
-                continue
-
-            if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_est > 34:
                 continue
 
             # at a given time, look at what classes were seen. compile all objects of these classes into a list
@@ -212,6 +210,10 @@ class rosbags_to_logs:
             if len(corespondences) == 0:
                 continue
             for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt in corespondences:
+
+                if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
+                    continue
+
                 log_data = {}
                 box_length, box_width, box_height, diam = self.bb_3d_dict_all[name]
                 vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
@@ -266,6 +268,7 @@ class rosbags_to_logs:
                 add_errs.append(log_data['add_err'])
                 R_errs.append(log_data['ang_err'])
                 t_errs.append(la.norm(tf_w_ado_est[0:3, 3] - tf_w_ado_gt[0:3, 3]))
+                tms.append(t_gt)
 
                 if len(self.abb_time_list[name]) > 0:
                     (abb, im_seg_mode), _ = find_closest_by_time(t_est, self.abb_time_list[name], message_list=self.abb_list[name])
@@ -281,13 +284,13 @@ class rosbags_to_logs:
             self.raptor_metrics.print_final_metrics()
         print("done processing rosbag into logs!")
         plt.figure(0)
-        plt.plot(range(len(add_errs)), add_errs, 'b.')
+        plt.plot(tms, add_errs, 'b.')
         plt.gca().set_title("ADD")
         plt.figure(1)
-        plt.plot(range(len(t_errs)), t_errs, 'r.')
+        plt.plot(tms, t_errs, 'r.')
         plt.gca().set_title("Trans Err")
         plt.figure(2)
-        plt.plot(range(len(R_errs)), R_errs, 'm.')
+        plt.plot(tms, R_errs, 'm.')
         plt.gca().set_title("Rotation Err")
         plt.show(block=False)
         input("\nPress enter to close program\n")
