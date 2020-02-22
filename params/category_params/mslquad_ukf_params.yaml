@@ -3,16 +3,16 @@ b_enforce_z: False
 b_enforce_0_pitch: False
 b_enforce_0_roll: False
 kappa: 2
-dp: 0.1
-dv: 0.005
-dq: 0.3
-dw: 0.005
 dp_sigma: [0.1,0.1,0.1]
 dv_sigma: [0.005,0.005,0.005]
 dq_sigma: [0.1,0.1,0.1]
 dw_sigma: [0.005,0.005,0.005]
 dp_q: [0.02,0.02,0.02]
 dv_q: [0.001,0.001,0.001]
-dq_q: [0.01,0.01,0.01]
+dq_q: [0.005,0.005,0.005]
 dw_q: [0.001,0.001,0.001]
-R: [2, 2, 10, 10, 0.08]
+R: [2, 2, 10, 10, 0.12]
+# Offsets in meters for length, width and height of the bounding box
+offset_bb_l: -0.02
+offset_bb_w: -0.02
+offset_bb_h: 0.0

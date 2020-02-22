@@ -9,6 +9,8 @@ import pdb
 # math
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+
+from matplotlib import pyplot as plt
 # ros
 import rosbag
 import rospy
@@ -171,6 +173,10 @@ class rosbags_to_logs:
         ###################################
 
         print("Post-processing data now")
+        add_errs = []
+        R_errs = []
+        t_errs = []
+        tms = []
         for i, t_est in enumerate(self.t_est):
             if t_est < 0:
                 continue
@@ -204,6 +210,10 @@ class rosbags_to_logs:
             if len(corespondences) == 0:
                 continue
             for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt in corespondences:
+
+                if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
+                    continue
+
                 log_data = {}
                 box_length, box_width, box_height, diam = self.bb_3d_dict_all[name]
                 vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
@@ -231,10 +241,6 @@ class rosbags_to_logs:
                 R_cam_ado_gt = tf_cam_ado_gt[0:3, 0:3]
                 t_cam_ado_gt = tf_cam_ado_gt[0:3, 3].reshape((3, 1))
                 
-                print("name = {}, i = {}, t_est = {}, t_gt = {}".format(name, i, t_est, calcAngularDistance(R_cam_ado_gt, R_cam_ado_pr)))
-                # angs_est = quat_to_ang(rotm_to_quat(tf_w_ado_est[0:3, 0:3]).reshape((1,4)))
-                # angs_gt = quat_to_ang(rotm_to_quat(tf_w_ado_gt[0:3, 0:3]).reshape((1,4)))
-                # # pdb.set_trace()
                 ######################################################
                 
                 self.raptor_metrics.update_all_metrics(name=name, vertices=vertices, tf_w_cam=tf_w_cam, R_cam_ado_gt=R_cam_ado_gt, t_cam_ado_gt=t_cam_ado_gt, R_cam_ado_pr=R_cam_ado_pr, t_cam_ado_pr=t_cam_ado_pr, K=self.new_camera_matrix)
@@ -257,7 +263,12 @@ class rosbags_to_logs:
                 log_data['z_err'] = tf_w_ado_est[2, 3] - tf_w_ado_gt[2, 3]
                 log_data['ang_err'] = calcAngularDistance(tf_w_ado_est[0:3, 0:3], tf_w_ado_gt[0:3, 0:3])
                 log_data['pix_err'] = np.mean(la.norm(self.raptor_metrics.proj_2d_pr[name] - self.raptor_metrics.proj_2d_gt[name], axis=0))
+                log_data['add_err'] = np.mean(la.norm(corners3D_pr - corners3D_gt, axis=0))
                 log_data['measurement_dist'] = la.norm(tf_w_ego_gt[0:3, 3] - tf_w_ado_gt[0:3, 3])
+                add_errs.append(log_data['add_err'])
+                R_errs.append(log_data['ang_err'])
+                t_errs.append(la.norm(tf_w_ado_est[0:3, 3] - tf_w_ado_gt[0:3, 3]))
+                tms.append(t_gt)
 
                 if len(self.abb_time_list[name]) > 0:
                     (abb, im_seg_mode), _ = find_closest_by_time(t_est, self.abb_time_list[name], message_list=self.abb_list[name])
@@ -272,11 +283,22 @@ class rosbags_to_logs:
             self.raptor_metrics.calc_final_metrics()
             self.raptor_metrics.print_final_metrics()
         print("done processing rosbag into logs!")
+        plt.figure(0)
+        plt.plot(tms, add_errs, 'b.')
+        plt.gca().set_title("ADD")
+        plt.figure(1)
+        plt.plot(tms, t_errs, 'r.')
+        plt.gca().set_title("Trans Err")
+        plt.figure(2)
+        plt.plot(tms, R_errs, 'm.')
+        plt.gca().set_title("Rotation Err")
+        plt.show(block=False)
+        input("\nPress enter to close program\n")
 
 
     def process_rb(self):
         print("Processing {}".format(self.rb_name))
-        for topic, msg, t in self.bag.read_messages():
+        for i, (topic, msg, t) in enumerate(self.bag.read_messages()):
             t_split = topic.split("/")
             name = t_split[1]
             topic_name = t_split[-1]

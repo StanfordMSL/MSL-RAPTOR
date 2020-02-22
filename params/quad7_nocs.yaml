@@ -6,6 +6,3 @@ t_cam_ego: [0.,0.,0.]
 dx: 0.0
 dy: 0.0
 dz: 0.0
-target_bound_box_l: 0.27
-target_bound_box_w: 0.27
-target_bound_box_h: 0.13

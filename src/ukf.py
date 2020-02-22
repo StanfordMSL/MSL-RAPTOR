@@ -22,7 +22,7 @@ from utils_msl_raptor.math_utils import *
 
 class UKF:
 
-    def __init__(self, camera, bb_3d, obj_width, init_time=0.0, b_use_gt_bb=False, class_str='mslquad', obj_id=0,verbose=False):
+    def __init__(self, camera, bb_3d, obj_width, ukf_prms, init_time=0.0, b_use_gt_bb=False, class_str='mslquad', obj_id=0,verbose=False):
 
         self.verbose = verbose
 
@@ -37,27 +37,7 @@ class UKF:
         self.obj_id = obj_id  # a unique int classifier
         self.projected_3d_bb = None  # r, c of projection of the estimated 3d bounding box
         
-        if self.class_str == 'mslquad':
-            yaml_file = "mslquad_ukf_params.yaml"
-        elif self.class_str == 'person':
-            yaml_file = "person_ukf_params.yaml"
-            self.height = 1.8  # maybe load this from a person-specific yaml? (there is already one for a quad)
-        elif self.class_str == 'cup':
-            yaml_file = "cup_ukf_params.yaml"
-        elif self.class_str == 'bowl':
-            yaml_file = "bowl_ukf_params.yaml"
-        elif self.class_str == 'laptop':
-            yaml_file = "laptop_ukf_params.yaml"
-        elif self.class_str == 'bottle':
-            yaml_file = "bottle_ukf_params.yaml"
-        else:
-            raise RuntimeError('Unknown object type: {}'.format(self.class_str))
-        
-        with open("/root/msl_raptor_ws/src/msl_raptor/params/" + yaml_file, 'r') as stream:
-            try:
-                self.ukf_prms = yaml.safe_load(stream)
-            except yaml.YAMLError as exc:
-                print(exc)
+        self.ukf_prms = ukf_prms
         
         self.b_enforce_0_yaw   = bool(self.ukf_prms['b_enforce_0_yaw'])
         self.b_enforce_z       = bool(self.ukf_prms['b_enforce_z'])
@@ -232,7 +212,7 @@ class UKF:
         if self.b_enforce_0_yaw:
             mu_out[6:10] = remove_yaw(mu_out[6:10])
         if self.b_enforce_z:
-            mu_out[2] = self.height
+            mu_out[2] = self.bb_3d[0,2]
 
 
         sigma_out -=  k @ S @ k.T
@@ -330,7 +310,7 @@ class UKF:
         if self.b_enforce_0_yaw:
             sig_step_all[8, :] = 0
         if self.b_enforce_z:
-            sig_step_all[2, :] = self.height
+            sig_step_all[2, :] = self.bb_3d[0,2]
 
         q_nom = mu[6:10]
         q_perturb = axang_to_quat(sig_step_all[6:9, :].T)

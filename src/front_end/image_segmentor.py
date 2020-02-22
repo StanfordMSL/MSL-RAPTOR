@@ -76,6 +76,7 @@ class ImageSegmentor:
 
     def stop_tracking_lost_objects(self):
         # Remove objects that triggered detection and were not matched to new detections
+        self.last_lost_objects = set(self.last_lost_objects)
         for obj_id in self.last_lost_objects:
             c = self.tracked_objects[obj_id].class_str
             print('Removing '+c)
