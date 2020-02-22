@@ -6,6 +6,6 @@ t_cam_ego: [0.01504337, -0.06380886, -0.13854437]
 dx: 0.04444444444
 dy: 0.04444444444
 dz: 0.0
-target_bound_box_l: 0.27
-target_bound_box_w: 0.27
+target_bound_box_l: 0.25
+target_bound_box_w: 0.25
 target_bound_box_h: 0.13
