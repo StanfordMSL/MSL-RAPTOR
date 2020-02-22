@@ -11,7 +11,7 @@ try:
     from utils_msl_raptor.math_utils import *
 except:
     from math_utils import *
-
+from os import listdir
 
 def state_to_tf(state):
     """ returns tf_w_quad given the state vector """
@@ -208,3 +208,17 @@ def pose_to_3d_bb_proj(tf_w_ado, tf_w_ego, vertices_ado, camera):
         projected_vertices[i, :] = camera.pnt3d_to_pix(bb_vert)
 
     return projected_vertices
+
+def load_category_params():
+    params = {}
+    for f in listdir("/root/msl_raptor_ws/src/msl_raptor/params/category_params"):
+        class_str = f.split('_')[0]
+        yaml_file = cl+class_str+'_ukf_params.yaml'
+
+        with open( "/root/msl_raptor_ws/src/msl_raptor/params/category_params/"+ f) as stream:
+            try:
+                params.append(yaml.safe_load(stream))
+            except yaml.YAMLError as exc:
+                print(exc)
+
+    return params
