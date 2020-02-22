@@ -257,6 +257,7 @@ class rosbags_to_logs:
                 log_data['z_err'] = tf_w_ado_est[2, 3] - tf_w_ado_gt[2, 3]
                 log_data['ang_err'] = calcAngularDistance(tf_w_ado_est[0:3, 0:3], tf_w_ado_gt[0:3, 0:3])
                 log_data['pix_err'] = np.mean(la.norm(self.raptor_metrics.proj_2d_pr[name] - self.raptor_metrics.proj_2d_gt[name], axis=0))
+                log_data['add_err'] = np.mean(la.norm(corners3D_pr - corners3D_gt, axis=0))
                 log_data['measurement_dist'] = la.norm(tf_w_ego_gt[0:3, 3] - tf_w_ado_gt[0:3, 3])
 
                 if len(self.abb_time_list[name]) > 0:

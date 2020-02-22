@@ -137,7 +137,7 @@ class PoseMetricTracker:
 
 
     def corner_3d_error(self, name, vertices, Rt_cam_ado_gt=None, Rt_cam_ado_pr=None, R_cam_ado_gt=None, t_cam_ado_gt=None, R_cam_ado_pr=None, t_cam_ado_pr=None):
-        # Compute 3D distances
+        # Compute 3D distances - this is known as the ADD metric
         if Rt_cam_ado_gt is None:
             if R_cam_ado_gt is None or t_cam_ado_gt is None:
                 raise RuntimeError("Either Rt_cam_ado_gt or both R_cam_ado_gt and t_cam_ado_gt must be provided for 3d corner error computation")

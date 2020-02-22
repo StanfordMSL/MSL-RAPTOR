@@ -52,6 +52,7 @@ class RaptorLogger:
                                  ('z err', 'z_err', 1),
                                  ('ang err (deg)', 'ang_err', 1),
                                  ('3d projection pix norm err', 'pix_err', 1),
+                                 ('3d corner norm err (ADD)', 'add_err', 1),
                                  ('Distance camera to ado', 'measurement_dist', 1)]
         self.save_elms['ssp'] = [('Time (s)', 'time', 1),  # list of tuples ("HEADER STRING", "DICT KEY STRING", # OF VALUES (int))
                                  ('Ado State GT', 'state_gt', 13), 
@@ -62,11 +63,12 @@ class RaptorLogger:
                                  ('3D Corner GT (X|Y|Z)', 'corners_3d_gt', 8*3), 
                                  ('Corner 2D Projections Est (r|c)', 'proj_corners_est', 8*2), 
                                  ('Corner 2D Projections GT (r|c)', 'proj_corners_gt', 8*2)]
+        self.save_elms['ssperr'] = self.save_elms['err']
 
         if not b_ssp:
             self.modes = ['est', 'gt', 'err']
         else:
-            self.modes = ['ssp']
+            self.modes = ['ssp', 'ssperr']
 
 
         if mode=="read":
@@ -223,7 +225,6 @@ class RaptorLogger:
         Return a dict with keys being error type
         """
         err_log_dict = {}
-
         ind = 0
         f = open(log_path)
         header_str = f.readline()
