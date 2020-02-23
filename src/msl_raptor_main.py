@@ -60,6 +60,7 @@ def run_execution_loop():
     ukf_dict = {}  # key: object_id value: ukf object
     ros.camera = camera(ros)
     my_camera = ros.camera
+    loop_time_hist = []
 
     ros.create_subs_and_pubs()
     dim_state = 13
@@ -86,6 +87,9 @@ def run_execution_loop():
             rate.sleep()
             continue
         
+        loop_time_hist.append(loop_time)
+        previous_image_time = loop_time  # this ensures we dont reuse the image
+
         # get latest data from ros
         processed_image = ros.im_process_output
         im_seg_mode = ros.latest_bb_method
@@ -120,8 +124,6 @@ def run_execution_loop():
 
             obj_ids_tracked.append(obj_id)
 
-            previous_image_time = loop_time  # this ensures we dont reuse the image
-
             if ukf_dict[obj_id] is not None:
                 ukf_dict[obj_id].step_ukf(abb, tf_ego_w, loop_time)  # update ukf
                 if b_pub_3d_bb_proj:
@@ -130,6 +132,7 @@ def run_execution_loop():
 
         ros.publish_filter_state(obj_ids_tracked,ukf_dict)#, ukf_dict[obj_id].mu, ukf_dict[obj_id].itr_time, ukf_dict[obj_id].itr)  # send vector with time, iteration, state_est
         ros.publish_bb_msg(processed_image,im_seg_mode, loop_time)# obj_ids_tracked, abb, im_seg_mode, loop_time)
+        # print(np.mean([loop_time_hist[i] - loop_time_hist[i-1] for i in range(1, len(loop_time_hist))]))
         
         # Save current object states in image segmentor
         ros.im_seg.ukf_dict = ukf_dict

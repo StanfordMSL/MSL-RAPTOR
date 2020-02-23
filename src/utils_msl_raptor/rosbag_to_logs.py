@@ -225,6 +225,9 @@ class rosbags_to_logs:
                                      [-box_length/2, box_width/2,-box_height/2, 1.],
                                      [-box_length/2, box_width/2, box_height/2, 1.]]).T
                 
+                if gt_ind > len(self.ego_gt_pose):
+                    break # this can happen at the end of a bag
+
                 tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[gt_ind])
 
                 pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
@@ -300,14 +303,16 @@ class rosbags_to_logs:
         print("Processing {}".format(self.rb_name))
         for i, (topic, msg, t) in enumerate(self.bag.read_messages()):
             t_split = topic.split("/")
-            name = t_split[1]
-            topic_name = t_split[-1]
-            topic_category = t_split[-2]
             if topic in self.topic_func_dict:
                 self.topic_func_dict[topic](msg)
-            elif topic_name == 'msl_raptor_state': # estimate
+            elif t_split[-1] == 'msl_raptor_state': # estimate
                 self.parse_ado_est_msg(msg, t=t.to_sec())
-            elif name in self.ado_names_all and topic_name == 'pose' and topic_category == 'vision_pose': # ground truth
+            elif t_split[1] in self.ado_names_all and t_split[-1] == 'pose' and t_split[-2] == 'vision_pose': # ground truth from a quad / nocs
+                name = t_split[1]
+                self.ado_names.add(name)
+                self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
+            elif t_split[1] == 'vrpn_client_node' and t_split[-1] == 'pose': # ground truth from optitrack default
+                name = t_split[2]
                 self.ado_names.add(name)
                 self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
 

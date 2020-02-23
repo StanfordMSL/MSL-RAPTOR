@@ -5,7 +5,7 @@
 # t_cam_ego: [0.01504337, -0.06380886, -0.13854437]
 ---
 id: 0
-ns: 'person'
+ns: 'safety_hat'
 class_str: 'person'
 bound_box_l: 0.35
 bound_box_w: 0.5
