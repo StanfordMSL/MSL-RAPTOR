@@ -383,14 +383,14 @@ class rosbags_to_logs:
                 Angle_y = obj_prms['dy']
                 Angle_z = obj_prms['dz']
                 R_deltax = np.array([[ 1.             , 0.             , 0.              ],
-                                        [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
-                                        [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
+                                     [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
+                                     [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
                 R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
-                                        [ 0.             , 1.             , 0               ],
-                                        [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
+                                     [ 0.             , 1.             , 0               ],
+                                     [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
                 R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
-                                        [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
-                                        [ 0.             , 0.             , 1.              ]])
+                                     [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
+                                     [ 0.             , 0.             , 1.              ]])
                 R_delta = R_deltax @ R_deltay @ R_deltaz
                 self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
             except yaml.YAMLError as exc:
@@ -439,7 +439,7 @@ class rosbags_to_logs:
         if self.K is None:
             camera_info = msg
             self.K = np.reshape(camera_info.K, (3, 3))
-            if len(camera_info.D) == 5:
+            if len(camera_info.D) == 5:  # this just checks if there are distortion coefficients included in the message
                 self.dist_coefs = np.reshape(camera_info.D, (5,))
                 self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
             else:
