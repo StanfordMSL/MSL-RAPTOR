@@ -99,18 +99,19 @@ class MultiObjectPlotGenerator:
         pcnt = {}
         leg_hands = []
         leg_str = []
-        all_dist_err = []
+        all_dist_err = {}
 
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
             total_count[cl] = np.ones((nx))*self.eps
             pcnt[cl] = np.zeros((nx))
             err_log_list = err_log_dict[cl]
+            all_dist_err[cl] = []
             for err_log in err_log_list:
                 for thresh_ind, (dist_thresh, ang_thresh, pix_thresh) in enumerate(thresh_list):
                     for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
                         dist_err = la.norm([x_err, y_err, z_err])
-                        all_dist_err.append(dist_err)
+                        all_dist_err[cl].append(dist_err)
                         total_count[cl][thresh_ind] += 1
                         if np.abs(dist_err) < dist_thresh:
                             success_count[cl][thresh_ind] += 1
@@ -128,7 +129,11 @@ class MultiObjectPlotGenerator:
         plt.legend(leg_hands, leg_str, prop=leg_font_props)
         plt.show(block=False)
 
-        print("Avg translation error: "+str(np.mean(all_dist_err))+" m")
+        for k in all_dist_err.keys():
+            print(cl+ " avg translation error: "+str(np.mean(all_dist_err[k]))+" m")
+
+
+        print("Total avg translation error: "+str(np.mean(list(all_dist_err.values())))+" m")
         ##########################################################################
 
 
@@ -141,17 +146,18 @@ class MultiObjectPlotGenerator:
         pcnt = {}
         leg_hands = []
         leg_str = []
-        all_ang_err = []
+        all_ang_err = {}
 
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
             total_count[cl] = np.ones((nx))*self.eps
             pcnt[cl] = np.zeros((nx))
             err_log_list = err_log_dict[cl]
+            all_ang_err[cl] = []
             for err_log in err_log_list:
                 for thresh_ind, (dist_thresh, ang_thresh, pix_thresh) in enumerate(thresh_list):
                     for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
-                        all_ang_err.append(ang_err)
+                        all_ang_err[cl].append(ang_err)
                         total_count[cl][thresh_ind] += 1
                         if np.abs(ang_err) < ang_thresh:
                             success_count[cl][thresh_ind] += 1
@@ -169,7 +175,10 @@ class MultiObjectPlotGenerator:
         plt.legend(leg_hands, leg_str, prop=leg_font_props)
         plt.show(block=False)
         
-        print("Avg rotation error: "+str(np.mean(all_ang_err))+" deg")
+        for k in all_ang_err.keys():
+            print(cl+ " avg rotation error: "+str(np.mean(all_ang_err[k]))+" deg")
+
+        print("Avg rotation error: "+str(np.mean(list(.values())))+" deg")
 
         ##########################################################################
 
@@ -185,8 +194,8 @@ class MultiObjectPlotGenerator:
         pcnt2 = {}
         leg_hands = []
         leg_str = []
-        all_ip_trans_err = []
-        all_depth_err = []
+        all_ip_trans_err = {}
+        all_depth_err = {}
 
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
@@ -194,13 +203,15 @@ class MultiObjectPlotGenerator:
             total_count[cl] = np.ones((nx))*self.eps
             pcnt[cl] = np.zeros((nx))
             err_log_list = err_log_dict[cl]
+            all_ip_trans_err[cl] = []
+            all_depth_err[cl] = []
             for err_log in err_log_list:
                 for thresh_ind, (dist_thresh, ang_thresh, pix_thresh) in enumerate(thresh_list):
                     for (x_err, y_err, z_err, ang_err) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err']):
                         dist_err_inplane = la.norm([y_err, z_err])
                         dist_err_depth = la.norm([x_err])
-                        all_ip_trans_err.append(dist_err_inplane)
-                        all_depth_err.append(dist_err_depth)
+                        all_ip_trans_err[cl].append(dist_err_inplane)
+                        all_depth_err[cl].append(dist_err_depth)
                         total_count[cl][thresh_ind] += 1
                         if np.abs(dist_err_inplane) < dist_thresh:
                             success_count[cl][thresh_ind] += 1
@@ -227,6 +238,16 @@ class MultiObjectPlotGenerator:
         print("Avg in-plane translation error: "+str(np.mean(all_ip_trans_err))+" m")
         print("Avg depth translation error: "+str(np.mean(all_depth_err))+" m")
 
+        for k in all_depth_err.keys():
+            print(cl+ " avg depth translation error: "+str(np.mean(all_depth_err[k]))+" m")
+
+        print("Total avg depth translation error: "+str(np.mean(list(all_depth_err.values())))+" m")
+
+        for k in all_ip_trans_err.keys():
+            print(cl+ " avg depth in plane translation error: "+str(np.mean(all_ip_trans_err[k]))+" m")
+
+        print("Total avg in plane translation error: "+str(np.mean(list(all_ip_trans_err.values())))+" m")
+        
         ##########################################################################
         
         
