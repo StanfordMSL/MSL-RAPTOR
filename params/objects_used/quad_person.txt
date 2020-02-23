@@ -1,2 +1,2 @@
 quad4
-person
+safety_hat
