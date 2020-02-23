@@ -92,7 +92,7 @@ class rosbags_to_logs:
                                (0, 0, 0),       # 6 black
                                (125, 125, 125)] # 8 grey
             self.ado_name_to_color = {}
-            self.bb_linewidth = 1.5
+            self.bb_linewidth = 1
 
         # Read yaml file to get object params
         self.ado_names = set()  # names actually in our rosbag
@@ -343,7 +343,7 @@ class rosbags_to_logs:
             if topic in self.topic_func_dict:
                 self.topic_func_dict[topic](msg, t=t.to_sec())
             elif t_split[-1] == 'msl_raptor_state': # estimate
-                self.parse_ado_est_msg(msg, t=t.to_sec())
+                self.parse_ado_est_msg(msg)
             elif t_split[1] in self.ado_names_all and t_split[-1] == 'pose' and t_split[-2] == 'vision_pose': # ground truth from a quad / nocs
                 name = t_split[1]
                 self.ado_names.add(name)
@@ -424,6 +424,7 @@ class rosbags_to_logs:
             except yaml.YAMLError as exc:
                 print(exc)
 
+
     def parse_camera_img_msg(self, msg, t:None):
         if t is None:
             t_img = to.pose.header.stamp.to_sec()
@@ -431,6 +432,7 @@ class rosbags_to_logs:
             t_img = t
         self.img_time_buffer.append(t_img)
         self.img_msg_buffer.append(msg)
+
 
     def parse_camera_info_msg(self, msg, t=None):
         if self.K is None:
@@ -451,19 +453,21 @@ class rosbags_to_logs:
         tracked_obs = msg.tracked_objects
         if len(tracked_obs) == 0:
             return
-        if t is None:
-            t_est = to.pose.header.stamp.to_sec()
-        else:
+
+        t_est = None
+        if t is not None:
             t_est = t
-        self.t_est.add(t_est)
+
         for to in tracked_obs:
+            if t_est is None:
+                t_est = to.pose.header.stamp.to_sec() # to message doesnt have its own header, the publisher set this time to be that of the image the measurement that went into the ukf was received at
             pose = to.pose.pose
 
             if to.class_str in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
                 self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append(pose)
             else:
                 self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [pose]
-            # self.ado_est_state[name].append(to.state)
+        self.t_est.add(t_est)
 
 
     def parse_ado_gt_msg(self, msg, name, t=None):
