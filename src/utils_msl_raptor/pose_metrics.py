@@ -52,6 +52,7 @@ class PoseMetricTracker:
         # Provide external access to these variables
         self.proj_2d_gt = {}
         self.proj_2d_pr = {}
+        self.corners2D_pr = {}
 
 
     def translation_error(self, name, t_cam_ado_gt, t_cam_ado_pr):
@@ -115,7 +116,7 @@ class PoseMetricTracker:
                 raise RuntimeError("If corners2D_gt not given, (Rt_cam_ado_gt & K) or (R_cam_ado_gt & t_cam_ado_gt & K) must be provided for 2d corner error computation")
         else:
             raise RuntimeError("Either corners2D_gt OR vertices & tf info must be provide for 2d corner error computation")
-        
+
         if corners2D_pr is not None:
             pass # we are all good, just use this
         elif vertices is not None:
@@ -127,6 +128,7 @@ class PoseMetricTracker:
                 raise RuntimeError("If corners2D_pr not given, (Rt_cam_ado_pr & K) or (R_cam_ado_pr & t_cam_ado_pr & K) must be provided for 2d corner error computation")
         else:
             raise RuntimeError("Either corners2D_pr OR vertices & tf info must be provide for 2d corner error computation")
+        self.corners2D_pr[name] = corners2D_pr
             
         # at this point we have corners2D_gt & corners2D_pr
         
