@@ -129,9 +129,8 @@ def run_execution_loop():
                 if b_pub_3d_bb_proj:
                     tf_w_ado = state_to_tf(ukf_dict[obj_id].mu)
                     ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
-
-        ros.publish_filter_state(obj_ids_tracked,ukf_dict)#, ukf_dict[obj_id].mu, ukf_dict[obj_id].itr_time, ukf_dict[obj_id].itr)  # send vector with time, iteration, state_est
-        ros.publish_bb_msg(processed_image,im_seg_mode, loop_time)# obj_ids_tracked, abb, im_seg_mode, loop_time)
+        ros.publish_filter_state(obj_ids_tracked,ukf_dict)
+        ros.publish_bb_msg(processed_image, im_seg_mode, loop_time)
         # print(np.mean([loop_time_hist[i] - loop_time_hist[i-1] for i in range(1, len(loop_time_hist))]))
         
         # Save current object states in image segmentor
