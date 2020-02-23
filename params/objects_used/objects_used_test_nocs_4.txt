@@ -1,0 +1,7 @@
+bottle_red_stanford_norm
+bottle_shampoo_norm
+camera_canon_len_norm
+can_arizona_tea_norm
+can_green_norm
+laptop_mac_pro_norm
+mug_anastasia_norm
