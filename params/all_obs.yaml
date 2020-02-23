@@ -164,3 +164,147 @@ bound_box_l: 0.075
 bound_box_h: 0.2509
 bound_box_w: 0.0759
 b_enforce_0: ['yaw']
+---
+id: 20
+ns: 'laptop_mac_pro_norm'
+class_str: 'laptop'
+bound_box_l: 0.382706
+bound_box_h: 0.147758
+bound_box_w: 0.317864
+b_enforce_0: []
+---
+id: 21
+ns: 'bowl_shengjun_norm'
+class_str: 'bowl'
+bound_box_l: 0.172298
+bound_box_h: 0.08747
+bound_box_w: 0.171082
+b_enforce_0: ['yaw']
+---
+id: 22
+ns: 'bowl_blue_white_chinese_norm'
+class_str: 'bowl'
+bound_box_l: 0.156416
+bound_box_h: 0.077216
+bound_box_w: 0.157024
+b_enforce_0: ['yaw']
+---
+id: 23
+ns: 'laptop_alienware_norm'
+class_str: 'laptop'
+bound_box_l: 0.417686
+bound_box_h: 0.215843
+bound_box_w: 0.334892
+b_enforce_0: []
+---
+id: 24
+ns: 'mug_daniel_norm'
+class_str: 'cup'
+bound_box_l: 0.106928
+bound_box_h: 0.10112
+bound_box_w: 0.074034
+b_enforce_0: []
+---
+id: 25
+ns: 'camera_canon_len_norm'
+class_str: 'camera'
+bound_box_l: 0.180496
+bound_box_h: 0.107126
+bound_box_w: 0.150726
+b_enforce_0: []
+---
+id: 26
+ns: 'laptop_air_xin_norm'
+class_str: 'laptop'
+bound_box_l: 0.306686
+bound_box_h: 0.168628
+bound_box_w: 0.279084
+b_enforce_0: []
+---
+id: 27
+ns: 'can_lotte_milk_norm'
+class_str: 'can'
+bound_box_l: 0.05697
+bound_box_h: 0.130476
+bound_box_w: 0.057044
+b_enforce_0: ['yaw']
+---
+id: 28
+ns: 'bottle_red_stanford_norm'
+class_str: 'bottle'
+bound_box_l: 0.079576
+bound_box_h: 0.15878
+bound_box_w: 0.077166
+b_enforce_0: ['yaw']
+---
+id: 29
+ns: 'mug_anastasia_norm'
+class_str: 'cup'
+bound_box_l: 0.12702
+bound_box_h: 0.092322
+bound_box_w: 0.094914
+b_enforce_0: []
+---
+id: 30
+ns: 'bowl_white_small_norm'
+class_str: 'bowl'
+bound_box_l: 0.142528
+bound_box_h: 0.065706
+bound_box_w: 0.139422
+b_enforce_0: ['yaw']
+---
+id: 31
+ns: 'can_green_norm'
+class_str: 'can'
+bound_box_l: 0.078016
+bound_box_h: 0.191488
+bound_box_w: 0.075812
+b_enforce_0: ['yaw']
+---
+id: 32
+ns: 'camera_canon_wo_len_norm'
+class_str: 'camera'
+bound_box_l: 0.087208
+bound_box_h: 0.105428
+bound_box_w: 0.15194
+b_enforce_0: []
+---
+id: 33
+ns: 'mug_brown_starbucks_norm'
+class_str: 'cup'
+bound_box_l: 0.113598
+bound_box_h: 0.1063
+bound_box_w: 0.085526
+b_enforce_0: []
+---
+id: 34
+ns: 'bottle_shengjun_norm'
+class_str: 'bottle'
+bound_box_l: 0.090736
+bound_box_h: 0.159426
+bound_box_w: 0.092402
+b_enforce_0: ['yaw']
+---
+id: 35
+ns: 'can_arizona_tea_norm'
+class_str: 'can'
+bound_box_l: 0.069392
+bound_box_h: 0.155506
+bound_box_w: 0.071462
+b_enforce_0: ['yaw']
+---
+id: 36
+ns: 'bottle_shampoo_norm'
+class_str: 'bottle'
+bound_box_l: 0.053994
+bound_box_h: 0.182898
+bound_box_w: 0.053044
+b_enforce_0: ['yaw']
+---
+id: 37
+ns: 'camera_shengjun_norm'
+class_str: 'camera'
+bound_box_l: 0.067202
+bound_box_h: 0.112505
+bound_box_w: 0.103714
+b_enforce_0: []

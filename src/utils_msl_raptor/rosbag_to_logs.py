@@ -211,25 +211,25 @@ class rosbags_to_logs:
             # for each object seen, find the closest ground truth pose
             corespondences = []
             for name, class_str in candidate_name_class:
-                candidate_poses = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
-                if candidate_poses is None or len(candidate_poses) == 0 or not name in self.t_gt:
+                candidate_poses_and_bbs = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
+                if candidate_poses_and_bbs is None or len(candidate_poses_and_bbs) == 0 or not name in self.t_gt:
                     continue
                 t_gt, gt_ind = find_closest_by_time(t_est, self.t_gt[name])
                 tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[name][gt_ind])
 
                 # try each candidate pose
                 min_dist_err = 1e10
-                for ado_pose in candidate_poses:
+                for (ado_pose, bb_proj) in candidate_poses_and_bbs:
                     tf_w_ado_est = pose_to_tf(ado_pose)
                     dist_err = la.norm(tf_w_ado_est[0:3, 3] - tf_w_ado_gt[0:3, 3])
                     if dist_err < min_dist_err:
                         min_dist_err = dist_err
-                        best_corr = (tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt)
+                        best_corr = (tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj)
                 corespondences.append(best_corr)
                 
             if len(corespondences) == 0:
                 continue
-            for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt in corespondences:
+            for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj in corespondences:
 
                 if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
                     continue
@@ -309,8 +309,23 @@ class rosbags_to_logs:
                         img_msg, _ = find_closest_by_time(t_est, self.img_time_buffer, message_list=self.img_msg_buffer)
                         image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
                         image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
-                    self.processed_image_dict[t_est] = draw_2d_proj_of_3D_bounding_box(image, self.raptor_metrics.corners2D_pr[name][1:, :], corners2D_gt=self.raptor_metrics.corners2D_gt[name][1:, :], color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
-                ######################################################
+                    
+                    # alt_pr = pose_to_3d_bb_proj(tf_w_ado_est, tf_w_ego_gt, vertices, ukf_dict[obj_id].camera)
+                    # print(self.new_camera_matrix)
+                    # print(self.tf_cam_ego)
+                    N = vertices.shape[1]
+                    tf_cam_ado = self.tf_cam_ego @ inv_tf(tf_w_ego_gt) @ tf_w_ado_est
+                    vertices_cam = tf_cam_ado @ vertices
+                    projected_vertices = np.zeros((N, 2))
+                    for i, bb_vert in enumerate(vertices_cam.T):
+                        rc = self.new_camera_matrix @ np.reshape(bb_vert[0:3], 3, 1)
+                        rc = np.array([rc[1], rc[0]]) / rc[2]
+                        projected_vertices[i, :] = rc
+                    projected_vertices = np.fliplr(projected_vertices)
+
+                    if len(bb_proj) > 0:
+                        self.processed_image_dict[t_est] = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
+                    ######################################################
             
 
         if self.raptor_metrics is not None:
@@ -338,6 +353,9 @@ class rosbags_to_logs:
 
 
     def process_rb(self):
+        """
+        Reads all data from the rosbag (since time ordering is not guaranteed). Processes each message based on topic
+        """
         print("Processing {}".format(self.rb_name))
         for i, (topic, msg, t) in enumerate(self.bag.read_messages()):
             t_split = topic.split("/")
@@ -428,7 +446,7 @@ class rosbags_to_logs:
 
     def parse_camera_img_msg(self, msg, t:None):
         if t is None:
-            t_img = to.pose.header.stamp.to_sec()
+            t_img = msg.header.stamp.to_sec()
         else:
             t_img = t
         self.img_time_buffer.append(t_img)
@@ -464,10 +482,15 @@ class rosbags_to_logs:
                 t_est = to.pose.header.stamp.to_sec() # to message doesnt have its own header, the publisher set this time to be that of the image the measurement that went into the ukf was received at
             pose = to.pose.pose
 
+            proj_3d_bb = []
+            if len(to.projected_3d_bb) > 0:
+                proj_3d_bb = np.reshape(to.projected_3d_bb, (int(len(to.projected_3d_bb)/2), 2) )
+
             if to.class_str in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
-                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append(pose)
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append((pose, proj_3d_bb))
             else:
-                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [pose]
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [(pose, proj_3d_bb)]
+
         self.t_est.add(t_est)
 
 
