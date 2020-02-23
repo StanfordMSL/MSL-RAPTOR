@@ -83,7 +83,9 @@
     </group>
     <group unless="$(arg b_rosbag)">
       <!-- if NOT from a rosbag (i.e. live), then use the current timestamp to name the bag -->
-      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ -a"/>
+     <!-- <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ /clock /tf ns/mavros/vision_pose/pose ns/mavros/local_position/pose ns/bb_data ns/msl_raptor_state ns/tracked_objects_poses ns/camera/camera_info /ns/camera/image_raw"/> -->
+     <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ /clock /tf ns/mavros/vision_pose/pose ns/mavros/local_position/pose ns/bb_data ns/msl_raptor_state ns/tracked_objects_poses ns/camera/camera_info"/camera/image_raw>
+
   </group>
   </group>
 </launch>
