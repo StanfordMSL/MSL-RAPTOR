@@ -28,11 +28,9 @@ class poses_viz_node:
         rospy.init_node('poses_viz_node', anonymous=True)
 
         self.ns = rospy.get_param('~ns')  # robot namespace
-        self.b_save_3d_bb_img = rospy.get_param('~b_save_3d_bb_img')  # robot namespace
        
         self.tracked_objects_sub = rospy.Subscriber(self.ns + '/msl_raptor_state', TrackedObjects, self.tracked_objects_cb, queue_size=5)
         self.pose_array_pub = rospy.Publisher(self.ns + '/tracked_objects_poses', PoseArray, queue_size=5)
-        self.img_index = 0
         
         # for displaying the 3d bb projected onto an image
         self.b_overlay = rospy.get_param('~b_overlay')  # robot namespace
@@ -91,18 +89,10 @@ class poses_viz_node:
 
         for tracked_obj in tracked_objects_msg.tracked_objects:
             pose_arr.poses.append(tracked_obj.pose.pose)
-            if self.b_overlay and not len(tracked_obj.projected_3d_bb) == 0:
-                proj_3d_bb = np.reshape(tracked_obj.projected_3d_bb, (int(len(tracked_obj.projected_3d_bb)/2), 2) )
-                image = self.draw_2d_proj_of_3D_bounding_box(image, corners2D_pr=proj_3d_bb)
-            
 
         self.pose_array_pub.publish(pose_arr)
         if self.b_overlay:
             self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(image, "bgr8"))
-            fn_str = "overlaid_raptor_img_{:d}".format(self.img_index)
-            self.img_index += 1
-            if self.b_save_3d_bb_img:
-                cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", image)
 
 
 if __name__ == '__main__':
