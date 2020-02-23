@@ -38,7 +38,7 @@ class rosbags_to_logs:
     The code currently also runs the quantitative metric analysis in the processes, but this is optional and will be done 
     again in the result_analyser. 
     """
-    def __init__(self, rb_name=None, data_source='raptor', ego_quad_ns="/quad7", ego_yaml="quad7", ado_yaml="all_obj", b_save_3dbb_imgs=True):
+    def __init__(self, rb_name=None, data_source='raptor', ego_quad_ns="/quad7", ego_yaml="quad7", ado_yaml="all_obj", b_save_3dbb_imgs=False):
         # Parse rb_name
         us_split = rb_name.split("_")
         if rb_name[-4:] == '.bag' or "_".join(us_split[0:3]) == 'msl_raptor_output':
@@ -76,23 +76,24 @@ class rosbags_to_logs:
                                 self.ego_est_topic : self.parse_ego_est_msg,
                                 self.cam_info_topic: self.parse_camera_info_msg}
         self.camera_topic = ego_quad_ns + '/camera/image_raw'
-        if b_save_3dbb_imgs:
+        self.b_save_3dbb_imgs = b_save_3dbb_imgs
+        if self.b_save_3dbb_imgs:
             self.bridge = CvBridge()
-            self.img_time_buffer = []
-            self.img_msg_buffer = []
             self.processed_image_dict = {}  # t_est --> image w/ 3d bbs overlaid
             self.topic_func_dict[self.camera_topic] = self.parse_camera_img_msg
-            self.color_list = [(0, 0, 255),     # 0 red
-                               (0, 255, 0),     # 1 green
-                               (255, 0, 0),     # 2 blue
-                               (255, 255, 0),   # 3 cyan
-                               (255, 0, 255),   # 4 magenta
-                               (0, 255, 255),   # 5 yellow
-                               (255, 255, 255), # 7 white
-                               (0, 0, 0),       # 6 black
-                               (125, 125, 125)] # 8 grey
-            self.ado_name_to_color = {}
-            self.bb_linewidth = 1
+        self.color_list = [(0, 0, 255),     # 0 red
+                            (0, 255, 0),     # 1 green
+                            (255, 0, 0),     # 2 blue
+                            (255, 255, 0),   # 3 cyan
+                            (255, 0, 255),   # 4 magenta
+                            (0, 255, 255),   # 5 yellow
+                            (255, 255, 255), # 7 white
+                            (0, 0, 0),       # 6 black
+                            (125, 125, 125)] # 8 grey
+        self.ado_name_to_color = {}
+        self.bb_linewidth = 1
+        self.img_time_buffer = []
+        self.img_msg_buffer = []
 
         # Read yaml file to get object params
         self.ado_names = set()  # names actually in our rosbag
@@ -301,7 +302,7 @@ class rosbags_to_logs:
                 self.logger.write_data_to_log(log_data, name, mode='err')
                 ######################################################
                 # draw on image (3d bb estimate)
-                if self.camera_topic in self.topic_func_dict:
+                if self.b_save_3dbb_imgs:
                     if t_est in self.processed_image_dict:
                         image = self.processed_image_dict[t_est]
                     else:
@@ -317,7 +318,7 @@ class rosbags_to_logs:
             self.raptor_metrics.print_final_metrics()
 
         # write images!!
-        if self.camera_topic in self.topic_func_dict:
+        if self.b_save_3dbb_imgs:
             for img_ind, t_est in enumerate(self.processed_image_dict):
                 fn_str = "mslraptor_{:d}".format(img_ind)
                 cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", self.processed_image_dict[t_est])
@@ -520,7 +521,7 @@ if __name__ == '__main__':
             my_data_source = sys.argv[2]
             my_ego_yaml = sys.argv[3]
             my_ado_yaml = sys.argv[4]
-            my_b_save_3dbb_imgs = sys.argv[5]
+            my_b_save_3dbb_imgs = bool(sys.argv[5])
         else:
             raise RuntimeError("Incorrect arguments! needs <rosbag_name> <data_source> <ego_yaml> <ado_yaml> <b_save_3dbb_imgs> (leave off .bag and .yaml extensions)")
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
