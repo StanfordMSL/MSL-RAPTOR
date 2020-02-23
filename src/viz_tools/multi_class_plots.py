@@ -16,13 +16,13 @@ import matplotlib.ticker as ticker
 # Utils
 sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor')
 from raptor_logger import *
-
+from itertools import chain
 class MultiObjectPlotGenerator:
 
     def __init__(self, base_directory, class_labels):
 
         # PLOT OPTIONS ###################################
-        b_nocs = False
+        b_nocs = True
         color_strs = ['r', 'b', 'm', 'k', 'c', 'g']
         fontsize = 26
         linewidth = 3
@@ -43,8 +43,8 @@ class MultiObjectPlotGenerator:
         matplotlib.rc('font', **font)
 
         if b_nocs:
-            nx = 100  # number of ticks on x axis
-            show_every_nth_label = 20
+            nx = 20  # number of ticks on x axis
+            show_every_nth_label = 5
             d_max = 0.2  # max trans err thresh
             d_unitless_max = 0.1  # max trans error / distance thresh
             a_max = 60  # max angle thresh
@@ -130,10 +130,10 @@ class MultiObjectPlotGenerator:
         plt.show(block=False)
 
         for k in all_dist_err.keys():
-            print(cl+ " avg translation error: "+str(np.mean(all_dist_err[k]))+" m")
+            print(k+ " avg translation error: "+str(np.mean(all_dist_err[k]))+" m")
 
 
-        print("Total avg translation error: "+str(np.mean(list(all_dist_err.values())))+" m")
+        print("Total avg translation error: "+str(np.mean(list(chain.from_iterable(list(all_dist_err.values())))))+" m\n")
         ##########################################################################
 
 
@@ -176,9 +176,9 @@ class MultiObjectPlotGenerator:
         plt.show(block=False)
         
         for k in all_ang_err.keys():
-            print(cl+ " avg rotation error: "+str(np.mean(all_ang_err[k]))+" deg")
+            print(k+ " avg rotation error: "+str(np.mean(all_ang_err[k]))+" deg")
 
-        print("Avg rotation error: "+str(np.mean(list(.values())))+" deg")
+        print("Avg rotation error: "+str(np.mean(list(chain.from_iterable(list(all_ang_err.values())))))+" deg\n")
 
         ##########################################################################
 
@@ -235,19 +235,19 @@ class MultiObjectPlotGenerator:
         plt.legend(leg_hands, leg_str, prop=leg_font_props)
         plt.show(block=False)
 
-        print("Avg in-plane translation error: "+str(np.mean(all_ip_trans_err))+" m")
-        print("Avg depth translation error: "+str(np.mean(all_depth_err))+" m")
-
         for k in all_depth_err.keys():
-            print(cl+ " avg depth translation error: "+str(np.mean(all_depth_err[k]))+" m")
+            print(k+ " avg depth translation error: "+str(np.mean(all_depth_err[k]))+" m")
 
-        print("Total avg depth translation error: "+str(np.mean(list(all_depth_err.values())))+" m")
+        print("Avg depth translation error: "+str(np.mean(list(chain.from_iterable(list(all_depth_err.values())))))+" m\n")
+
+
 
         for k in all_ip_trans_err.keys():
-            print(cl+ " avg depth in plane translation error: "+str(np.mean(all_ip_trans_err[k]))+" m")
+            print(k+ " avg depth in plane translation error: "+str(np.mean(all_ip_trans_err[k]))+" m")
+       
+        print("Avg depth translation error: "+str(np.mean(list(chain.from_iterable(list(all_ip_trans_err.values())))))+" m\n")
 
-        print("Total avg in plane translation error: "+str(np.mean(list(all_ip_trans_err.values())))+" m")
-        
+
         ##########################################################################
         
         
