@@ -38,7 +38,7 @@ class rosbags_to_logs:
     The code currently also runs the quantitative metric analysis in the processes, but this is optional and will be done 
     again in the result_analyser. 
     """
-    def __init__(self, rb_name=None, data_source='raptor', ego_quad_ns="/quad7", ego_yaml="quad7", ado_yaml="all_obj", b_save_3dbb_imgs=True):
+    def __init__(self, rb_name=None, data_source='raptor', ego_quad_ns="/quad7", ego_yaml="quad7", ado_yaml="all_obj", b_save_3dbb_imgs=False):
         # Parse rb_name
         us_split = rb_name.split("_")
         if rb_name[-4:] == '.bag' or "_".join(us_split[0:3]) == 'msl_raptor_output':
@@ -76,23 +76,24 @@ class rosbags_to_logs:
                                 self.ego_est_topic : self.parse_ego_est_msg,
                                 self.cam_info_topic: self.parse_camera_info_msg}
         self.camera_topic = ego_quad_ns + '/camera/image_raw'
-        if b_save_3dbb_imgs:
+        self.b_save_3dbb_imgs = b_save_3dbb_imgs
+        if self.b_save_3dbb_imgs:
             self.bridge = CvBridge()
-            self.img_time_buffer = []
-            self.img_msg_buffer = []
             self.processed_image_dict = {}  # t_est --> image w/ 3d bbs overlaid
             self.topic_func_dict[self.camera_topic] = self.parse_camera_img_msg
-            self.color_list = [(0, 0, 255),     # 0 red
-                               (0, 255, 0),     # 1 green
-                               (255, 0, 0),     # 2 blue
-                               (255, 255, 0),   # 3 cyan
-                               (255, 0, 255),   # 4 magenta
-                               (0, 255, 255),   # 5 yellow
-                               (255, 255, 255), # 7 white
-                               (0, 0, 0),       # 6 black
-                               (125, 125, 125)] # 8 grey
-            self.ado_name_to_color = {}
-            self.bb_linewidth = 1
+        self.color_list = [(0, 0, 255),     # 0 red
+                           (0, 255, 0),     # 1 green
+                           (255, 0, 0),     # 2 blue
+                           (255, 255, 0),   # 3 cyan
+                           (255, 0, 255),   # 4 magenta
+                           (0, 255, 255),   # 5 yellow
+                           (255, 255, 255), # 7 white
+                           (0, 0, 0),       # 6 black
+                           (125, 125, 125)] # 8 grey
+        self.ado_name_to_color = {}
+        self.bb_linewidth = 1
+        self.img_time_buffer = []
+        self.img_msg_buffer = []
 
         # Read yaml file to get object params
         self.ado_names = set()  # names actually in our rosbag
@@ -301,14 +302,14 @@ class rosbags_to_logs:
                 self.logger.write_data_to_log(log_data, name, mode='err')
                 ######################################################
                 # draw on image (3d bb estimate)
-                if self.camera_topic in self.topic_func_dict:
+                if self.b_save_3dbb_imgs:
                     if t_est in self.processed_image_dict:
                         image = self.processed_image_dict[t_est]
                     else:
                         img_msg, _ = find_closest_by_time(t_est, self.img_time_buffer, message_list=self.img_msg_buffer)
                         image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
                         image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
-                    self.processed_image_dict[t_est] = draw_2d_proj_of_3D_bounding_box(image, self.raptor_metrics.corners2D_pr[name][1:, :],  color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
+                    self.processed_image_dict[t_est] = draw_2d_proj_of_3D_bounding_box(image, self.raptor_metrics.corners2D_pr[name][1:, :], corners2D_gt=self.raptor_metrics.corners2D_gt[name][1:, :], color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
                 ######################################################
             
 
@@ -317,7 +318,7 @@ class rosbags_to_logs:
             self.raptor_metrics.print_final_metrics()
 
         # write images!!
-        if self.camera_topic in self.topic_func_dict:
+        if self.b_save_3dbb_imgs:
             for img_ind, t_est in enumerate(self.processed_image_dict):
                 fn_str = "mslraptor_{:d}".format(img_ind)
                 cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", self.processed_image_dict[t_est])
@@ -382,14 +383,14 @@ class rosbags_to_logs:
                 Angle_y = obj_prms['dy']
                 Angle_z = obj_prms['dz']
                 R_deltax = np.array([[ 1.             , 0.             , 0.              ],
-                                        [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
-                                        [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
+                                     [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
+                                     [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
                 R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
-                                        [ 0.             , 1.             , 0               ],
-                                        [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
+                                     [ 0.             , 1.             , 0               ],
+                                     [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
                 R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
-                                        [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
-                                        [ 0.             , 0.             , 1.              ]])
+                                     [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
+                                     [ 0.             , 0.             , 1.              ]])
                 R_delta = R_deltax @ R_deltay @ R_deltaz
                 self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
             except yaml.YAMLError as exc:
@@ -438,7 +439,7 @@ class rosbags_to_logs:
         if self.K is None:
             camera_info = msg
             self.K = np.reshape(camera_info.K, (3, 3))
-            if len(camera_info.D) == 5:
+            if len(camera_info.D) == 5:  # this just checks if there are distortion coefficients included in the message
                 self.dist_coefs = np.reshape(camera_info.D, (5,))
                 self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
             else:
@@ -520,7 +521,7 @@ if __name__ == '__main__':
             my_data_source = sys.argv[2]
             my_ego_yaml = sys.argv[3]
             my_ado_yaml = sys.argv[4]
-            my_b_save_3dbb_imgs = sys.argv[5]
+            my_b_save_3dbb_imgs = bool(sys.argv[5])
         else:
             raise RuntimeError("Incorrect arguments! needs <rosbag_name> <data_source> <ego_yaml> <ado_yaml> <b_save_3dbb_imgs> (leave off .bag and .yaml extensions)")
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
