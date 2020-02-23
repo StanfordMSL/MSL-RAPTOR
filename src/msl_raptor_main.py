@@ -133,9 +133,6 @@ def run_execution_loop():
         ros.publish_bb_msg(processed_image, im_seg_mode, loop_time)
         # print(np.mean([loop_time_hist[i] - loop_time_hist[i-1] for i in range(1, len(loop_time_hist))]))
 
-        # print(ukf_dict[obj_id].camera.new_camera_matrix)
-        # print(ukf_dict[obj_id].camera.tf_cam_ego)
-        
         # Save current object states in image segmentor
         ros.im_seg.ukf_dict = ukf_dict
 
