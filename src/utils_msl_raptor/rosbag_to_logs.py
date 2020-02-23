@@ -29,6 +29,7 @@ from ros_utils import *
 from ukf_utils import *
 from raptor_logger import *
 from pose_metrics import *
+from viz_utils import *
 
 class rosbags_to_logs:
     """
@@ -37,7 +38,7 @@ class rosbags_to_logs:
     The code currently also runs the quantitative metric analysis in the processes, but this is optional and will be done 
     again in the result_analyser. 
     """
-    def __init__(self, rb_name=None, data_source='raptor', ego_quad_ns="/quad7", ego_yaml="quad7", ado_yaml="all_obj"):
+    def __init__(self, rb_name=None, data_source='raptor', ego_quad_ns="/quad7", ego_yaml="quad7", ado_yaml="all_obj", b_save_3dbb_imgs=True):
         # Parse rb_name
         us_split = rb_name.split("_")
         if rb_name[-4:] == '.bag' or "_".join(us_split[0:3]) == 'msl_raptor_output':
@@ -74,6 +75,24 @@ class rosbags_to_logs:
                                 self.ego_gt_topic  : self.parse_ego_gt_msg, 
                                 self.ego_est_topic : self.parse_ego_est_msg,
                                 self.cam_info_topic: self.parse_camera_info_msg}
+        self.camera_topic = ego_quad_ns + '/camera/image_raw'
+        if b_save_3dbb_imgs:
+            self.bridge = CvBridge()
+            self.img_time_buffer = []
+            self.img_msg_buffer = []
+            self.processed_image_dict = {}  # t_est --> image w/ 3d bbs overlaid
+            self.topic_func_dict[self.camera_topic] = self.parse_camera_img_msg
+            self.color_list = [(0, 0, 255),     # 0 red
+                               (0, 255, 0),     # 1 green
+                               (255, 0, 0),     # 2 blue
+                               (255, 255, 0),   # 3 cyan
+                               (255, 0, 255),   # 4 magenta
+                               (0, 255, 255),   # 5 yellow
+                               (255, 255, 255), # 7 white
+                               (0, 0, 0),       # 6 black
+                               (125, 125, 125)] # 8 grey
+            self.ado_name_to_color = {}
+            self.bb_linewidth = 1.5
 
         # Read yaml file to get object params
         self.ado_names = set()  # names actually in our rosbag
@@ -281,10 +300,28 @@ class rosbags_to_logs:
                 self.logger.write_data_to_log(log_data, name, mode='gt')
                 self.logger.write_data_to_log(log_data, name, mode='err')
                 ######################################################
+                # draw on image (3d bb estimate)
+                if self.camera_topic in self.topic_func_dict:
+                    if t_est in self.processed_image_dict:
+                        image = self.processed_image_dict[t_est]
+                    else:
+                        img_msg, _ = find_closest_by_time(t_est, self.img_time_buffer, message_list=self.img_msg_buffer)
+                        image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
+                        image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
+                    self.processed_image_dict[t_est] = draw_2d_proj_of_3D_bounding_box(image, self.raptor_metrics.corners2D_pr[name][1:, :],  color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
+                ######################################################
+            
 
         if self.raptor_metrics is not None:
             self.raptor_metrics.calc_final_metrics()
             self.raptor_metrics.print_final_metrics()
+
+        # write images!!
+        if self.camera_topic in self.topic_func_dict:
+            for img_ind, t_est in enumerate(self.processed_image_dict):
+                fn_str = "mslraptor_{:d}".format(img_ind)
+                cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", self.processed_image_dict[t_est])
+        
         print("done processing rosbag into logs!")
         plt.figure(0)
         plt.plot(tms, add_errs, 'b.')
@@ -304,7 +341,7 @@ class rosbags_to_logs:
         for i, (topic, msg, t) in enumerate(self.bag.read_messages()):
             t_split = topic.split("/")
             if topic in self.topic_func_dict:
-                self.topic_func_dict[topic](msg)
+                self.topic_func_dict[topic](msg, t=t.to_sec())
             elif t_split[-1] == 'msl_raptor_state': # estimate
                 self.parse_ado_est_msg(msg, t=t.to_sec())
             elif t_split[1] in self.ado_names_all and t_split[-1] == 'pose' and t_split[-2] == 'vision_pose': # ground truth from a quad / nocs
@@ -323,8 +360,10 @@ class rosbags_to_logs:
         old_keys = copy(list(self.ado_est_pose_BY_TIME_BY_CLASS.keys()))
         for old_key in old_keys:
             self.ado_est_pose_BY_TIME_BY_CLASS[old_key - self.t0] = self.ado_est_pose_BY_TIME_BY_CLASS.pop(old_key)
-        for n in self.ado_names:
+        for i, n in enumerate(self.ado_names):
             self.t_gt[n] = np.asarray(self.t_gt[n]) - self.t0
+            self.ado_name_to_color[n] = self.color_list[i]
+        self.img_time_buffer = np.asarray(self.img_time_buffer) - self.t0
         # self.detect_time[n] = np.asarray(self.detect_time) - self.t0
         # self.detect_times[n] = np.asarray(self.detect_times) - self.t0
 
@@ -385,6 +424,13 @@ class rosbags_to_logs:
             except yaml.YAMLError as exc:
                 print(exc)
 
+    def parse_camera_img_msg(self, msg, t:None):
+        if t is None:
+            t_img = to.pose.header.stamp.to_sec()
+        else:
+            t_img = t
+        self.img_time_buffer.append(t_img)
+        self.img_msg_buffer.append(msg)
 
     def parse_camera_info_msg(self, msg, t=None):
         if self.K is None:
@@ -465,15 +511,16 @@ class rosbags_to_logs:
 
 if __name__ == '__main__':
     try:
-        if len(sys.argv) == 5:
+        if len(sys.argv) == 6:
             my_rb_name = sys.argv[1]
             my_data_source = sys.argv[2]
             my_ego_yaml = sys.argv[3]
             my_ado_yaml = sys.argv[4]
+            my_b_save_3dbb_imgs = sys.argv[5]
         else:
-            raise RuntimeError("Incorrect arguments! needs <rosbag_name> <data_source> <ego_yaml> <ado_yaml> (leave off .bag and .yaml extensions)")
+            raise RuntimeError("Incorrect arguments! needs <rosbag_name> <data_source> <ego_yaml> <ado_yaml> <b_save_3dbb_imgs> (leave off .bag and .yaml extensions)")
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
-        program = rosbags_to_logs(rb_name=my_rb_name, data_source=my_data_source, ego_yaml=my_ego_yaml, ado_yaml=my_ado_yaml)
+        program = rosbags_to_logs(rb_name=my_rb_name, data_source=my_data_source, ego_yaml=my_ego_yaml, ado_yaml=my_ado_yaml, b_save_3dbb_imgs=my_b_save_3dbb_imgs)
         
     except:
         import traceback
