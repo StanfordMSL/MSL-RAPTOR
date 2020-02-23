@@ -82,14 +82,14 @@ class rosbags_to_logs:
             self.processed_image_dict = {}  # t_est --> image w/ 3d bbs overlaid
             self.topic_func_dict[self.camera_topic] = self.parse_camera_img_msg
         self.color_list = [(0, 0, 255),     # 0 red
-                            (0, 255, 0),     # 1 green
-                            (255, 0, 0),     # 2 blue
-                            (255, 255, 0),   # 3 cyan
-                            (255, 0, 255),   # 4 magenta
-                            (0, 255, 255),   # 5 yellow
-                            (255, 255, 255), # 7 white
-                            (0, 0, 0),       # 6 black
-                            (125, 125, 125)] # 8 grey
+                           (0, 255, 0),     # 1 green
+                           (255, 0, 0),     # 2 blue
+                           (255, 255, 0),   # 3 cyan
+                           (255, 0, 255),   # 4 magenta
+                           (0, 255, 255),   # 5 yellow
+                           (255, 255, 255), # 7 white
+                           (0, 0, 0),       # 6 black
+                           (125, 125, 125)] # 8 grey
         self.ado_name_to_color = {}
         self.bb_linewidth = 1
         self.img_time_buffer = []
@@ -309,7 +309,7 @@ class rosbags_to_logs:
                         img_msg, _ = find_closest_by_time(t_est, self.img_time_buffer, message_list=self.img_msg_buffer)
                         image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
                         image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
-                    self.processed_image_dict[t_est] = draw_2d_proj_of_3D_bounding_box(image, self.raptor_metrics.corners2D_pr[name][1:, :],  color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
+                    self.processed_image_dict[t_est] = draw_2d_proj_of_3D_bounding_box(image, self.raptor_metrics.corners2D_pr[name][1:, :], corners2D_gt=self.raptor_metrics.corners2D_gt[name][1:, :], color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
                 ######################################################
             
 
