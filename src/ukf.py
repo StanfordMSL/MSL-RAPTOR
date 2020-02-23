@@ -326,24 +326,8 @@ class UKF:
         next_states = copy(states)
 
         # General point mass model
-        if self.class_str.lower() in ['mslquad','cup','bowl','laptop','bottle'] :
 
-            # update position
-            next_states[0:3,:] += dt * states[3:6,:]
-
-            # update orientation
-            quat = states[6:10,:].T  # current orientation
-            omegas = states[10:13,:]  # angular velocity vector
-            om_norm = la.norm(omegas,axis=0)  # rate of change of all angles
-            om_norm[np.argwhere(om_norm == 0)] = 1
-            ang = om_norm * dt  # change in angle in this small timestep
-            ax = omegas / om_norm  # axis about angle change
-            quat_delta = axang_to_quat((ax * ang).T)
-            quat_new = quat_mul(quat_delta, quat)
-
-            next_states[6:10,:] = quat_new.T
-            
-        elif self.class_str.lower() == 'person':
+        if self.class_str.lower() == 'person':
             # People on on the ground
             # update position
             # Get unique vector pointing towards heading. Maybe use heading from next_states?
@@ -363,8 +347,25 @@ class UKF:
             quat_new = quat_mul(quat_delta, quat)
 
             next_states[6:10,:] = quat_new.T
-        else:
-            raise RuntimeError('Unknown object type: {}'.format(self.class_str))    
+
+        else :
+
+            # update position
+            next_states[0:3,:] += dt * states[3:6,:]
+
+            # update orientation
+            quat = states[6:10,:].T  # current orientation
+            omegas = states[10:13,:]  # angular velocity vector
+            om_norm = la.norm(omegas,axis=0)  # rate of change of all angles
+            om_norm[np.argwhere(om_norm == 0)] = 1
+            ang = om_norm * dt  # change in angle in this small timestep
+            ax = omegas / om_norm  # axis about angle change
+            quat_delta = axang_to_quat((ax * ang).T)
+            quat_new = quat_mul(quat_delta, quat)
+
+            next_states[6:10,:] = quat_new.T
+            
+    
             
         if self.b_enforce_0_roll:
             next_states[6:10,:] = remove_roll(quat_new).T
