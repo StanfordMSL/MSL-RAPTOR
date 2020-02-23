@@ -9,10 +9,10 @@ dq_sigma: [0.000003,0.000003,0.000003]
 dw_sigma: [0.000005,0.000005,0.00005]
 dp_q: [0.002,0.0002,0.0002]
 dv_q: [0.0001,0.0000001,0.0001]
-dq_q: [0.0006,0.000006,0.00006]
+dq_q: [0.0001,0.0001,0.0001]
 dw_q: [0.00001,0.0001,0.00001]
-R: [1, 1, 2, 1, 0.005]
+R: [2, 2, 4, 4, 0.05]
 # Offsets in meters for length, width and height of the bounding box
-offset_bb_l: -0.02
-offset_bb_w: -0.02
+offset_bb_l: -0.01
+offset_bb_w: -0.01
 offset_bb_h: 0.0
