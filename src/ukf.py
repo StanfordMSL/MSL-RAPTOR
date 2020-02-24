@@ -421,6 +421,7 @@ class UKF:
         """
         Initialize a state with groundtruth pose
         """
+        print('USING GROUND TRUTH TO INITIALIZE POSE')
         mu = np.array([pose[0],pose[1],pose[2],0.,0.,0.,pose[3],pose[4],pose[5],pose[6],0.,0.,0.])
         # Add noise
         noise = np.array([random.uniform(-0.02, 0.02) for i in range(3)]) 

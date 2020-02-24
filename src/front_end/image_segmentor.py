@@ -64,6 +64,8 @@ class ImageSegmentor:
         self.max_aspect_ratio = {'person':0.4,'mslquad':5,'bowl':2,'cup':1.3,'laptop':3,'bottle':1.0}
 
         self.chi2_03 = 6.06
+        self.chi2_005 = 11.07
+
         self.im_width = im_width
         self.im_height = im_height
 
@@ -110,8 +112,9 @@ class ImageSegmentor:
             bbs_no_angle[:,2:4] += self.box_buffer
             # Detections to reinit tracker
             self.reinit_tracker(bbs_no_angle, image)
-            output = self.track(image)
             self.mode = self.TRACK
+            output = self.track(image)
+            
             return output
         elif self.mode == self.TRACK:
             if self.use_track_checks:
@@ -204,7 +207,7 @@ class ImageSegmentor:
                 self.active_objects_ids_per_class[class_str] = [obj_id]
             else:
                 # There exist some active objects of this class, check if they match
-                best_t = self.chi2_03
+                best_t = self.chi2_005
                 obj_id = None
                 # Go through active candidate objects
                 for id in self.active_objects_ids_per_class[class_str]:
@@ -274,18 +277,22 @@ class ImageSegmentor:
         class_str = self.class_id_to_str[detection[-1]]
         # Left side in image
         if (bb[0]) < self.min_pix_from_edge:
+            print('Rejected measurement, too close to the left edge')
             return False
         
         # Right side in image
         if (bb[0] + bb[2]) > self.im_width - self.min_pix_from_edge:
+            print('Rejected measurement, too close to the right edge')
             return False
 
         # Top in image
         if (bb[1] ) < self.min_pix_from_edge:
+            print('Rejected measurement, too close to the top edge')
             return False
         
         # Bottom in image
         if (bb[1] + bb[3]) > self.im_height - self.min_pix_from_edge:
+            print('Rejected measurement, too close to the bottom')
             return False
 
         # Aspect ratio valid
@@ -327,7 +334,7 @@ class ImageSegmentor:
 
 
         t = self.compute_mahalanobis_dist(ukf,abb)
-        if t > self.chi2_03:
+        if t > self.chi2_005:
             print("Rejected measurement too far from distribution: F={}".format(t))
             return False
 

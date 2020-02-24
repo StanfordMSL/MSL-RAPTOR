@@ -126,6 +126,8 @@ def run_execution_loop():
                     approx_position = ukf_dict[obj_id].approx_position_from_bb(abb, tf_w_ego)
                     gt_pose = ros.get_closest_pose(class_str,approx_position)
                     ukf_dict[obj_id].reinit_filter_from_gt(gt_pose)
+                    # Avoid reusing GT to initialize pose TODO Currently limits gt to first object
+                    b_use_gt_pose_init = False
                 else:
                     ukf_dict[obj_id].reinit_filter_approx(abb, tf_w_ego)
                 continue

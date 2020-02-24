@@ -230,10 +230,10 @@ class ros_interface:
                 (x,y,w,h) = corners_to_aligned_bb(proj_corners)
 
                 # Add 5% of size noise
-                dx = 0.05*random.uniform(-w,w)/2.
-                dy = 0.05*random.uniform(-h,h)/2.
-                dw = 0.05*random.uniform(-w,w)/2.
-                dh = 0.05*random.uniform(-h,h)/2.
+                dx = 0.1*random.uniform(-w,w)/2.
+                dy = 0.1*random.uniform(-h,h)/2.
+                dw = 0.1*random.uniform(-w,w)/2.
+                dh = 0.1*random.uniform(-h,h)/2.
 
                 gt_boxes.append([x+dx,y+dy,w+dw,h+dh,1.,1.,self.im_seg.class_str_to_id[class_str]])
         return np.array(gt_boxes)
