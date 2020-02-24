@@ -16,6 +16,7 @@ from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.ukf_utils import *
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
+import random
 
 class ros_interface:
 
@@ -227,6 +228,13 @@ class ros_interface:
                 tf_w_ado[:3,3] = pose[:3]
                 proj_corners = pose_to_3d_bb_proj(tf_w_ado,self.tf_w_ego,self.bb_3d[class_str],self.camera)
                 (x,y,w,h) = corners_to_aligned_bb(proj_corners)
-                gt_boxes.append([x,y,w,h,1.,1.,self.im_seg.class_str_to_id[class_str]])
+
+                # Add 5% of size noise
+                dx = 0.05*random.uniform(-w,w)/2.
+                dy = 0.05*random.uniform(-h,h)/2.
+                dw = 0.05*random.uniform(-w,w)/2.
+                dh = 0.05*random.uniform(-h,h)/2.
+
+                gt_boxes.append([x+dx,y+dy,w+dw,h+dh,1.,1.,self.im_seg.class_str_to_id[class_str]])
         return np.array(gt_boxes)
 
