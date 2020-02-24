@@ -147,8 +147,8 @@ class bb_viz_node:
             box = np.int0(cv2.boxPoints( ( (bb_msg.x, bb_msg.y), (bb_msg.width, bb_msg.height), -np.degrees(bb_msg.angle))) )
             cv2.drawContours(image, [box], 0, box_color, 2)
         self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(image, "bgr8"))
-
-        # cv2.imwrite('/test_img{}.png'.format(self.itr), image)
+        if False:
+            cv2.imwrite('/mounted_folder/front_end_imgs/front_end_{}.png'.format(self.itr), image)
         self.itr += 1
         # pdb.set_trace()
 
