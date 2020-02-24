@@ -38,7 +38,7 @@ def run_execution_loop():
     # Returns dict of params per class name
     category_params = load_category_params()
 
-    bb_3d, obj_width, classes_names, classes_ids, objects_names_per_class = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,category_params)  # Parse objects used and associated configurations
+    bb_3d, obj_width,obj_height, classes_names, classes_ids, objects_names_per_class = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,category_params)  # Parse objects used and associated configurations
 
 
     ros.objects_names_per_class = objects_names_per_class
@@ -121,9 +121,9 @@ def run_execution_loop():
             ukf = None
             if not obj_id in ukf_dict:  # New Object
                 print("new object (id = {}, type = {})".format(obj_id, class_str))
-                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str],ukf_prms=category_params[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id,verbose=b_verbose)
+                ukf_dict[obj_id] = UKF(camera=my_camera, bb_3d=bb_3d[class_str], obj_width=obj_width[class_str],obj_height=obj_height[class_str], ukf_prms=category_params[class_str], init_time=loop_time, class_str=class_str, obj_id=obj_id,verbose=b_verbose)
                 if b_use_gt_pose_init:
-                    approx_position = ukf_dict[obj_id].approx_position_from_bb(abb, tf_w_ego)
+                    approx_position,_ = ukf_dict[obj_id].approx_pose_from_bb(abb, tf_w_ego)
                     gt_pose = ros.get_closest_pose(class_str,approx_position)
                     ukf_dict[obj_id].reinit_filter_from_gt(gt_pose)
                     # Avoid reusing GT to initialize pose TODO Currently limits gt to first object
@@ -188,6 +188,8 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
     classes_used_ids = []
     bb_3d = {}
     obj_width = {}
+    obj_height = {}
+
     objects_names_per_class = {}
     with open(objects_sizes_yaml, 'r') as stream:
         try:
@@ -208,6 +210,7 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
                                                              [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
                     obj_width[obj_dict['class_str']] = 2*half_width
+                    obj_height[obj_dict['class_str']] = 2*half_height
 
                     # Add the object's class to the classes used, if not there already
                     if obj_dict['class_str'] not in classes_names:
@@ -223,7 +226,7 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
         except yaml.YAMLError as exc:
             print(exc)
 
-    return bb_3d, obj_width, classes_used_names, classes_used_ids,objects_names_per_class
+    return bb_3d, obj_width, obj_height, classes_used_names, classes_used_ids,objects_names_per_class
 
 
 def wait_intil_ros_ready(ros, rate):
