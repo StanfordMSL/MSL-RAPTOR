@@ -13,6 +13,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as mfm
 import matplotlib.ticker as ticker
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
 # Utils
 sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor')
 from raptor_logger import *
@@ -22,25 +23,33 @@ class MultiObjectPlotGenerator:
     def __init__(self, base_directory, class_labels):
 
         # PLOT OPTIONS ###################################
-        b_nocs = True
+        b_nocs = False
+        b_save_figs = True
+        self.b_show_figs = False
+        img_path = '/mounted_folder/saved_figs/'
         color_strs = ['r', 'b', 'm', 'k', 'c', 'g']
-        fontsize = 26
+        fontsize = 40
+        tick_fontsize = 34
+        legend_fontsize = 26
         linewidth = 3
-        text_weight = 'bold'  # 'normal' or 'bold'
+        text_weight = 'normal'  # 'normal' or 'bold'
         # font_path = '/usr/local/lib/python3.6/dist-packages/matplotlib/mpl-data/fonts/ttf/DejaVuSansMono-Bold.ttf'  # this one has bold
-        font_path = '/usr/local/lib/python3.6/dist-packages/matplotlib/mpl-data/fonts/ttf/STIXGeneral.ttf'  # this one does not...
-        self.plot_scale = 1.5 # make plots bigger so there is space for legend
+        # font_path = '/usr/local/lib/python3.6/dist-packages/matplotlib/mpl-data/fonts/ttf/STIXGeneral.ttf'  # this one does not...
+        self.plot_scale = 1.8 # make plots bigger so there is space for legend
         b_capitalize_names = True
         b_show_dots = False
         b_plot_titles = False
-        leg_font_props = mfm.FontProperties(fname=font_path, weight=text_weight, size=fontsize-2)
-        perp_symbol = u'\u27c2'
-        prrl_symbol = u'\u2225' # prrl_symbol = '||'  
+        # leg_font_props = mfm.FontProperties(fname=font_path, weight=text_weight, size=fontsize-2)
+        perp_symbol = '$^+$'#u'\u27c2'
+        prrl_symbol = '$^=$'#u'\u2225' # prrl_symbol = '||'  
 
-        font = {'family': 'STIXGeneral',
-                'weight' : text_weight,
-                'size'   : fontsize}
-        matplotlib.rc('font', **font)
+        # font = {'family' : 'serif',
+        #         'weight' : text_weight,
+        #         'size'   : fontsize}
+        # matplotlib.rc('font', **font)
+        plt.rc('font', family='serif', size=fontsize, weight=text_weight)
+        plt.rc('xtick', labelsize='x-small')
+        plt.rc('ytick', labelsize='x-small')
 
         if b_nocs:
             nx = 20  # number of ticks on x axis
@@ -56,6 +65,10 @@ class MultiObjectPlotGenerator:
             d_unitless_max = 1.5
             a_max = 30
             p_max = 50
+
+        
+        major_ticks_x = np.arange(0, nx + .01, show_every_nth_label)
+        minor_ticks_x = np.arange(0, nx + .01, 1)
 
         x_dist_labels_to_show = np.linspace(0, d_max, show_every_nth_label)
         x_dist_unitless_labels_to_show = np.linspace(0, d_unitless_max, show_every_nth_label)
@@ -121,13 +134,17 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_dist_labels_to_show, size='small')
-        ax.set_xlabel("translation error threshold (m)", fontsize=fontsize, weight=text_weight)
-        ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
+        self.adjust_axes(ax, major_ticks_x, minor_ticks_x, x_dist_labels_to_show)
+
+        ax.set_xlabel("translation error threshold (m)", size=tick_fontsize, weight=text_weight)
+        ax.set_ylabel("correct estimates in %", size=tick_fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error")
-        plt.legend(leg_hands, leg_str, prop=leg_font_props)
-        plt.show(block=False)
+        plt.legend(leg_hands, leg_str, loc=0, prop={'size': legend_fontsize, 'weight': text_weight})
+        if self.b_show_figs:
+            plt.show(block=False)
+        if b_save_figs:
+            plt.savefig(img_path + '/s_curve_trans.png', bbox_inches='tight')
 
         for k in all_dist_err.keys():
             print(k+ " avg translation error: "+str(np.mean(all_dist_err[k]))+" m")
@@ -167,13 +184,17 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_ang_labels_to_show, size='small')
-        ax.set_xlabel("angle threshold (deg)", fontsize=fontsize, weight=text_weight)
-        ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
+        self.adjust_axes(ax, major_ticks_x, minor_ticks_x, x_dist_labels_to_show)
+        ax.set_xlabel("angle threshold (deg)", fontsize=tick_fontsize, weight=text_weight)
+        ax.set_ylabel("correct estimates in %", fontsize=tick_fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Rotation Error")
-        plt.legend(leg_hands, leg_str, prop=leg_font_props)
-        plt.show(block=False)
+        plt.legend(leg_hands, leg_str, loc=0, prop={'size': legend_fontsize, 'weight': text_weight})
+        
+        if self.b_show_figs:
+            plt.show(block=False)
+        if b_save_figs:
+            plt.savefig(img_path + '/s_curve_rot.png', bbox_inches='tight')
         
         for k in all_ang_err.keys():
             print(k+ " avg rotation error: "+str(np.mean(all_ang_err[k]))+" deg")
@@ -181,7 +202,6 @@ class MultiObjectPlotGenerator:
         print("Avg rotation error: "+str(np.mean(list(chain.from_iterable(list(all_ang_err.values())))))+" deg\n")
 
         ##########################################################################
-
 
         # in plane vs depth translation err plot ##########################################################################
         plt.figure(fig_ind)
@@ -223,24 +243,25 @@ class MultiObjectPlotGenerator:
                 plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
                 plt.plot(range(nx), pcnt2[cl], color_strs[i] + '.', markersize=4)
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
-            leg_str.append(perp_symbol + ' ' + cl)
+            leg_str.append(perp_symbol + cl)
             leg_hands.append(plt.plot(range(nx), pcnt2[cl], color_strs[i] + '--', linewidth=linewidth)[0])
-            leg_str.append(prrl_symbol + ' ' + cl)
+            leg_str.append(prrl_symbol + cl)
         ax = plt.gca()
-        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_dist_labels_to_show, size='small')
-        ax.set_xlabel("translation error threshold (m)", fontsize=fontsize, weight=text_weight)
-        ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
+        self.adjust_axes(ax, major_ticks_x, minor_ticks_x, x_dist_labels_to_show)
+        ax.set_xlabel("translation error threshold (m)", fontsize=tick_fontsize, weight=text_weight)
+        ax.set_ylabel("correct estimates in %", fontsize=tick_fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error (In-Plane vs. Depth)")
-        plt.legend(leg_hands, leg_str, prop=leg_font_props)
-        plt.show(block=False)
+        plt.legend(leg_hands, leg_str, loc=0, prop={'size': legend_fontsize, 'weight': text_weight})
+        if self.b_show_figs:
+            plt.show(block=False)
+        if b_save_figs:
+            plt.savefig(img_path + '/s_curve_trans_inplanedepth.png', bbox_inches='tight')
 
         for k in all_depth_err.keys():
             print(k+ " avg depth translation error: "+str(np.mean(all_depth_err[k]))+" m")
 
         print("Avg depth translation error: "+str(np.mean(list(chain.from_iterable(list(all_depth_err.values())))))+" m\n")
-
-
 
         for k in all_ip_trans_err.keys():
             print(k+ " avg depth in plane translation error: "+str(np.mean(all_ip_trans_err[k]))+" m")
@@ -279,50 +300,53 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_dist_unitless_labels_to_show, size='small')
-        ax.set_xlabel("translation error / distance threshold (m/m)", fontsize=fontsize, weight=text_weight)
-        ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
+        self.adjust_axes(ax, major_ticks_x, minor_ticks_x, x_dist_labels_to_show)
+        ax.set_xlabel("translation error / distance threshold (m/m)", fontsize=tick_fontsize, weight=text_weight)
+        ax.set_ylabel("correct estimates in %", fontsize=tick_fontsize, weight=text_weight)
         if b_plot_titles:
             ax.set_title("Translation Error / Distance to Object")
-        plt.legend(leg_hands, leg_str, prop=leg_font_props)
-        plt.show(block=False)
+        plt.legend(leg_hands, leg_str, loc=0, prop={'size': legend_fontsize, 'weight': text_weight})
+        if self.b_show_figs:
+            plt.show(block=False)
+        if b_save_figs:
+            plt.savefig(img_path + '/s_curve_trans_per_depth.png', bbox_inches='tight')
         ##########################################################################
         
-        # pixel to target plot ##########################################################################
-        plt.figure(fig_ind)
-        fig_ind += 1
-        self.adjust_plot_size()
-        success_count = {}
-        total_count = {}
-        pcnt = {}
-        leg_hands = []
-        leg_str = []
+        # # pixel to target plot ##########################################################################
+        # plt.figure(fig_ind)
+        # fig_ind += 1
+        # self.adjust_plot_size()
+        # success_count = {}
+        # total_count = {}
+        # pcnt = {}
+        # leg_hands = []
+        # leg_str = []
 
-        for i, cl in enumerate(err_log_dict):
-            success_count[cl] = np.zeros((nx))
-            total_count[cl] = np.ones((nx))*self.eps
-            pcnt[cl] = np.zeros((nx))
-            err_log_list = err_log_dict[cl]
-            for err_log in err_log_list:
-                for thresh_ind, (dist_thresh, ang_thresh, pix_thresh) in enumerate(thresh_list):
-                    for pix_err in err_log["pix_err"]:
-                        total_count[cl][thresh_ind] += 1
-                        if np.abs(pix_err) < pix_thresh:
-                            success_count[cl][thresh_ind] += 1
-            pcnt[cl] = np.array([100*s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
-            if b_show_dots:
-                plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
-            leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
-            leg_str.append(cl)
-        ax = plt.gca()
-        plt.xticks(plt.xticks()[0] - plt.xticks()[0][0], x_pix_labels_to_show, size='small')
-        ax.set_xlabel("pixel threshold (pix)", fontsize=fontsize, weight=text_weight)
-        ax.set_ylabel("correct estimates in %", fontsize=fontsize, weight=text_weight)
-        if b_plot_titles:
-            ax.set_title("Pixel Error")
-        plt.legend(leg_hands, leg_str, prop=leg_font_props)
-        plt.show(block=False)
-        ##########################################################################
+        # for i, cl in enumerate(err_log_dict):
+        #     success_count[cl] = np.zeros((nx))
+        #     total_count[cl] = np.ones((nx))*self.eps
+        #     pcnt[cl] = np.zeros((nx))
+        #     err_log_list = err_log_dict[cl]
+        #     for err_log in err_log_list:
+        #         for thresh_ind, (dist_thresh, ang_thresh, pix_thresh) in enumerate(thresh_list):
+        #             for pix_err in err_log["pix_err"]:
+        #                 total_count[cl][thresh_ind] += 1
+        #                 if np.abs(pix_err) < pix_thresh:
+        #                     success_count[cl][thresh_ind] += 1
+        #     pcnt[cl] = np.array([100*s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
+        #     if b_show_dots:
+        #         plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
+        #     leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
+        #     leg_str.append(cl)
+        # ax = plt.gca()
+        # self.adjust_axes(ax, major_ticks_x, minor_ticks_x, x_dist_labels_to_show)
+        # ax.set_xlabel("pixel threshold (pix)", fontsize=tick_fontsize, weight=text_weight)
+        # ax.set_ylabel("correct estimates in %", fontsize=tick_fontsize, weight=text_weight)
+        # if b_plot_titles:
+        #     ax.set_title("Pixel Error")
+        # plt.legend(leg_hands, leg_str, loc=0, prop={'size': legend_fontsize, 'weight': text_weight})
+        # plt.show(block=False)
+        # ##########################################################################
 
     def adjust_plot_size(self):
         fig_size = plt.gcf().get_size_inches() #Get current size
@@ -330,6 +354,13 @@ class MultiObjectPlotGenerator:
         # Modify the current size by the factor
         plt.gcf().set_size_inches(sizefactor * fig_size)
 
+    def adjust_axes(self, ax, major_ticks_x, minor_ticks_x, x_dist_labels_to_show):
+        ax.set_xticks(major_ticks_x)
+        ax.set_xticklabels(x_dist_labels_to_show)
+        ax.set_xticks(minor_ticks_x, minor=True)
+        ax.grid(which='both')
+        ax.grid(which='minor', alpha=0.2)
+        ax.grid(which='major', alpha=0.5)
 
 if __name__ == '__main__':
     try:
@@ -356,7 +387,8 @@ if __name__ == '__main__':
 
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
         program = MultiObjectPlotGenerator(base_directory=my_base_directory, class_labels=my_class_labels)
-        input("\nPress enter to close program\n")
+        if program.b_show_figs:
+            input("\nPress enter to close program\n")
         
     except:
         import traceback
