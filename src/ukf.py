@@ -402,18 +402,23 @@ class UKF:
         """
         Initialize a state with approximations using a single bounding box
         """
+        print(bb)
         if self.obj_width < self.obj_height:
             width = min(bb[2],bb[3])
             height = max(bb[2],bb[3])
         else :
             width = max(bb[2],bb[3])
             height = min(bb[2],bb[3])
-        z = self.camera.new_camera_matrix[0,0]* width /bb[2]
+        print(width)
+        print(height)
+        z = self.camera.new_camera_matrix[0,0]* self.obj_width /width
         im_coor = z*np.array([bb[0],bb[1],1.0])
         pos = self.camera.new_camera_matrix_inv @ im_coor
         pos = tf_w_ego @ inv_tf(self.camera.tf_cam_ego) @ np.concatenate([pos, [1]])
         # Only roll from the angle of the box
-        quat = ang_to_quat([bb[-1],0,0])
+        quat = ang_to_quat(np.array([[bb[-1],0,0]])).flatten()
+        print('pos')
+        print(pos)
         return pos[:3],quat
 
 
@@ -422,6 +427,8 @@ class UKF:
         Initialize a state with approximations using a single bounding box
         """
         pos,quat = self.approx_pose_from_bb(bb,tf_w_ego)
+        print(pos)
+        print(quat)
         mu = np.array([pos[0],pos[1],pos[2],0.,0.,0.,quat[0],quat[1],quat[2],quat[3],0.,0.,0.])
         self.init_filter_elements(mu)
 
