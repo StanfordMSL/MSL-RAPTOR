@@ -89,3 +89,16 @@ def find_closest_by_time(time_to_match, time_list, message_list=None):
        return message_list[pos], pos
     else:
        return message_list[pos - 1], pos - 1
+
+
+def update_running_average(ave_info, new_el):
+    """
+    ave_info: [running mean, # of elements so far (not counting new one)]
+    new_el: new element to be put into running mean
+    """
+    if ave_info[0] == 0:
+        ave_info = [ave_info[-1], 1]
+    else:
+        ave_info[0] = ave_info[0] + (new_el - ave_info[0]) / ave_info[1]
+        ave_info[1] += 1
+    return ave_info

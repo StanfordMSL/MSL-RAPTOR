@@ -33,6 +33,7 @@ class ros_interface:
         self.im_seg = None  # object for parsing images into angled bounding boxes
         self.b_use_gt_bb = b_use_gt_bb  # toggle for debugging using ground truth bounding boxes
         self.latest_img_time = -1
+        self.front_end_time = None
         ####################################################################
 
         self.ns = rospy.get_param('~ns')  # robot namespace
@@ -109,6 +110,8 @@ class ros_interface:
         if len(self.ego_pose_rosmesg_buffer[0]) == 0:
             return # this happens if we are just starting
 
+        t_fe_start = time.time()  # start timer for frontend
+
         self.tf_w_ego = pose_to_tf(find_closest_by_time(my_time, self.ego_pose_rosmesg_buffer[1], self.ego_pose_rosmesg_buffer[0])[0])
 
         image = self.bridge.imgmsg_to_cv2(msg,desired_encoding="bgr8")
@@ -123,6 +126,7 @@ class ros_interface:
             self.im_process_output = self.im_seg.process_image(image,my_time,gt_bbs)
         else:
             self.im_process_output = self.im_seg.process_image(image,my_time)
+        self.front_end_time = time.time() - t_fe_start
         self.latest_img_time = my_time  # DO THIS LAST
         # self.img_seg_mode = self.IGNORE
         if self.verbose:

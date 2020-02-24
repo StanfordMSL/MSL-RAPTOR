@@ -61,6 +61,11 @@ def run_execution_loop():
     ros.camera = camera(ros)
     my_camera = ros.camera
     loop_time_hist = []
+    fe_time_hist = []
+    be_time_hist = []
+    loop_ave_info = [0, 0]  # [running mean, num els]
+    fe_ave_info = [0, 0]  # [running mean, num els]
+    be_ave_info = [0, 0]  # [running mean, num els]
 
     ros.create_subs_and_pubs()
     dim_state = 13
@@ -86,8 +91,11 @@ def run_execution_loop():
             loop_count += 1
             rate.sleep()
             continue
-        
-        loop_time_hist.append(loop_time)
+
+        t_be_start = time.time()  # start timer for backend
+        new_fe_time = ros.front_end_time
+        fe_time_hist.append(new_fe_time)
+        loop_time_hist.append(loop_time - previous_image_time)
         previous_image_time = loop_time  # this ensures we dont reuse the image
 
         # get latest data from ros
@@ -129,9 +137,19 @@ def run_execution_loop():
                 if b_pub_3d_bb_proj:
                     tf_w_ado = state_to_tf(ukf_dict[obj_id].mu)
                     ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
+        
+        be_time_hist.append(time.time() - t_be_start)
         ros.publish_filter_state(obj_ids_tracked, ukf_dict)
         ros.publish_bb_msg(processed_image, im_seg_mode, loop_time)
-        # print(np.mean([loop_time_hist[i] - loop_time_hist[i-1] for i in range(1, len(loop_time_hist))]))
+
+        # update running averages
+        loop_ave_info = update_running_average(loop_ave_info, loop_time_hist[-1])
+        fe_ave_info   = update_running_average(fe_ave_info, fe_time_hist[-1])
+        be_ave_info   = update_running_average(be_ave_info, be_time_hist[-1])
+        
+        if loop_count % 10 == 0:
+            print("loop itr {}:\n\tAve front end time = {}\n\tAve back end time = {}\n\tAve loop time - {}".format(loop_count, fe_ave_info[0], be_ave_info[0], loop_ave_info[0]))
+            
 
         # Save current object states in image segmentor
         ros.im_seg.ukf_dict = ukf_dict
