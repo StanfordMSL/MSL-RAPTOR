@@ -14,6 +14,7 @@ import cv2
 import numpy as np
 import numpy.linalg as la
 
+import random
 # libs & utils
 from utils_msl_raptor.ukf_utils import *
 from utils_msl_raptor.ros_utils import *
@@ -421,6 +422,9 @@ class UKF:
         Initialize a state with groundtruth pose
         """
         mu = np.array([pose[0],pose[1],pose[2],0.,0.,0.,pose[3],pose[4],pose[5],pose[6],0.,0.,0.])
+        # Add noise
+        noise = np.array([random.uniform(-0.02, 0.02) for i in range(3)]) 
+        mu[:3] = mu[:3]+noise
         self.init_filter_elements(mu)
 
 
