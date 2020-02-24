@@ -18,6 +18,8 @@ from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
 sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor')
 from raptor_logger import *
 from itertools import chain
+from ssp_utils import makedirs
+
 class MultiObjectPlotGenerator:
 
     def __init__(self, base_directory, class_labels):
@@ -27,6 +29,7 @@ class MultiObjectPlotGenerator:
         b_save_figs = True
         self.b_show_figs = False
         img_path = '/mounted_folder/saved_figs/'
+        makedirs(img_path)
         color_strs = ['r', 'b', 'm', 'k', 'c', 'g']
         fontsize = 40
         tick_fontsize = 34
