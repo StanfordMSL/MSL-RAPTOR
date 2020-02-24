@@ -66,6 +66,9 @@ class rosbags_to_logs:
         except Exception as e:
             raise RuntimeError("Unable to Process Rosbag!!\n{}".format(e))
 
+        self.bags_and_cut_times = {"msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" : 31,
+                                   "msl_raptor_output_from_bag_rosbag_for_post_process_TX2_2019-12-18-02-10-28.bag" : 1576663867}
+
 
         self.bb_data_topic   = ego_quad_ns + '/bb_data'  # ego_quad_ns since it is ego_quad's estimate of the bounding box
         self.ego_gt_topic    = ego_quad_ns + '/mavros/vision_pose/pose'
@@ -79,7 +82,7 @@ class rosbags_to_logs:
         self.b_save_3dbb_imgs = b_save_3dbb_imgs
         if self.b_save_3dbb_imgs:
             self.bridge = CvBridge()
-            self.processed_image_dict = {}  # t_est --> image w/ 3d bbs overlaid
+            self.processed_image_dict = {} 
             self.topic_func_dict[self.camera_topic] = self.parse_camera_img_msg
         self.color_list = [(0, 0, 255),     # 0 red
                            (0, 255, 0),     # 1 green
@@ -193,6 +196,7 @@ class rosbags_to_logs:
         ###################################
 
         print("Post-processing data now")
+        t_img_to_t_est_dict = {}
         add_errs = []
         R_errs = []
         t_errs = []
@@ -304,27 +308,34 @@ class rosbags_to_logs:
                 # draw on image (3d bb estimate)
                 if self.b_save_3dbb_imgs:
                     if t_est in self.processed_image_dict:
-                        image = self.processed_image_dict[t_est]
+                        image, _, __ = self.processed_image_dict[t_est]
                     else:
-                        img_msg, _ = find_closest_by_time(t_est, self.img_time_buffer, message_list=self.img_msg_buffer)
+                        img_msg, img_pos = find_closest_by_time(t_est, self.img_time_buffer, message_list=self.img_msg_buffer)
+                        img_time = self.img_time_buffer[img_pos]
+                        t_img_to_t_est_dict[img_time] = t_est
                         image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
                         image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
                     
                     # alt_pr = pose_to_3d_bb_proj(tf_w_ado_est, tf_w_ego_gt, vertices, ukf_dict[obj_id].camera)
                     # print(self.new_camera_matrix)
                     # print(self.tf_cam_ego)
-                    N = vertices.shape[1]
-                    tf_cam_ado = self.tf_cam_ego @ inv_tf(tf_w_ego_gt) @ tf_w_ado_est
-                    vertices_cam = tf_cam_ado @ vertices
-                    projected_vertices = np.zeros((N, 2))
-                    for i, bb_vert in enumerate(vertices_cam.T):
-                        rc = self.new_camera_matrix @ np.reshape(bb_vert[0:3], 3, 1)
-                        rc = np.array([rc[1], rc[0]]) / rc[2]
-                        projected_vertices[i, :] = rc
-                    projected_vertices = np.fliplr(projected_vertices)
+                    # N = vertices.shape[1]
+                    # tf_cam_ado = self.tf_cam_ego @ inv_tf(tf_w_ego_gt) @ tf_w_ado_est
+                    # vertices_cam = tf_cam_ado @ vertices
+                    # projected_vertices = np.zeros((N, 2))
+                    # for i, bb_vert in enumerate(vertices_cam.T):
+                    #     rc = self.new_camera_matrix @ np.reshape(bb_vert[0:3], 3, 1)
+                    #     rc = np.array([rc[1], rc[0]]) / rc[2]
+                    #     projected_vertices[i, :] = rc
+                    # projected_vertices = np.fliplr(projected_vertices)
 
                     if len(bb_proj) > 0:
-                        self.processed_image_dict[t_est] = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
+                        if t_est in self.processed_image_dict:
+                            self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
+                            self.processed_image_dict[t_est][1].append(bb_proj)
+                            self.processed_image_dict[t_est][2].append(name)
+                        else:
+                            self.processed_image_dict[t_est] = (draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth), [bb_proj], [name])
                     ######################################################
             
 
@@ -334,9 +345,37 @@ class rosbags_to_logs:
 
         # write images!!
         if self.b_save_3dbb_imgs:
-            for img_ind, t_est in enumerate(self.processed_image_dict):
-                fn_str = "mslraptor_{:d}".format(img_ind)
-                cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", self.processed_image_dict[t_est])
+            b_fill_in_gaps = True
+            img_ind = 0
+            max_skip_count = 3
+            if b_fill_in_gaps:
+                for img_msg_time, img_msg in zip(self.img_time_buffer, self.img_msg_buffer):
+                    if img_msg_time < -0.04:
+                        continue
+                    if self.rb_name in self.bags_and_cut_times and img_msg_time + self.t0 > self.bags_and_cut_times[self.rb_name]:
+                        break
+                    if img_msg_time in t_img_to_t_est_dict:
+                        # we have a bb for this frame
+                        image, last_bb_proj_list, last_name_list = self.processed_image_dict[t_img_to_t_est_dict[img_msg_time]]
+                        skip_count = 0
+                    else:
+                        # we dont, use the latest bb if within skip_count
+                        image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
+                        image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
+                        if skip_count < max_skip_count: # if its jus a little later... reuse prev box
+                            for bb_proj, name in zip(last_bb_proj_list, last_name_list):
+                                image = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
+                        else:
+                            print("over skip count ({})".format(img_ind))
+                        skip_count += 1
+                    fn_str = "mslraptor_{:d}".format(img_ind)
+                    cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", image)
+                    img_ind += 1
+            else:
+                for img_ind, t_est in enumerate(self.processed_image_dict):
+                    image, _, _ = self.processed_image_dict[t_est]
+                    fn_str = "mslraptor_{:d}".format(img_ind)
+                    cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", image)
         
         print("done processing rosbag into logs!")
         plt.figure(0)
