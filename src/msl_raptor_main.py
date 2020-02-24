@@ -148,7 +148,7 @@ def run_execution_loop():
         be_ave_info   = update_running_average(be_ave_info, be_time_hist[-1])
         
         if loop_count % 10 == 0:
-            print("loop itr {}:\n\tAve front end time = {}\n\tAve back end time = {}\n\tAve loop time - {}".format(loop_count, fe_ave_info[0], be_ave_info[0], loop_ave_info[0]))
+            print("loop itr {}:\n\tAve front end time = {}\n\tAve back end time = {}\n\tAve loop time - {}\n\t%% detects = {}".format(loop_count, fe_ave_info[0], be_ave_info[0], loop_ave_info[0], 100 * ros.im_seg.num_detections / ros.num_imgs_processed))
             
 
         # Save current object states in image segmentor

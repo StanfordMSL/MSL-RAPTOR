@@ -73,6 +73,8 @@ class ImageSegmentor:
         self.verbose = verbose
         self.use_track_checks = use_track_checks
         self.use_gt_detect_bb = use_gt_detect_bb
+        
+        self.num_detections = 0
 
     def stop_tracking_lost_objects(self):
         # Remove objects that triggered detection and were not matched to new detections
@@ -254,6 +256,7 @@ class ImageSegmentor:
         detections = detections[valid_detections_ids,:]
 
         print("detect time = {:.4f}".format(time.time() - tic))
+        self.num_detections += 1
         return detections
 
 

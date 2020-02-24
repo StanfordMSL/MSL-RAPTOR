@@ -53,6 +53,9 @@ class ros_interface:
         self.b_use_gt_pose_init  = b_use_gt_pose_init
         self.b_use_gt_detect_bb = b_use_gt_detect_bb
         self.b_pub_3d_bb_proj = b_pub_3d_bb_proj
+        self.num_imgs_processed = 0
+
+
     def get_first_image(self):
         return self.bridge.imgmsg_to_cv2(rospy.wait_for_message(self.ns + '/camera/image_raw',Image), desired_encoding="bgr8")
 
@@ -127,6 +130,7 @@ class ros_interface:
         else:
             self.im_process_output = self.im_seg.process_image(image,my_time)
         self.front_end_time = time.time() - t_fe_start
+        self.num_imgs_processed += 1
         self.latest_img_time = my_time  # DO THIS LAST
         # self.img_seg_mode = self.IGNORE
         if self.verbose:
