@@ -26,7 +26,7 @@ class MultiObjectPlotGenerator:
         b_nocs = False
         b_save_figs = True
         self.b_show_figs = False
-        img_path = '/mounted_folder/saved_figs/'
+        img_path = '/mounted_folder/saved_figs'
         color_strs = ['r', 'b', 'm', 'k', 'c', 'g']
         fontsize = 40
         tick_fontsize = 34
