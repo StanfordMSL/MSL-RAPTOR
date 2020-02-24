@@ -23,7 +23,7 @@ from utils_msl_raptor.math_utils import *
 
 class UKF:
 
-    def __init__(self, camera, bb_3d, obj_width, ukf_prms, init_time=0.0, b_use_gt_bb=False, class_str='mslquad', obj_id=0,verbose=False):
+    def __init__(self, camera, bb_3d, obj_width, obj_height, ukf_prms, init_time=0.0, b_use_gt_bb=False, class_str='mslquad', obj_id=0,verbose=False):
 
         self.verbose = verbose
 
@@ -58,6 +58,7 @@ class UKF:
         # init vars #############################
         self.bb_3d = bb_3d
         self.obj_width = obj_width
+        self.obj_height = obj_height
         self.itr = 0
         self.itr_time_prev = init_time
         self.itr_time = init_time
@@ -397,23 +398,35 @@ class UKF:
         return mu_bar, sig_bar
 
 
-    def approx_position_from_bb(self,bb,tf_w_ego):
+    def approx_pose_from_bb(self,bb,tf_w_ego):
         """
         Initialize a state with approximations using a single bounding box
         """
-        z = self.camera.new_camera_matrix[0,0]* self.obj_width /bb[2]
+        if self.obj_width < self.obj_height:
+            width = min(bb[2],bb[3])
+            height = max(bb[2],bb[3])
+        else :
+            width = max(bb[2],bb[3])
+            height = min(bb[2],bb[3])
+
+        z = self.camera.new_camera_matrix[0,0]* self.obj_width /width
         im_coor = z*np.array([bb[0],bb[1],1.0])
         pos = self.camera.new_camera_matrix_inv @ im_coor
         pos = tf_w_ego @ inv_tf(self.camera.tf_cam_ego) @ np.concatenate([pos, [1]])
-        return pos[:3]
+        # Only roll from the angle of the box
+        quat = ang_to_quat(np.array([[bb[-1],0,0]])).flatten()
+        # quat = np.array([1.,0.,0.,0.])
+        return pos[:3],quat
 
 
     def reinit_filter_approx(self,bb,tf_w_ego):
         """
         Initialize a state with approximations using a single bounding box
         """
-        pos = self.approx_position_from_bb(bb,tf_w_ego)
-        mu = np.array([pos[0],pos[1],pos[2],0.,0.,0.,1,0.,0.,0.,0.,0.,0.])
+        pos,quat = self.approx_pose_from_bb(bb,tf_w_ego)
+        print(pos)
+        print(quat)
+        mu = np.array([pos[0],pos[1],pos[2],0.,0.,0.,quat[0],quat[1],quat[2],quat[3],0.,0.,0.])
         self.init_filter_elements(mu)
 
 

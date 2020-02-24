@@ -54,6 +54,11 @@ class ImageSegmentor:
         ####################################################################
 
         # Statistics used for testing new measurements
+        self.z_l_00005 = -3.32
+        self.z_r_00005 = 3.32
+
+        self.z_09998_one_sided = 3.49
+        self.z_099_one_sided = 2.33
         self.z_090_one_sided = 1.282
         self.z_075_one_sided = 0.674
         self.z_050_one_sided = 0.0
@@ -65,6 +70,8 @@ class ImageSegmentor:
 
         self.chi2_03 = 6.06
         self.chi2_005 = 11.07
+        self.chi2_001 = 20.52
+
 
         self.im_width = im_width
         self.im_height = im_height
@@ -207,7 +214,7 @@ class ImageSegmentor:
                 self.active_objects_ids_per_class[class_str] = [obj_id]
             else:
                 # There exist some active objects of this class, check if they match
-                best_t = self.chi2_005
+                best_t = self.chi2_001
                 obj_id = None
                 # Go through active candidate objects
                 for id in self.active_objects_ids_per_class[class_str]:
@@ -318,7 +325,7 @@ class ImageSegmentor:
         z_x_l = (0-mu_x_l)/sigma_x
         z_x_r = (self.im_width-mu_x_r)/sigma_x
 
-        if z_x_l > -self.z_090_one_sided or z_x_r < self.z_090_one_sided:
+        if z_x_l > -self.z_099_one_sided or z_x_r < self.z_099_one_sided:
             print("Rejected measurement with values left {} and right {} for {}".format(z_x_l,z_x_r,ukf.class_str))
             return False
 
@@ -328,13 +335,13 @@ class ImageSegmentor:
         z_y_l = (0-mu_y_l)/sigma_y
         z_y_r = (self.im_height-mu_y_r)/sigma_y
 
-        if z_y_l > -self.z_075_one_sided or z_y_r < self.z_075_one_sided:
+        if z_y_l > -self.z_099_one_sided or z_y_r < self.z_099_one_sided:
             print("Rejected measurement with values top {} and bottom {}".format(z_y_l,z_y_r))
             return False
 
 
         t = self.compute_mahalanobis_dist(ukf,abb)
-        if t > self.chi2_005:
+        if t > self.chi2_001:
             print("Rejected measurement too far from distribution: F={}".format(t))
             return False
 
