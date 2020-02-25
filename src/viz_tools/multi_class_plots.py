@@ -187,7 +187,7 @@ class MultiObjectPlotGenerator:
             leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(cl)
         ax = plt.gca()
-        self.adjust_axes(ax, major_ticks_x, minor_ticks_x, x_dist_labels_to_show)
+        self.adjust_axes(ax, major_ticks_x, minor_ticks_x, x_ang_labels_to_show)
         ax.set_xlabel("angle threshold (deg)", fontsize=tick_fontsize, weight=text_weight)
         ax.set_ylabel("correct estimates in %", fontsize=tick_fontsize, weight=text_weight)
         if b_plot_titles:
