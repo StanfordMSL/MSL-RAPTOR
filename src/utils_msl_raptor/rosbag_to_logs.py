@@ -66,7 +66,7 @@ class rosbags_to_logs:
         except Exception as e:
             raise RuntimeError("Unable to Process Rosbag!!\n{}".format(e))
 
-        self.bags_and_cut_times = {"msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" : 31,
+        self.bags_and_cut_times = {"msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" : 1576663867,
                                    "msl_raptor_output_from_bag_rosbag_for_post_process_TX2_2019-12-18-02-10-28.bag" : 1576663867}
 
 
@@ -84,11 +84,11 @@ class rosbags_to_logs:
             self.bridge = CvBridge()
             self.processed_image_dict = {} 
             self.topic_func_dict[self.camera_topic] = self.parse_camera_img_msg
-        self.color_list = [(0, 0, 255),     # 0 red
+        self.color_list = [(255, 0, 255),   # 0 magenta
                            (0, 255, 0),     # 1 green
                            (255, 0, 0),     # 2 blue
                            (255, 255, 0),   # 3 cyan
-                           (255, 0, 255),   # 4 magenta
+                           (0, 0, 255),     # 4 red
                            (0, 255, 255),   # 5 yellow
                            (255, 255, 255), # 7 white
                            (0, 0, 0),       # 6 black
@@ -329,13 +329,13 @@ class rosbags_to_logs:
                     #     projected_vertices[i, :] = rc
                     # projected_vertices = np.fliplr(projected_vertices)
 
-                    if len(bb_proj) > 0:
+                    if self.b_save_3dbb_imgs and len(bb_proj) > 0:
                         if t_est in self.processed_image_dict:
                             self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
                             self.processed_image_dict[t_est][1].append(bb_proj)
                             self.processed_image_dict[t_est][2].append(name)
                         else:
-                            self.processed_image_dict[t_est] = (draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth), [bb_proj], [name])
+                            self.processed_image_dict[t_est] = [draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth), [bb_proj], [name]]
                     ######################################################
             
 
@@ -345,7 +345,7 @@ class rosbags_to_logs:
 
         # write images!!
         if self.b_save_3dbb_imgs:
-            b_fill_in_gaps = True
+            b_fill_in_gaps = False
             img_ind = 0
             max_skip_count = 3
             if b_fill_in_gaps:
