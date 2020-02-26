@@ -26,7 +26,7 @@ class MultiObjectPlotGenerator:
 
         # PLOT OPTIONS ###################################
         b_nocs = False
-        b_save_figs = False
+        b_save_figs = True
         self.b_show_figs = True
         img_path = '/mounted_folder/saved_figs/'
         makedirs(img_path)
@@ -72,7 +72,6 @@ class MultiObjectPlotGenerator:
         
         major_ticks_x = np.arange(0, nx + .01, show_every_nth_label)
         minor_ticks_x = np.arange(0, nx + .01, 1)
-        pdb.set_trace()
         x_dist_labels_to_show = np.round((np.linspace(0, d_max, show_every_nth_label) * 100)) / 100
         x_dist_unitless_labels_to_show = np.linspace(0, d_unitless_max, show_every_nth_label)
         x_ang_labels_to_show = np.linspace(0, a_max, show_every_nth_label).astype(int)
