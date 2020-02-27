@@ -7,6 +7,9 @@ import pdb
 # math
 import math
 import numpy as np
+# plots
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 # magic
 from string import digits
 
@@ -44,22 +47,86 @@ def load_mesh(mesh_path, is_save=False, is_normalized=False, is_flipped=False):
 
     return vertices, faces
 
+def mug_dims_to_verts(D, H, l, w, h, o, name=None):
+    """
+    This if for a standard, non-tapered mug
+    The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
+    """
+    origin = np.array([(D + l)/2, H/2, D/2])
+    # verts assuming origin is is at bottom corner of 3D bb s.t. everything is positive
+    cup_verts = np.asarray([[0,   0,       0    ], [D,    0,       0    ], [  0,     0,       D    ], [ D,      0,       D    ],\
+                            [0,   H,       0    ], [D,    H,       0    ], [  0,     H,       D    ], [ D,      H,       D    ],\
+                            [D,   o,   D/2 - w/2], [D,    o,   D/2 + w/2], [D + l,   o,   D/2 - w/2], [D + l,   o,   D/2 + w/2],\
+                            [D, o + h, D/2 - w/2], [D,  o + h, D/2 + w/2], [D + l, o + h, D/2 - w/2], [D + l, o + h, D/2 + w/2]]) - origin
+    # cup_verts = np.asarray([[-D/2, 0,  D/2], [-D/2, 0,  -D/2], [D/2,      0,  D/2], [D/2,      0,  -D/2],\
+    #                         [-D/2, H,  D/2], [-D/2, H,  -D/2], [D/2,      H,  D/2], [D/2,      H,  -D/2],\
+    #                         [D/2,  o,  w/2], [D/2,  o,  -w/2], [D/2 + l,  o,  w/2], [D/2 + l,  o,  -w/2],\
+    #                         [D/2, o+h, w/2], [D/2, o+h, -w/2], [D/2 + l, o+h, w/2], [D/2 + l, o+h, -w/2]])
+
+    if name is not None:
+        print("{} dims =\n{}".format(name, np.asarray(cup_verts)))
+    return cup_verts
+           
+
+def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
+    """
+    This if for a tapered mug 
+    The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
+    Assumes top dims are bigger 
+    """
+    origin = np.array([(Dt + lt)/2, H/2, Dt/2])
+    # verts assuming origin is is at bottom corner of 3D bb s.t. everything is positive
+    cup_verts = np.asarray([[Dt/2 - Db/2, 0, Dt/2 - Db/2], [Dt/2 - Db/2, 0, Dt/2 + Db/2], [Dt/2 + Db/2, 0, Dt/2 - Db/2], [Dt/2 + Db/2, 0, Dt/2 + Db/2],\
+                            [0, H, 0], [Dt, H, 0], [0, H, Dt], [Dt, H, Dt],\
+                            [Dt/2 + Db/2, ob1, Dt/2 - w/2], [Dt/2 + Db/2, ob1, Dt/2 + w/2],\
+                            [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 - w/2], [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 + w/2],
+                            [Dt + lt, H - ot, Dt/2 - w/2], [Dt + lt, H - ot, Dt/2 + w/2],\
+                            [Dt, H - ot, Dt/2 - w/2], [Dt, H - ot, Dt/2 + w/2]]) - origin
+
+    if name is not None:
+        print("{} dims =\n{}".format(name, np.asarray(cup_verts)))
+    return cup_verts
+
+
+def plot_object_verts(verts):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(1000*verts[:,0], 1000*verts[:,1], 1000*verts[:,2], 'b.')
+    ax.set_xlabel('X (mm)')
+    ax.set_ylabel('Y (mm)')
+    ax.set_zlabel('Z (mm)')
+    plt.show(block=False)
+
 
 if __name__ == '__main__':
+    np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
     try:
-        np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
-        mesh_path = "/Users/benjamin/Documents/Cours/Stanford/msl/pose_estimation/nocs_dataset/obj_models/real_train/"
-        obs_paths = glob.glob(mesh_path + '*.obj')
-        start_num = 2
-        for i, mesh_path in enumerate(obs_paths):
-            vertices, faces  = load_mesh(mesh_path)
-            spans = np.max(vertices, axis=0) - np.min(vertices, axis=0)
-            name = mesh_path.split("/")[-1].split(".")[0]
-            class_str = name.split('_')[0].rstrip(digits)
-            # print("dims for {}: ".format(name, spans))
-            print("---\nid: {}\nns: '{}'\nclass_str: '{}'".format(i + start_num, name, class_str))
-            print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
-            print("b_enforce_0: []")
+        if False:
+            np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
+            mesh_path = "/Users/benjamin/Documents/Cours/Stanford/msl/pose_estimation/nocs_dataset/obj_models/real_train/"
+            obs_paths = glob.glob(mesh_path + '*.obj')
+            start_num = 2
+            for i, mesh_path in enumerate(obs_paths):
+                vertices, faces  = load_mesh(mesh_path)
+                spans = np.max(vertices, axis=0) - np.min(vertices, axis=0)
+                name = mesh_path.split("/")[-1].split(".")[0]
+                class_str = name.split('_')[0].rstrip(digits)
+                # print("dims for {}: ".format(name, spans))
+                print("---\nid: {}\nns: '{}'\nclass_str: '{}'".format(i + start_num, name, class_str))
+                print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
+                print("b_enforce_0: []")
+        else:
+            objs = {}
+            objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
+            objs["mug_brown_starbucks_norm"] = mug_dims_to_verts(D=0.08599, H=0.10509, l=0.02830, h=0.07339, w=0.01394, o=0.01649, name="mug_brown_starbucks_norm")
+            objs["mug_daniel_norm"]          = mug_dims_to_verts(D=0.07354, H=0.05665, l=0.03313, h=0.05665, w=0.01089, o=0.02797, name="mug_daniel_norm")
+            objs["mug_vignesh_norm"]         = mug_dims_to_verts(D=0.08126, H=0.10097, l=0.03192, h=0.06865, w=0.01823, o=0.01752, name="mug_vignesh_norm")
+            objs["mug_white_green_norm"]     = mug_dims_to_verts(D=0.10265, H=0.08295, l=0.03731, h=0.05508, w=0.01917, o=0.02352, name="mug_white_green_norm")
+            objs["mug2_scene3_norm"]         = mug_tapered_dims_to_verts(Dt=0.11442, Db=0.0687, H=0.08295, lt=0.02803, lb=0.0390, w=0.015, ob1=0.01728, ob2=0.02403, ot=0.00954, name="mug2_scene3_norm")
+            print("WARNING!!!! MADE UP VALUE FOR WIDTH OF TAPERED MUG HANDLE (mug2_scene3_norm)")
+
+            plot_object_verts(objs["mug2_scene3_norm"])
+            plt.show()
         print("\n\nDONE!!!")
         
     except:
