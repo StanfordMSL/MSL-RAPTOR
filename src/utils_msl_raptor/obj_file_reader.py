@@ -97,6 +97,10 @@ def plot_object_verts(verts):
     ax.set_zlabel('Z (mm)')
     plt.show(block=False)
 
+def save_objs_verts_as_txt(verts, name, path):
+    np.savetxt(path + name, X=verts)
+    # np.savetxt(sp, s, fmt='%g') 
+
 
 if __name__ == '__main__':
     np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
@@ -124,6 +128,10 @@ if __name__ == '__main__':
             objs["mug_white_green_norm"]     = mug_dims_to_verts(D=0.10265, H=0.08295, l=0.03731, h=0.05508, w=0.01917, o=0.02352, name="mug_white_green_norm")
             objs["mug2_scene3_norm"]         = mug_tapered_dims_to_verts(Dt=0.11442, Db=0.0687, H=0.08295, lt=0.02803, lb=0.0390, w=0.015, ob1=0.01728, ob2=0.02403, ot=0.00954, name="mug2_scene3_norm")
             print("WARNING!!!! MADE UP VALUE FOR WIDTH OF TAPERED MUG HANDLE (mug2_scene3_norm)")
+
+            save_path = '/mounted_folder/generated_vertices_for_raptor/'
+            for key in objs:
+                save_objs_verts_as_txt(verts=objs[key], name=key, path=save_path)
 
             plot_object_verts(objs["mug2_scene3_norm"])
             plt.show()
