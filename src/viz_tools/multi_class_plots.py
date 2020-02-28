@@ -283,6 +283,7 @@ class MultiObjectPlotGenerator:
         pcnt = {}
         leg_hands = []
         leg_str = []
+        all_trans_err_per_depth = defaultdict(list)
 
         for i, cl in enumerate(err_log_dict):
             success_count[cl] = np.zeros((nx))
@@ -294,7 +295,9 @@ class MultiObjectPlotGenerator:
                     for (x_err, y_err, z_err, ang_err, meas_dist) in zip(err_log['x_err'], err_log['y_err'], err_log['z_err'], err_log['ang_err'], err_log["measurement_dist"]):
                         dist_err = la.norm([x_err, y_err, z_err])
                         total_count[cl][thresh_ind] += 1
-                        if np.abs(dist_err)/meas_dist < unitless_thresh:
+                        t_err_per_depth = np.abs(dist_err)/meas_dist
+                        all_trans_err_per_depth[cl].append(t_err_per_depth)
+                        if t_err_per_depth < unitless_thresh:
                             success_count[cl][thresh_ind] += 1
             pcnt[cl] = np.array([100*s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
             if b_show_dots:
@@ -312,9 +315,18 @@ class MultiObjectPlotGenerator:
             plt.show(block=False)
         if b_save_figs:
             plt.savefig(img_path + '/s_curve_trans_per_depth.png', bbox_inches='tight')
+        
+        for k in all_trans_err_per_depth.keys():
+            print(k+ " avg translation errpr / depth: "+str(np.mean(all_trans_err_per_depth[k]))+" m")
+        # med_t_err_msl = np.median(all_dist_err["mslraptor".upper()])
+        # med_t_err_ssp = np.median(all_dist_err["ssp".upper()])
+        # med_r_err_msl = np.median(all_ang_err["mslraptor".upper()])
+        # med_r_err_ssp = np.median(all_ang_err["ssp".upper()])
+        # print("Median dist err = {} m for mslraptor and {} m for ssp\nMedian rotation error = {} deg for mslraptor and {} deg for ssp".format(med_t_err_msl, med_t_err_ssp, med_r_err_msl, med_r_err_ssp))
+        # pdb.set_trace()
         ##########################################################################
         
-        # # pixel to target plot ##########################################################################
+        # # pixel to target plot ###################### error####################################################
         # plt.figure(fig_ind)
         # fig_ind += 1
         # self.adjust_plot_size()
