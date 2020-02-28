@@ -209,21 +209,21 @@ class MultiObjectPlotGenerator:
         plt.figure(fig_ind)
         fig_ind += 1
         self.adjust_plot_size()
-        success_count = {}
+        success_count_in_plane = {}
         total_count = {}
-        pcnt = {}
-        success_count2 = {}
-        pcnt2 = {}
+        pcnt_in_plane = {}
+        success_count_depth = {}
+        pcnt_depth = {}
         leg_hands = []
         leg_str = []
         all_ip_trans_err = {}
         all_depth_err = {}
 
         for i, cl in enumerate(err_log_dict):
-            success_count[cl] = np.zeros((nx))
-            success_count2[cl] = np.zeros((nx))
+            success_count_in_plane[cl] = np.zeros((nx))
+            success_count_depth[cl] = np.zeros((nx))
             total_count[cl] = np.ones((nx))*self.eps
-            pcnt[cl] = np.zeros((nx))
+            pcnt_in_plane[cl] = np.zeros((nx))
             err_log_list = err_log_dict[cl]
             all_ip_trans_err[cl] = []
             all_depth_err[cl] = []
@@ -236,17 +236,17 @@ class MultiObjectPlotGenerator:
                         all_depth_err[cl].append(dist_err_depth)
                         total_count[cl][thresh_ind] += 1
                         if np.abs(dist_err_inplane) < dist_thresh:
-                            success_count[cl][thresh_ind] += 1
+                            success_count_in_plane[cl][thresh_ind] += 1
                         if np.abs(dist_err_depth) < dist_thresh:
-                            success_count2[cl][thresh_ind] += 1
-            pcnt[cl] = np.array([100*s/t for s, t in zip(success_count[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
-            pcnt2[cl] = np.array([100*s/t for s, t in zip(success_count2[cl], total_count[cl])]) # elementwise success_count[cl] / total_count[cl]
+                            success_count_depth[cl][thresh_ind] += 1
+            pcnt_in_plane[cl] = np.array([100*s/t for s, t in zip(success_count_in_plane[cl], total_count[cl])]) # elementwise success_count_in_plane[cl] / total_count[cl]
+            pcnt_depth[cl] = np.array([100*s/t for s, t in zip(success_count_depth[cl], total_count[cl])]) # elementwise success_count_depth[cl] / total_count[cl]
             if b_show_dots:
-                plt.plot(range(nx), pcnt[cl], color_strs[i] + '.', markersize=4)
-                plt.plot(range(nx), pcnt2[cl], color_strs[i] + '.', markersize=4)
-            leg_hands.append(plt.plot(range(nx), pcnt[cl], color_strs[i] + '-', linewidth=linewidth)[0])
+                plt.plot(range(nx), pcnt_in_plane[cl], color_strs[i] + '.', markersize=4)
+                plt.plot(range(nx), pcnt_depth[cl], color_strs[i] + '.', markersize=4)
+            leg_hands.append(plt.plot(range(nx), pcnt_in_plane[cl], color_strs[i] + '-', linewidth=linewidth)[0])
             leg_str.append(perp_symbol + cl)
-            leg_hands.append(plt.plot(range(nx), pcnt2[cl], color_strs[i] + '--', linewidth=linewidth)[0])
+            leg_hands.append(plt.plot(range(nx), pcnt_depth[cl], color_strs[i] + '--', linewidth=linewidth)[0])
             leg_str.append(prrl_symbol + cl)
         ax = plt.gca()
         self.adjust_axes(ax, major_ticks_x, minor_ticks_x, x_dist_labels_to_show)
