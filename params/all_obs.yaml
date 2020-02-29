@@ -23,6 +23,7 @@ b_enforce_0: ['yaw']
 ---
 id: 2
 ns: 'mug_vignesh_norm'
+cust_vert_file: ''
 class_str: 'cup'
 bound_box_l: 0.112448
 bound_box_h: 0.102444
