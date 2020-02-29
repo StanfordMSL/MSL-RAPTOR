@@ -205,6 +205,7 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
                         file_path = obj_dict['cust_vert_file'] + obj_dict['ns']
                         my_arr = np.loadtxt(file_path)
                         bb_3d[obj_dict['class_str']] = my_arr
+                        raise RuntimeError("NEED TO FIGURE OUT half_width, half_height")
                     else:
                         half_length = (float(obj_dict['bound_box_l']) + category_params[obj_dict['class_str']]['offset_bb_l']) /2
                         half_width = (float(obj_dict['bound_box_w']) + category_params[obj_dict['class_str']]['offset_bb_w']) /2 
