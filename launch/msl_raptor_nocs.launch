@@ -21,7 +21,7 @@
   <arg name="classes_names_file"  default="$(find msl_raptor)/params/fake_list_nocs.names" /> <!-- yaml file containing all the object sizes -->
   <arg name="object_sizes_file"   default="$(find msl_raptor)/params/all_obs.yaml" /> <!-- yaml file containing all the object sizes -->
   <arg name="object_used_path"    default="$(find msl_raptor)/params/objects_used/" /> <!-- yaml file containing the names of objects used -->
-  <arg name="object_used_file"    default="objects_used_nocs_1.txt" /> <!-- yaml file containing the names of objects used -->
+  <arg name="object_used_file"    default="objects_used_test_nocs_1.txt" /> <!-- yaml file containing the names of objects used -->
   <arg name="b_pub_3d_bb_proj"    default="false" />
 
   <group if="$(arg b_rosbag)">

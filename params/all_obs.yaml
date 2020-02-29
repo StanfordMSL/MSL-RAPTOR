@@ -23,7 +23,7 @@ b_enforce_0: ['yaw']
 ---
 id: 2
 ns: 'mug_vignesh_norm'
-cust_vert_file: ''
+cust_vert_file: '/mounted_folder/custom_verts/'
 class_str: 'cup'
 bound_box_l: 0.112448
 bound_box_h: 0.102444
@@ -81,6 +81,7 @@ b_enforce_0: ['yaw']
 id: 9
 ns: 'mug_white_green_norm'
 class_str: 'cup'
+cust_vert_file: '/mounted_folder/custom_verts/'
 bound_box_l: 0.134662
 bound_box_h: 0.088348
 bound_box_w: 0.102778
@@ -113,6 +114,7 @@ b_enforce_0: []
 id: 13
 ns: 'mug2_scene3_norm'
 class_str: 'cup'
+cust_vert_file: '/mounted_folder/custom_verts/'
 bound_box_l: 0.146434
 bound_box_h: 0.083732
 bound_box_w: 0.114616
@@ -201,6 +203,7 @@ b_enforce_0: []
 id: 24
 ns: 'mug_daniel_norm'
 class_str: 'cup'
+cust_vert_file: '/mounted_folder/custom_verts/'
 bound_box_l: 0.106928
 bound_box_h: 0.10112
 bound_box_w: 0.074034
@@ -241,6 +244,7 @@ b_enforce_0: ['yaw']
 id: 29
 ns: 'mug_anastasia_norm'
 class_str: 'cup'
+cust_vert_file: '/mounted_folder/custom_verts/'
 bound_box_l: 0.12702
 bound_box_h: 0.092322
 bound_box_w: 0.094914
@@ -273,6 +277,7 @@ b_enforce_0: []
 id: 33
 ns: 'mug_brown_starbucks_norm'
 class_str: 'cup'
+cust_vert_file: '/mounted_folder/custom_verts/'
 bound_box_l: 0.113598
 bound_box_h: 0.1063
 bound_box_w: 0.085526

@@ -195,19 +195,29 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
         try:
             obj_prms = list(yaml.load_all(stream))
             for obj_dict in obj_prms:
+                # print(obj_dict['ns'])
+                # print(obj_dict.keys())
                 if obj_dict['ns'] in objects_used:
-                    half_length = (float(obj_dict['bound_box_l']) + category_params[obj_dict['class_str']]['offset_bb_l']) /2
-                    half_width = (float(obj_dict['bound_box_w']) + category_params[obj_dict['class_str']]['offset_bb_w']) /2 
-                    half_height = (float(obj_dict['bound_box_h']) + category_params[obj_dict['class_str']]['offset_bb_h'])/2
-                    
-                    bb_3d[obj_dict['class_str']] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
-                                                             [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
-                                                             [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
-                                                             [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
-                                                             [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
-                                                             [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
-                                                             [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
-                                                             [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
+                    if 'cust_vert_file' in obj_dict and obj_dict['cust_vert_file'] and not obj_dict['cust_vert_file'] == "":
+                        print("USING CUSTOM VERTS!!! (for {})".format(obj_dict['ns']))
+                        pdb.set_trace()
+                        # file_path = "/".join(os.path.abspath(__file__).split('/')[:-1]) + "/" + obj_dict['ns']
+                        file_path = obj_dict['cust_vert_file'] + obj_dict['ns']
+                        my_arr = np.loadtxt(file_path)
+                        bb_3d[obj_dict['class_str']] = my_arr
+                    else:
+                        half_length = (float(obj_dict['bound_box_l']) + category_params[obj_dict['class_str']]['offset_bb_l']) /2
+                        half_width = (float(obj_dict['bound_box_w']) + category_params[obj_dict['class_str']]['offset_bb_w']) /2 
+                        half_height = (float(obj_dict['bound_box_h']) + category_params[obj_dict['class_str']]['offset_bb_h'])/2
+                        
+                        bb_3d[obj_dict['class_str']] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
+                                                                 [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
+                                                                 [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
+                                                                 [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
+                                                                 [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
+                                                                 [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
+                                                                 [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
+                                                                 [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
                     obj_width[obj_dict['class_str']] = 2*half_width
                     obj_height[obj_dict['class_str']] = 2*half_height
