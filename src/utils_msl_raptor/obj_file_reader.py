@@ -130,6 +130,9 @@ if __name__ == '__main__':
             print("WARNING!!!! MADE UP VALUE FOR WIDTH OF TAPERED MUG HANDLE (mug2_scene3_norm)")
 
             save_path = '/mounted_folder/generated_vertices_for_raptor/'
+            if not os.path.exists( save_path ):
+                os.makedirs( save_path )
+
             for key in objs:
                 save_objs_verts_as_txt(verts=objs[key], name=key, path=save_path)
 
