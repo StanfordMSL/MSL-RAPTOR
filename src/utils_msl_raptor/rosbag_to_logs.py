@@ -223,17 +223,17 @@ class rosbags_to_logs:
 
                 # try each candidate pose
                 min_dist_err = 1e10
-                for (ado_pose, bb_proj) in candidate_poses_and_bbs:
+                for (ado_pose, bb_proj, connected_inds) in candidate_poses_and_bbs:
                     tf_w_ado_est = pose_to_tf(ado_pose)
                     dist_err = la.norm(tf_w_ado_est[0:3, 3] - tf_w_ado_gt[0:3, 3])
                     if dist_err < min_dist_err:
                         min_dist_err = dist_err
-                        best_corr = (tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj)
+                        best_corr = (tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds)
                 corespondences.append(best_corr)
                 
             if len(corespondences) == 0:
                 continue
-            for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj in corespondences:
+            for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds in corespondences:
 
                 if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
                     continue
@@ -331,11 +331,11 @@ class rosbags_to_logs:
 
                     if self.b_save_3dbb_imgs and len(bb_proj) > 0:
                         if t_est in self.processed_image_dict:
-                            self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=True)
+                            self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=True, inds_to_connect=connected_inds)
                             self.processed_image_dict[t_est][1].append(bb_proj)
                             self.processed_image_dict[t_est][2].append(name)
                         else:
-                            self.processed_image_dict[t_est] = [draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=True), [bb_proj], [name]]
+                            self.processed_image_dict[t_est] = [draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=True, inds_to_connect=connected_inds), [bb_proj], [name]]
                     ######################################################
             
 
@@ -525,10 +525,14 @@ class rosbags_to_logs:
             if len(to.projected_3d_bb) > 0:
                 proj_3d_bb = np.reshape(to.projected_3d_bb, (int(len(to.projected_3d_bb)/2), 2) )
 
+            connected_inds = []
+            if len(to.connected_inds) > 0:
+                connected_inds = np.reshape(to.connected_inds, (int(len(to.connected_inds)/2), 2) )
+
             if to.class_str in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
-                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append((pose, proj_3d_bb))
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append((pose, proj_3d_bb, connected_inds))
             else:
-                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [(pose, proj_3d_bb)]
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [(pose, proj_3d_bb, connected_inds)]
 
         self.t_est.add(t_est)
 

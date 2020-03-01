@@ -37,6 +37,7 @@ class UKF:
         self.class_str = class_str  # class name (string) e.g. 'person' or 'mslquad'
         self.obj_id = obj_id  # a unique int classifier
         self.projected_3d_bb = None  # r, c of projection of the estimated 3d bounding box
+        self.connected_inds = None
         
         self.ukf_prms = ukf_prms
         

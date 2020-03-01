@@ -62,10 +62,17 @@ def mug_dims_to_verts(D, H, l, w, h, o, name=None):
     #                         [-D/2, H,  D/2], [-D/2, H,  -D/2], [D/2,      H,  D/2], [D/2,      H,  -D/2],\
     #                         [D/2,  o,  w/2], [D/2,  o,  -w/2], [D/2 + l,  o,  w/2], [D/2 + l,  o,  -w/2],\
     #                         [D/2, o+h, w/2], [D/2, o+h, -w/2], [D/2 + l, o+h, w/2], [D/2 + l, o+h, -w/2]])
+    
+    connected_inds = [[0, 1], [0, 2], [1, 3],  [2, 3], \
+                      [4, 5], [4, 6], [5, 7],  [6, 7], \
+                      [0, 4], [1, 5], [2, 6],  [3, 7], \
+                      [8, 9], [10, 11], [12, 13],  [14, 15], \
+                      [8, 10], [9, 11], [12, 14],  [13, 15] , \
+                      [8, 12], [9, 13], [10, 14],  [11, 15] ]
 
     if name is not None:
         print("{} dims =\n{}".format(name, np.asarray(cup_verts)))
-    return cup_verts
+    return (cup_verts, connected_inds)
            
 
 def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
@@ -77,29 +84,44 @@ def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
     origin = np.array([(Dt + lt)/2, H/2, Dt/2])
     # verts assuming origin is is at bottom corner of 3D bb s.t. everything is positive
     cup_verts = np.asarray([[Dt/2 - Db/2, 0, Dt/2 - Db/2], [Dt/2 - Db/2, 0, Dt/2 + Db/2], [Dt/2 + Db/2, 0, Dt/2 - Db/2], [Dt/2 + Db/2, 0, Dt/2 + Db/2],\
-                            [0, H, 0], [Dt, H, 0], [0, H, Dt], [Dt, H, Dt],\
+                            [0, H, 0], [0, H, Dt], [Dt, H, 0], [Dt, H, Dt],\
                             [Dt/2 + Db/2, ob1, Dt/2 - w/2], [Dt/2 + Db/2, ob1, Dt/2 + w/2],\
                             [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 - w/2], [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 + w/2],
                             [Dt + lt, H - ot, Dt/2 - w/2], [Dt + lt, H - ot, Dt/2 + w/2],\
                             [Dt, H - ot, Dt/2 - w/2], [Dt, H - ot, Dt/2 + w/2]]) - origin
-
+                            
+    connected_inds = [[0, 1], [0, 2], [1, 3],  [2, 3], \
+                      [4, 5], [4, 6], [5, 7],  [6, 7], \
+                      [0, 4], [1, 5], [2, 6],  [3, 7], \
+                      [8, 9], [10, 11], [12, 13],  [14, 15], \
+                      [8, 10], [9, 11], [10, 12],  [11, 13], \
+                      [12, 14], [13, 15], [8, 13],  [9, 15] ]
     if name is not None:
         print("{} dims =\n{}".format(name, np.asarray(cup_verts)))
-    return cup_verts
+    return (cup_verts, connected_inds)
 
 
-def plot_object_verts(verts):
+def plot_object_verts(verts, connected_inds=None):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(1000*verts[:,0], 1000*verts[:,1], 1000*verts[:,2], 'b.')
+    # ax.scatter(1000*verts[:,0], 1000*verts[:,1], 1000*verts[:,2], 'b.')
+    verts_mm = 1000*verts
+    ax.scatter(verts_mm[:,0], verts_mm[:,1], verts_mm[:,2], 'b.')
+    if connected_inds is not None:
+        for pair in connected_inds:
+            pnt1 = verts_mm[pair[0]]
+            pnt2 = verts_mm[pair[1]]
+            ax.plot(xs=[pnt1[0], pnt2[0]], ys=[pnt1[1], pnt2[1]], zs=[pnt1[2], pnt2[2]], color='b', linestyle='-')
+
     ax.set_xlabel('X (mm)')
     ax.set_ylabel('Y (mm)')
     ax.set_zlabel('Z (mm)')
     plt.show(block=False)
 
-def save_objs_verts_as_txt(verts, name, path):
+def save_objs_verts_as_txt(verts, name, path, connected_inds=None):
     np.savetxt(path + name, X=verts)
-    # np.savetxt(sp, s, fmt='%g') 
+    if connected_inds is not None:
+        np.savetxt(path + name + "_joined_inds", X=connected_inds)
 
 
 if __name__ == '__main__':
@@ -129,15 +151,17 @@ if __name__ == '__main__':
             objs["mug2_scene3_norm"]         = mug_tapered_dims_to_verts(Dt=0.11442, Db=0.0687, H=0.08295, lt=0.02803, lb=0.0390, w=0.015, ob1=0.01728, ob2=0.02403, ot=0.00954, name="mug2_scene3_norm")
             print("WARNING!!!! MADE UP VALUE FOR WIDTH OF TAPERED MUG HANDLE (mug2_scene3_norm)")
 
-            save_path = '/mounted_folder/generated_vertices_for_raptor/'
-            if not os.path.exists( save_path ):
-                os.makedirs( save_path )
+            if True:
+                save_path = '/mounted_folder/generated_vertices_for_raptor/'
+                if not os.path.exists( save_path ):
+                    os.makedirs( save_path )
 
-            for key in objs:
-                save_objs_verts_as_txt(verts=objs[key], name=key, path=save_path)
+                for key in objs:
+                    save_objs_verts_as_txt(verts=objs[key][0], name=key, path=save_path, connected_inds=objs[key][1])
 
-            plot_object_verts(objs["mug2_scene3_norm"])
-            plt.show()
+            # plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
+            # plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
+            # plt.show()
         print("\n\nDONE!!!")
         
     except:

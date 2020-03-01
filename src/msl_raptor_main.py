@@ -38,7 +38,7 @@ def run_execution_loop():
     # Returns dict of params per class name
     category_params = load_category_params()
 
-    bb_3d, obj_width,obj_height, classes_names, classes_ids, objects_names_per_class = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,category_params)  # Parse objects used and associated configurations
+    bb_3d, obj_width,obj_height, classes_names, classes_ids, objects_names_per_class, conneted_inds = init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,category_params)  # Parse objects used and associated configurations
 
 
     ros.objects_names_per_class = objects_names_per_class
@@ -139,6 +139,8 @@ def run_execution_loop():
                 if b_pub_3d_bb_proj:
                     tf_w_ado = state_to_tf(ukf_dict[obj_id].mu)
                     ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
+                    if class_str in conneted_inds:
+                        ukf_dict[obj_id].conneted_inds = conneted_inds[class_str]
         
         be_time_hist.append(time.time() - t_be_start)
         ros.publish_filter_state(obj_ids_tracked, ukf_dict)
@@ -189,6 +191,7 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
     bb_3d = {}
     obj_width = {}
     obj_height = {}
+    conneted_inds = {}
 
     objects_names_per_class = {}
     with open(objects_sizes_yaml, 'r') as stream:
@@ -206,8 +209,17 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
                         # raise RuntimeError("NEED TO FIGURE OUT half_width, half_height")
                         # half_width = (np.max(bb_3d[obj_dict['class_str']][:, 0]) - np.min(bb_3d[obj_dict['class_str']][:, 0]) + \
                         #               np.max(bb_3d[obj_dict['class_str']][:, 2]) - np.min(bb_3d[obj_dict['class_str']][:, 2])) / 4
+
                         half_width = (np.max(bb_3d[obj_dict['class_str']][:, 0]) - np.min(bb_3d[obj_dict['class_str']][:, 0])) / 2
                         half_height = (np.max(bb_3d[obj_dict['class_str']][:, 1]) - np.min(bb_3d[obj_dict['class_str']][:, 1])) / 2
+
+                        file_path += "_joined_inds"
+                        if os.path.exists(file_path):
+                            print(obj_dict['ns'])
+                            print(obj_dict['class_str'])
+                            conneted_inds[obj_dict['class_str']] = np.loadtxt(file_path).astype(int)
+                        else:
+                            conneted_inds[obj_dict['class_str']] = None
                     else:
                         half_length = (float(obj_dict['bound_box_l']) + category_params[obj_dict['class_str']]['offset_bb_l']) /2
                         half_width = (float(obj_dict['bound_box_w']) + category_params[obj_dict['class_str']]['offset_bb_w']) /2 
@@ -239,7 +251,7 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
         except yaml.YAMLError as exc:
             print(exc)
 
-    return bb_3d, obj_width, obj_height, classes_used_names, classes_used_ids,objects_names_per_class
+    return bb_3d, obj_width, obj_height, classes_used_names, classes_used_ids,objects_names_per_class,conneted_inds
 
 
 def wait_intil_ros_ready(ros, rate):

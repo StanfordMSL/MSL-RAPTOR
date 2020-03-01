@@ -167,6 +167,11 @@ class ros_interface:
                 tmp = ukf_dict[id].projected_3d_bb
                 tmp = tmp.reshape((tmp.size, ))
                 obj.projected_3d_bb = tmp
+
+                if ukf_dict[id].connected_inds is not None:
+                    tmp = ukf_dict[id].connected_inds
+                    tmp = tmp.reshape((tmp.size, ))
+                    obj.connected_inds = tmp
             # else:
             #     obj.projected_3d_bb = [0]
             obj.id = id

@@ -45,7 +45,7 @@ def draw_2d_proj_of_3D_bounding_box(open_cv_image, corners2D_pr, corners2D_gt=No
     color_gt = (255,0,0)  # blue
     # color_pr = (0,0,255)  # red
     corners2D_pr = np.round(corners2D_pr).astype(int)
-
+    # pdb.set_trace()
     if b_verts_only:
         # if corners2D_gt is not None:
         #     for i, pnt in enumerate(corners2D_gt):
