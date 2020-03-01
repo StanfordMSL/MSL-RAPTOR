@@ -331,11 +331,11 @@ class rosbags_to_logs:
 
                     if self.b_save_3dbb_imgs and len(bb_proj) > 0:
                         if t_est in self.processed_image_dict:
-                            self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=True, inds_to_connect=connected_inds)
+                            self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
                             self.processed_image_dict[t_est][1].append(bb_proj)
                             self.processed_image_dict[t_est][2].append(name)
                         else:
-                            self.processed_image_dict[t_est] = [draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=True, inds_to_connect=connected_inds), [bb_proj], [name]]
+                            self.processed_image_dict[t_est] = [draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds), [bb_proj], [name]]
                     ######################################################
             
 

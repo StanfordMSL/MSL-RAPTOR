@@ -50,18 +50,17 @@ def load_mesh(mesh_path, is_save=False, is_normalized=False, is_flipped=False):
 def mug_dims_to_verts(D, H, l, w, h, o, name=None):
     """
     This if for a standard, non-tapered mug
-    The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
+    
     """
-    origin = np.array([(D + l)/2, H/2, D/2])
-    # verts assuming origin is is at bottom corner of 3D bb s.t. everything is positive
+    origin = np.array([(D + l)/2, H/2, D/2])  
+    # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
     cup_verts = np.asarray([[0,   0,       0    ], [D,    0,       0    ], [  0,     0,       D    ], [ D,      0,       D    ],\
                             [0,   H,       0    ], [D,    H,       0    ], [  0,     H,       D    ], [ D,      H,       D    ],\
                             [D,   o,   D/2 - w/2], [D,    o,   D/2 + w/2], [D + l,   o,   D/2 - w/2], [D + l,   o,   D/2 + w/2],\
                             [D, o + h, D/2 - w/2], [D,  o + h, D/2 + w/2], [D + l, o + h, D/2 - w/2], [D + l, o + h, D/2 + w/2]]) - origin
-    # cup_verts = np.asarray([[-D/2, 0,  D/2], [-D/2, 0,  -D/2], [D/2,      0,  D/2], [D/2,      0,  -D/2],\
-    #                         [-D/2, H,  D/2], [-D/2, H,  -D/2], [D/2,      H,  D/2], [D/2,      H,  -D/2],\
-    #                         [D/2,  o,  w/2], [D/2,  o,  -w/2], [D/2 + l,  o,  w/2], [D/2 + l,  o,  -w/2],\
-    #                         [D/2, o+h, w/2], [D/2, o+h, -w/2], [D/2 + l, o+h, w/2], [D/2 + l, o+h, -w/2]])
+                            
+    # turn the cup verts from NOCS frame to MSL-RAPTOR frame (Z up)
+    cup_verts = np.concatenate((cup_verts[:,0:1], cup_verts[:,2:3], cup_verts[:,1:2]), axis=1)
     
     connected_inds = [[0, 1], [0, 2], [1, 3],  [2, 3], \
                       [4, 5], [4, 6], [5, 7],  [6, 7], \
@@ -78,24 +77,53 @@ def mug_dims_to_verts(D, H, l, w, h, o, name=None):
 def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
     """
     This if for a tapered mug 
-    The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
     Assumes top dims are bigger 
     """
     origin = np.array([(Dt + lt)/2, H/2, Dt/2])
-    # verts assuming origin is is at bottom corner of 3D bb s.t. everything is positive
+    # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
     cup_verts = np.asarray([[Dt/2 - Db/2, 0, Dt/2 - Db/2], [Dt/2 - Db/2, 0, Dt/2 + Db/2], [Dt/2 + Db/2, 0, Dt/2 - Db/2], [Dt/2 + Db/2, 0, Dt/2 + Db/2],\
                             [0, H, 0], [0, H, Dt], [Dt, H, 0], [Dt, H, Dt],\
                             [Dt/2 + Db/2, ob1, Dt/2 - w/2], [Dt/2 + Db/2, ob1, Dt/2 + w/2],\
                             [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 - w/2], [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 + w/2],
                             [Dt + lt, H - ot, Dt/2 - w/2], [Dt + lt, H - ot, Dt/2 + w/2],\
                             [Dt, H - ot, Dt/2 - w/2], [Dt, H - ot, Dt/2 + w/2]]) - origin
+
+    # turn the cup verts from NOCS frame to MSL-RAPTOR frame (Z up)
+    cup_verts = np.concatenate((cup_verts[:,0:1], cup_verts[:,2:3], cup_verts[:,1:2]), axis=1)
                             
     connected_inds = [[0, 1], [0, 2], [1, 3],  [2, 3], \
                       [4, 5], [4, 6], [5, 7],  [6, 7], \
                       [0, 4], [1, 5], [2, 6],  [3, 7], \
                       [8, 9], [10, 11], [12, 13],  [14, 15], \
                       [8, 10], [9, 11], [10, 12],  [11, 13], \
-                      [12, 14], [13, 15], [8, 13],  [9, 15] ]
+                      [12, 14], [13, 15] ]
+    if name is not None:
+        print("{} dims =\n{}".format(name, np.asarray(cup_verts)))
+    return (cup_verts, connected_inds)
+
+
+def laptop_dims_to_verts(W, lb, hb, lt, gt, ang, name=None):
+    """
+    This if for a standard, non-tapered mug
+    
+    """
+    origin = np.array([(D + l)/2, (lt * np.sin(ang))/2, W/2])  
+    # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
+    cup_verts = np.asarray([[0,   0,       0    ], [D,    0,       0    ], [  0,     0,       D    ], [ D,      0,       D    ],\
+                            [0,   H,       0    ], [D,    H,       0    ], [  0,     H,       D    ], [ D,      H,       D    ],\
+                            [D,   o,   D/2 - w/2], [D,    o,   D/2 + w/2], [D + l,   o,   D/2 - w/2], [D + l,   o,   D/2 + w/2],\
+                            [D, o + h, D/2 - w/2], [D,  o + h, D/2 + w/2], [D + l, o + h, D/2 - w/2], [D + l, o + h, D/2 + w/2]]) - origin
+                            
+    # turn the cup verts from NOCS frame to MSL-RAPTOR frame (Z up)
+    cup_verts = np.concatenate((cup_verts[:,0:1], cup_verts[:,2:3], cup_verts[:,1:2]), axis=1)
+    
+    connected_inds = [[0, 1], [0, 2], [1, 3],  [2, 3], \
+                      [4, 5], [4, 6], [5, 7],  [6, 7], \
+                      [0, 4], [1, 5], [2, 6],  [3, 7], \
+                      [8, 9], [10, 11], [12, 13],  [14, 15], \
+                      [8, 10], [9, 11], [12, 14],  [13, 15] , \
+                      [8, 12], [9, 13], [10, 14],  [11, 15] ]
+
     if name is not None:
         print("{} dims =\n{}".format(name, np.asarray(cup_verts)))
     return (cup_verts, connected_inds)
@@ -142,6 +170,8 @@ if __name__ == '__main__':
                 print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
                 print("b_enforce_0: []")
         else:
+            b_save = True
+            b_plot = False
             objs = {}
             objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
             objs["mug_brown_starbucks_norm"] = mug_dims_to_verts(D=0.08599, H=0.10509, l=0.02830, h=0.07339, w=0.01394, o=0.01649, name="mug_brown_starbucks_norm")
@@ -151,17 +181,18 @@ if __name__ == '__main__':
             objs["mug2_scene3_norm"]         = mug_tapered_dims_to_verts(Dt=0.11442, Db=0.0687, H=0.08295, lt=0.02803, lb=0.0390, w=0.015, ob1=0.01728, ob2=0.02403, ot=0.00954, name="mug2_scene3_norm")
             print("WARNING!!!! MADE UP VALUE FOR WIDTH OF TAPERED MUG HANDLE (mug2_scene3_norm)")
 
-            if True:
+            if b_save:
                 save_path = '/mounted_folder/generated_vertices_for_raptor/'
                 if not os.path.exists( save_path ):
                     os.makedirs( save_path )
 
                 for key in objs:
                     save_objs_verts_as_txt(verts=objs[key][0], name=key, path=save_path, connected_inds=objs[key][1])
-
-            # plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
-            # plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
-            # plt.show()
+            
+            if b_plot:
+                plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
+                plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
+                plt.show()
         print("\n\nDONE!!!")
         
     except:

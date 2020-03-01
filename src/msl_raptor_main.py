@@ -140,7 +140,7 @@ def run_execution_loop():
                     tf_w_ado = state_to_tf(ukf_dict[obj_id].mu)
                     ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
                     if class_str in conneted_inds:
-                        ukf_dict[obj_id].conneted_inds = conneted_inds[class_str]
+                        ukf_dict[obj_id].connected_inds = conneted_inds[ukf_dict[obj_id].class_str]
         
         be_time_hist.append(time.time() - t_be_start)
         ros.publish_filter_state(obj_ids_tracked, ukf_dict)
@@ -198,20 +198,17 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
         try:
             obj_prms = list(yaml.load_all(stream))
             for obj_dict in obj_prms:
-                # print(obj_dict['ns'])
-                # print(obj_dict.keys())
                 if obj_dict['ns'] in objects_used:
                     if 'cust_vert_file' in obj_dict and obj_dict['cust_vert_file'] and not obj_dict['cust_vert_file'] == "":
+                        # If we are here then a custom vertex file was provided (instead of just height / width/ length for a box)
+                        #   first load in the verts, then check if there is a list of pairs of verts to use when drawing the volume
                         print("USING CUSTOM VERTS!!! (for {})".format(obj_dict['ns']))
                         file_path = obj_dict['cust_vert_file'] + obj_dict['ns']
                         loaded_verts = np.loadtxt(file_path)
                         bb_3d[obj_dict['class_str']] = np.concatenate(( loaded_verts, np.ones((loaded_verts.shape[0],1)) ), axis=1)
-                        # raise RuntimeError("NEED TO FIGURE OUT half_width, half_height")
-                        # half_width = (np.max(bb_3d[obj_dict['class_str']][:, 0]) - np.min(bb_3d[obj_dict['class_str']][:, 0]) + \
-                        #               np.max(bb_3d[obj_dict['class_str']][:, 2]) - np.min(bb_3d[obj_dict['class_str']][:, 2])) / 4
 
                         half_width = (np.max(bb_3d[obj_dict['class_str']][:, 0]) - np.min(bb_3d[obj_dict['class_str']][:, 0])) / 2
-                        half_height = (np.max(bb_3d[obj_dict['class_str']][:, 1]) - np.min(bb_3d[obj_dict['class_str']][:, 1])) / 2
+                        half_height = (np.max(bb_3d[obj_dict['class_str']][:, 2]) - np.min(bb_3d[obj_dict['class_str']][:, 2])) / 2
 
                         file_path += "_joined_inds"
                         if os.path.exists(file_path):
