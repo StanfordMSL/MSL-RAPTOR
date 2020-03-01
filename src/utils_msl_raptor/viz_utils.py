@@ -16,7 +16,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 
 
-def draw_2d_proj_of_3D_bounding_box(open_cv_image, corners2D_pr, corners2D_gt=None, color_pr=(0,0,255), linewidth=1, inds_to_connect=[[0, 3], [3, 2], [2, 1], [1, 0], [7, 4], [4, 5], [5, 6], [6, 7], [3, 4], [2, 5], [0, 7], [1, 6]]):
+def draw_2d_proj_of_3D_bounding_box(open_cv_image, corners2D_pr, corners2D_gt=None, color_pr=(0,0,255), linewidth=1, inds_to_connect=[[0, 3], [3, 2], [2, 1], [1, 0], [7, 4], [4, 5], [5, 6], [6, 7], [3, 4], [2, 5], [0, 7], [1, 6]], b_verts_only=False):
     """
     corners2D_gt/corners2D_pr is a 8x2 numpy array
     corner order (from ado frame):
@@ -40,23 +40,23 @@ def draw_2d_proj_of_3D_bounding_box(open_cv_image, corners2D_pr, corners2D_gt=No
                     (0, 0, 0),       # 6 black: back upper right
                     (255, 255, 255), # 7 white: back lower left
                     (125, 125, 125)] # 8 grey: back upper left
-    # if corners2D_gt is not None:
-    #     for i, pnt in enumerate(corners2D_gt):
-    #         pnt = np.round(pnt).astype(int)
-    #         open_cv_image = cv2.circle(open_cv_image, (pnt[0], pnt[1]), dot_radius, color_list[i], -1)  # -1 means filled in, else edge thickness
-    # if corners2D_pr is not None:
-    #     for i, pnt in enumerate(corners2D_pr):
-    #         pnt = np.round(pnt).astype(int)
-    #         open_cv_image = cv2.circle(open_cv_image, (pnt[0], pnt[1]), dot_radius, color_list[i], -1)  # -1 means filled in, else edge thickness
+    # 
 
     color_gt = (255,0,0)  # blue
     # color_pr = (0,0,255)  # red
     corners2D_pr = np.round(corners2D_pr).astype(int)
-    for inds in inds_to_connect:
 
-        if corners2D_gt is not None:
-            open_cv_image = cv2.line(open_cv_image, (corners2D_gt[inds[0],0], corners2D_gt[inds[0],1]), (corners2D_gt[inds[1],0], corners2D_gt[inds[1], 1]), color_gt, linewidth)
-
-        open_cv_image = cv2.line(open_cv_image, (corners2D_pr[inds[0],0], corners2D_pr[inds[0],1]), (corners2D_pr[inds[1],0], corners2D_pr[inds[1], 1]), color_pr, linewidth)
+    if b_verts_only:
+        # if corners2D_gt is not None:
+        #     for i, pnt in enumerate(corners2D_gt):
+        #         open_cv_image = cv2.circle(open_cv_image, (pnt[0], pnt[1]), dot_radius, color_list[i], -1)  # -1 means filled in, else edge thickness
+        if corners2D_pr is not None:
+            for i, pnt in enumerate(corners2D_pr):
+                open_cv_image = cv2.circle(open_cv_image, (pnt[0], pnt[1]), dot_radius, color_list[i % len(color_list)], -1)  # -1 means filled in, else edge thickness
+    else:
+        for inds in inds_to_connect:
+            if corners2D_gt is not None:
+                open_cv_image = cv2.line(open_cv_image, (corners2D_gt[inds[0],0], corners2D_gt[inds[0],1]), (corners2D_gt[inds[1],0], corners2D_gt[inds[1], 1]), color_gt, linewidth)
+            open_cv_image = cv2.line(open_cv_image, (corners2D_pr[inds[0],0], corners2D_pr[inds[0],1]), (corners2D_pr[inds[1],0], corners2D_pr[inds[1], 1]), color_pr, linewidth)
 
     return open_cv_image

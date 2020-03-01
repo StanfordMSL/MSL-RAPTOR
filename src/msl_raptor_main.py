@@ -200,12 +200,14 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
                 if obj_dict['ns'] in objects_used:
                     if 'cust_vert_file' in obj_dict and obj_dict['cust_vert_file'] and not obj_dict['cust_vert_file'] == "":
                         print("USING CUSTOM VERTS!!! (for {})".format(obj_dict['ns']))
-                        pdb.set_trace()
-                        # file_path = "/".join(os.path.abspath(__file__).split('/')[:-1]) + "/" + obj_dict['ns']
                         file_path = obj_dict['cust_vert_file'] + obj_dict['ns']
-                        my_arr = np.loadtxt(file_path)
-                        bb_3d[obj_dict['class_str']] = my_arr
-                        raise RuntimeError("NEED TO FIGURE OUT half_width, half_height")
+                        loaded_verts = np.loadtxt(file_path)
+                        bb_3d[obj_dict['class_str']] = np.concatenate(( loaded_verts, np.ones((loaded_verts.shape[0],1)) ), axis=1)
+                        # raise RuntimeError("NEED TO FIGURE OUT half_width, half_height")
+                        # half_width = (np.max(bb_3d[obj_dict['class_str']][:, 0]) - np.min(bb_3d[obj_dict['class_str']][:, 0]) + \
+                        #               np.max(bb_3d[obj_dict['class_str']][:, 2]) - np.min(bb_3d[obj_dict['class_str']][:, 2])) / 4
+                        half_width = (np.max(bb_3d[obj_dict['class_str']][:, 0]) - np.min(bb_3d[obj_dict['class_str']][:, 0])) / 2
+                        half_height = (np.max(bb_3d[obj_dict['class_str']][:, 1]) - np.min(bb_3d[obj_dict['class_str']][:, 1])) / 2
                     else:
                         half_length = (float(obj_dict['bound_box_l']) + category_params[obj_dict['class_str']]['offset_bb_l']) /2
                         half_width = (float(obj_dict['bound_box_w']) + category_params[obj_dict['class_str']]['offset_bb_w']) /2 
