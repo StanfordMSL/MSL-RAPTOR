@@ -30,7 +30,7 @@ class poses_viz_node:
 
         self.ns = rospy.get_param('~ns')  # robot namespace
 
-        b_draw_2d_bbs_on_3dbb_proj = True
+        self.b_draw_2d_bbs_on_3dbb_proj = True
        
         self.tracked_objects_sub = rospy.Subscriber(self.ns + '/msl_raptor_state', TrackedObjects, self.tracked_objects_cb, queue_size=5)
         self.pose_array_pub = rospy.Publisher(self.ns + '/tracked_objects_poses', PoseArray, queue_size=5)
@@ -103,7 +103,7 @@ class poses_viz_node:
                 else:
                     image = draw_2d_proj_of_3D_bounding_box(image, corners2D_pr=proj_3d_bb)
                 
-                if b_draw_2d_bbs_on_3dbb_proj:
+                if self.b_draw_2d_bbs_on_3dbb_proj:
                     abb = verts_to_angled_bb(proj_3d_bb)
                     box = np.int0(cv2.boxPoints( ( (abb[0], abb[1]), (abb[2], abb[3]), -np.degrees(abb[4]))) )
                     cv2.drawContours(image, [box], 0, (255,0,0), 2)
