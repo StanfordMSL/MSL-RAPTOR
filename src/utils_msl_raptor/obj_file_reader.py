@@ -102,31 +102,33 @@ def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
     return (cup_verts, connected_inds)
 
 
-def laptop_dims_to_verts(W, lb, hb, lt, gt, ang, name=None):
+def laptop_dims_to_verts(W, lb, hb, lt, ht, angr, name=None):
     """
-    This if for a standard, non-tapered mug
-    
+    This if for a laptop with its lid opened to a fixed angle
+    angr is in radians
     """
-    origin = np.array([(D + l)/2, (lt * np.sin(ang))/2, W/2])  
+    a = lt * np.sin(angr)
+    b = lt * np.cos(angr)
+    aa = ht * np.sin(np.pi/2 - angr)
+    bb = ht * np.cos(np.pi/2 - angr)
+    origin = np.array([(lb + b)/2, ( a  + ht* np.sin(np.pi/2 - angr) )/2, W/2])  
     # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
-    cup_verts = np.asarray([[0,   0,       0    ], [D,    0,       0    ], [  0,     0,       D    ], [ D,      0,       D    ],\
-                            [0,   H,       0    ], [D,    H,       0    ], [  0,     H,       D    ], [ D,      H,       D    ],\
-                            [D,   o,   D/2 - w/2], [D,    o,   D/2 + w/2], [D + l,   o,   D/2 - w/2], [D + l,   o,   D/2 + w/2],\
-                            [D, o + h, D/2 - w/2], [D,  o + h, D/2 + w/2], [D + l, o + h, D/2 - w/2], [D + l, o + h, D/2 + w/2]]) - origin
+    laptop_verts = np.asarray([[b, 0, 0 ], [b + lb,  0,  0 ], [b,  0, W  ], [ b + lb, 0, W ], \
+                               [b + bb, hb,  0 ], [b + lb,  hb,  0 ], [b + bb,  hb, W  ], [ b + lb, hb, W ], \
+                               [0, a, 0], [0, a, W], [bb, a + aa, 0], [bb, a + aa, W]]) - origin
                             
     # turn the cup verts from NOCS frame to MSL-RAPTOR frame (Z up)
-    cup_verts = np.concatenate((cup_verts[:,0:1], cup_verts[:,2:3], cup_verts[:,1:2]), axis=1)
+    laptop_verts = np.concatenate((laptop_verts[:,0:1], laptop_verts[:,2:3], laptop_verts[:,1:2]), axis=1)
     
     connected_inds = [[0, 1], [0, 2], [1, 3],  [2, 3], \
                       [4, 5], [4, 6], [5, 7],  [6, 7], \
-                      [0, 4], [1, 5], [2, 6],  [3, 7], \
-                      [8, 9], [10, 11], [12, 13],  [14, 15], \
-                      [8, 10], [9, 11], [12, 14],  [13, 15] , \
-                      [8, 12], [9, 13], [10, 14],  [11, 15] ]
+                      [0, 8], [2, 9], [4, 10],  [6, 11], \
+                      [8, 9], [9, 11], [11, 10],  [8, 10], \
+                      [0, 4], [2, 6], [1, 5],  [3, 7] ]
 
     if name is not None:
-        print("{} dims =\n{}".format(name, np.asarray(cup_verts)))
-    return (cup_verts, connected_inds)
+        print("{} dims =\n{}".format(name, np.asarray(laptop_verts)))
+    return (laptop_verts, connected_inds)
 
 
 def plot_object_verts(verts, connected_inds=None):
@@ -170,8 +172,8 @@ if __name__ == '__main__':
                 print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
                 print("b_enforce_0: []")
         else:
-            b_save = True
-            b_plot = False
+            b_save = False
+            b_plot = True
             objs = {}
             objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
             objs["mug_brown_starbucks_norm"] = mug_dims_to_verts(D=0.08599, H=0.10509, l=0.02830, h=0.07339, w=0.01394, o=0.01649, name="mug_brown_starbucks_norm")
@@ -181,6 +183,10 @@ if __name__ == '__main__':
             objs["mug2_scene3_norm"]         = mug_tapered_dims_to_verts(Dt=0.11442, Db=0.0687, H=0.08295, lt=0.02803, lb=0.0390, w=0.015, ob1=0.01728, ob2=0.02403, ot=0.00954, name="mug2_scene3_norm")
             print("WARNING!!!! MADE UP VALUE FOR WIDTH OF TAPERED MUG HANDLE (mug2_scene3_norm)")
 
+            objs["laptop_air_xin_norm"]   = laptop_dims_to_verts(W=0.27497, lb=0.20273, hb=0.01275, lt=0.19536, ht=0.01073, angr=0.987935358216449, name="laptop_air_xin_norm")
+            objs["laptop_alienware_norm"] = laptop_dims_to_verts(W=0.33020, lb=0.25560, hb=0.02397, lt=0.28086, ht=0.02253, angr=0.8798519277651176, name="laptop_alienware_norm")
+            objs["laptop_mac_pro_norm"]   = laptop_dims_to_verts(W=0.31531, lb=0.23383, hb=0.01076, lt=0.26085, ht=0.01022, angr=0.7343574355460224, name="laptop_mac_pro_norm")
+            # objs["laptop_air_0_norm"] = mug_tapered_dims_to_verts(laptop_dims_to_verts(W, lb, hb, lt, ht, angr, name="laptop_air_0_norm")
             if b_save:
                 save_path = '/mounted_folder/generated_vertices_for_raptor/'
                 if not os.path.exists( save_path ):
@@ -190,8 +196,11 @@ if __name__ == '__main__':
                     save_objs_verts_as_txt(verts=objs[key][0], name=key, path=save_path, connected_inds=objs[key][1])
             
             if b_plot:
-                plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
-                plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
+                # plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
+                # plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
+                plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
+                plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_alienware_norm"][1])
+                plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
                 plt.show()
         print("\n\nDONE!!!")
         
