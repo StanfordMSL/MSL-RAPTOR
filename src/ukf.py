@@ -279,23 +279,8 @@ class UKF:
         bb_3d_cam = (tf_cam_ado @ self.bb_3d.T).T[:, 0:3]
 
         bb_rc_list = pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), self.bb_3d, self.camera)
-        # construct sensor output
-        # minAreaRect sometimes flips the w/h and angle from how we want the output to be
-        # to fix this, we can use boxPoints to get the x,y of the bb rect, and use our function
-        # to get the output in the form we want 
-        rect = cv2.minAreaRect(np.fliplr(bb_rc_list.astype('float32')))  # apparently float64s cause this function to fail
-        box = cv2.boxPoints(rect)
-        output = bb_corners_to_angled_bb(box, output_coord_type='xy')
-        if measurement is not None:
-            ang_thesh = np.deg2rad(20)  # angle threshold for considering alternative box rotation
-            alt_ang = -np.sign(output[-1]) * (np.pi/2 - np.abs(output[-1]))  # negative complement of angle
-            
-            if (abs(alt_ang - measurement[-1]) < abs(output[-1] - measurement[-1])) and np.abs((np.abs(measurement[-1] - output[-1]) - np.pi/2)) < ang_thesh:
-                output[-1] = alt_ang 
-                w = output[2]
-                h = output[3]
-                output[2] = h
-                output[3] = w
+
+        output = verts_to_angled_bb(np.fliplr(bb_rc_list), measurement)
         return output
 
 

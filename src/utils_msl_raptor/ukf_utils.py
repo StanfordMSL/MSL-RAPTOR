@@ -6,6 +6,7 @@ import pdb
 import numpy as np
 import numpy.linalg as la
 import tf
+import cv2
 # libs & utils
 try:
     from utils_msl_raptor.math_utils import *
@@ -223,3 +224,26 @@ def load_category_params():
                 print(exc)
 
     return params
+
+def verts_to_angled_bb(verts, measurement=None):
+    """
+    verts should be [[x,y],[x,y]...]
+    """
+    # construct sensor output
+    # minAreaRect sometimes flips the w/h and angle from how we want the output to be
+    # to fix this, we can use boxPoints to get the x,y of the bb rect, and use our function
+    # to get the output in the form we want 
+    rect = cv2.minAreaRect(verts.astype('float32'))  # apparently float64s cause this function to fail
+    box = cv2.boxPoints(rect)
+    output = bb_corners_to_angled_bb(box, output_coord_type='xy')
+    if measurement is not None:
+        ang_thesh = np.deg2rad(20)  # angle threshold for considering alternative box rotation
+        alt_ang = -np.sign(output[-1]) * (np.pi/2 - np.abs(output[-1]))  # negative complement of angle
+        
+        if (abs(alt_ang - measurement[-1]) < abs(output[-1] - measurement[-1])) and np.abs((np.abs(measurement[-1] - output[-1]) - np.pi/2)) < ang_thesh:
+            output[-1] = alt_ang 
+            w = output[2]
+            h = output[3]
+            output[2] = h
+            output[3] = w
+    return output

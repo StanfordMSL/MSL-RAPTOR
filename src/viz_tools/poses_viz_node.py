@@ -20,6 +20,7 @@ from cv_bridge import CvBridge, CvBridgeError
 sys.path.append('/root/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor')
 from ros_utils import find_closest_by_time
 from ssp_utils import *
+from ukf_utils import verts_to_angled_bb
 from viz_utils import *
 
 class poses_viz_node:
@@ -96,6 +97,10 @@ class poses_viz_node:
                     image = draw_2d_proj_of_3D_bounding_box(image, corners2D_pr=proj_3d_bb, inds_to_connect=connected_inds)
                 else:
                     image = draw_2d_proj_of_3D_bounding_box(image, corners2D_pr=proj_3d_bb)
+                
+                abb = verts_to_angled_bb(proj_3d_bb)
+                box = np.int0(cv2.boxPoints( ( (abb[0], abb[1]), (abb[2], abb[3]), -np.degrees(abb[4]))) )
+                cv2.drawContours(image, [box], 0, (0,255,0), 2)
             
 
         self.pose_array_pub.publish(pose_arr)
