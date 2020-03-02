@@ -172,9 +172,10 @@ if __name__ == '__main__':
                 print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
                 print("b_enforce_0: []")
         else:
-            b_save = True
-            b_plot = False
+            b_save = False
+            b_plot = True
             objs = {}
+
             objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
             objs["mug_brown_starbucks_norm"] = mug_dims_to_verts(D=0.08599, H=0.10509, l=0.02830, h=0.07339, w=0.01394, o=0.01649, name="mug_brown_starbucks_norm")
             objs["mug_daniel_norm"]          = mug_dims_to_verts(D=0.07354, H=0.05665, l=0.03313, h=0.05665, w=0.01089, o=0.02797, name="mug_daniel_norm")
@@ -183,11 +184,12 @@ if __name__ == '__main__':
             objs["mug2_scene3_norm"]         = mug_tapered_dims_to_verts(Dt=0.11442, Db=0.0687, H=0.08295, lt=0.02803, lb=0.0390, w=0.0165, ob1=0.01728, ob2=0.02403, ot=0.00954, name="mug2_scene3_norm")
 
             objs["laptop_air_xin_norm"]   = laptop_dims_to_verts(W=0.27497, lb=0.20273, hb=0.01275, lt=0.19536, ht=0.01073, angr=0.987935358216449, name="laptop_air_xin_norm")
-            objs["laptop_alienware_norm"] = laptop_dims_to_verts(W=0.33020, lb=0.25560, hb=0.02397, lt=0.28086, ht=0.02253, angr=0.8798519277651176, name="laptop_alienware_norm")
-            objs["laptop_mac_pro_norm"]   = laptop_dims_to_verts(W=0.31531, lb=0.23383, hb=0.01076, lt=0.26085, ht=0.01022, angr=0.7343574355460224, name="laptop_mac_pro_norm")
-            # objs["laptop_air_0_norm"] = mug_tapered_dims_to_verts(laptop_dims_to_verts(W=0.32962, lb=0.22963, hb=0.01492, lt=0.22134, ht=0.01038, angr=1.1553204579999998, name="laptop_air_0_norm")
-            # objs["laptop_air_1_norm"] = mug_tapered_dims_to_verts(laptop_dims_to_verts(W=0.03710, lb=0.23781, hb=0.01500, lt=0.22038, ht=0.01000, angr=1.0313148404444445, name="laptop_air_1_norm")
-            # objs["laptop_dell_norm"]  = mug_tapered_dims_to_verts(laptop_dims_to_verts(W, lb, hb, lt, ht, angr, name="laptop_dell_norm")
+            objs["laptop_alienware_norm"] = laptop_dims_to_verts(W=0.33020, lb=0.25560, hb=0.02397, lt=0.28086, ht=0.02253, angr=0.879851927765118, name="laptop_alienware_norm")
+            objs["laptop_mac_pro_norm"]   = laptop_dims_to_verts(W=0.31531, lb=0.23383, hb=0.01076, lt=0.26085, ht=0.01022, angr=0.734357435546022, name="laptop_mac_pro_norm")
+            objs["laptop_air_0_norm"]     = laptop_dims_to_verts(W=0.32962, lb=0.22963, hb=0.01492, lt=0.22134, ht=0.01038, angr=2.310641396715293, name="laptop_air_0_norm")
+            objs["laptop_air_1_norm"]     = laptop_dims_to_verts(W=0.32710, lb=0.23781, hb=0.01500, lt=0.22038, ht=0.01000, angr=2.062630110006899, name="laptop_air_1_norm")
+            objs["laptop_dell_norm"]      = laptop_dims_to_verts(W=0.30858, lb=0.19788, hb=0.01493, lt=0.18519, ht=0.01200, angr=2.229134520647158, name="laptop_dell_norm")
+
             if b_save:
                 save_path = '/mounted_folder/generated_vertices_for_raptor/'
                 if not os.path.exists( save_path ):
