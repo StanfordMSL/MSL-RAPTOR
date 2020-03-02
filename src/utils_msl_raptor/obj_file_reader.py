@@ -172,8 +172,8 @@ if __name__ == '__main__':
                 print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
                 print("b_enforce_0: []")
         else:
-            b_save = False
-            b_plot = True
+            b_save = True
+            b_plot = False
             objs = {}
 
             objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
@@ -186,9 +186,9 @@ if __name__ == '__main__':
             objs["laptop_air_xin_norm"]   = laptop_dims_to_verts(W=0.27497, lb=0.20273, hb=0.01275, lt=0.19536, ht=0.01073, angr=0.987935358216449, name="laptop_air_xin_norm")
             objs["laptop_alienware_norm"] = laptop_dims_to_verts(W=0.33020, lb=0.25560, hb=0.02397, lt=0.28086, ht=0.02253, angr=0.879851927765118, name="laptop_alienware_norm")
             objs["laptop_mac_pro_norm"]   = laptop_dims_to_verts(W=0.31531, lb=0.23383, hb=0.01076, lt=0.26085, ht=0.01022, angr=0.734357435546022, name="laptop_mac_pro_norm")
-            objs["laptop_air_0_norm"]     = laptop_dims_to_verts(W=0.32962, lb=0.22963, hb=0.01492, lt=0.22134, ht=0.01038, angr=2.310641396715293, name="laptop_air_0_norm")
-            objs["laptop_air_1_norm"]     = laptop_dims_to_verts(W=0.32710, lb=0.23781, hb=0.01500, lt=0.22038, ht=0.01000, angr=2.062630110006899, name="laptop_air_1_norm")
-            objs["laptop_dell_norm"]      = laptop_dims_to_verts(W=0.30858, lb=0.19788, hb=0.01493, lt=0.18519, ht=0.01200, angr=2.229134520647158, name="laptop_dell_norm")
+            objs["laptop_air_0_norm"]     = laptop_dims_to_verts(W=0.32962, lb=0.22963, hb=0.01492, lt=0.22134, ht=0.01038, angr=(np.pi-2.310641396715293), name="laptop_air_0_norm")
+            objs["laptop_air_1_norm"]     = laptop_dims_to_verts(W=0.32710, lb=0.23781, hb=0.01500, lt=0.22038, ht=0.01000, angr=(np.pi-2.062630110006899), name="laptop_air_1_norm")
+            objs["laptop_dell_norm"]      = laptop_dims_to_verts(W=0.30858, lb=0.19788, hb=0.01493, lt=0.18519, ht=0.01200, angr=(np.pi-2.229134520647158), name="laptop_dell_norm")
 
             if b_save:
                 save_path = '/mounted_folder/generated_vertices_for_raptor/'
@@ -201,9 +201,12 @@ if __name__ == '__main__':
             if b_plot:
                 # plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
                 # plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
-                plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
+                plot_object_verts(objs["laptop_air_xin_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
                 plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_alienware_norm"][1])
-                plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
+                plot_object_verts(objs["laptop_mac_pro_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
+                plot_object_verts(objs["laptop_air_0_norm"][0], connected_inds=objs["laptop_air_0_norm"][1])
+                plot_object_verts(objs["laptop_air_1_norm"][0], connected_inds=objs["laptop_air_1_norm"][1])
+                plot_object_verts(objs["laptop_dell_norm"][0], connected_inds=objs["laptop_dell_norm"][1])
                 plt.show()
         print("\n\nDONE!!!")
         
