@@ -105,11 +105,41 @@ def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
     return (cup_verts, connected_inds)
 
 
+def bowl_dims_to_verts(Dt, Dm, Db, Ht, Hb, name=None):
+    """
+    This if for a tapered mug 
+    Assumes top dims are bigger 
+    """
+    Db *= 1.15
+    origin = np.array([Dt/2, (Ht + Hb)/2, Dt/2])
+    # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
+    bowl_verts = np.asarray([[Dt/2 - Db/2, 0, Dt/2 - Db/2], [Dt/2 + Db/2, 0, Dt/2 - Db/2], [Dt/2 - Db/2, 0, Dt/2 + Db/2], [Dt/2 + Db/2, 0, Dt/2 + Db/2],\
+                             [Dt/2 - Dm/2, Hb, Dt/2 - Dm/2], [Dt/2 + Dm/2, Hb, Dt/2 - Dm/2], [Dt/2 - Dm/2, Hb, Dt/2 + Dm/2], [Dt/2 + Dm/2, Hb, Dt/2 + Dm/2],\
+                             [0, Hb + Ht, 0], [Dt, Hb + Ht, 0], [0, Hb + Ht, Dt], [Dt, Hb + Ht, Dt]]) - origin
+
+    # turn the cup verts from NOCS frame to MSL-RAPTOR frame (Z up)
+    bowl_verts = np.concatenate((bowl_verts[:,0:1], bowl_verts[:,2:3], bowl_verts[:,1:2]), axis=1)
+                            
+    connected_inds = [[0, 1], [0, 2],  [1, 3],  [2, 3], \
+                      [4, 5], [4, 6],  [5, 7],  [6, 7], \
+                      [8, 9], [8, 10], [9, 11], [10, 11], \
+                      [0, 4], [1, 5],  [2, 6],  [3, 7], \
+                      [4, 8], [5, 9],  [6, 10], [7, 11] ]
+
+    if name is not None:
+        print("{} dims =\n{}".format(name, np.asarray(bowl_verts)))
+    return (bowl_verts, connected_inds)
+
+
 def laptop_dims_to_verts(W, lb, hb, lt, ht, angr, name=None):
     """
     This if for a laptop with its lid opened to a fixed angle
     angr is in radians
     """
+    lb *= 0.90
+    lt *= 0.95
+
+
     a = lt * np.sin(angr)
     b = lt * np.cos(angr)
     aa = ht * np.sin(np.pi/2 - angr)
@@ -189,10 +219,16 @@ if __name__ == '__main__':
             objs["laptop_air_xin_norm"]   = laptop_dims_to_verts(W=0.27497, lb=0.20273, hb=0.01275, lt=0.19536, ht=0.01073, angr=0.987935358216449, name="laptop_air_xin_norm")
             objs["laptop_alienware_norm"] = laptop_dims_to_verts(W=0.33020, lb=0.25560, hb=0.02397, lt=0.28086, ht=0.02253, angr=0.879851927765118, name="laptop_alienware_norm")
             objs["laptop_mac_pro_norm"]   = laptop_dims_to_verts(W=0.31531, lb=0.23383, hb=0.01076, lt=0.26085, ht=0.01022, angr=0.734357435546022, name="laptop_mac_pro_norm")
-            objs["laptop_air_0_norm"]     = laptop_dims_to_verts(W=0.32962, lb=0.22963, hb=0.01492, lt=0.22134, ht=0.01038, angr=(np.pi-2.310641396715293), name="laptop_air_0_norm")
+            objs["laptop_air_0_norm"]     = laptop_dims_to_verts(W=0.32962, lb=0.22963, hb=0.01492, lt=0.22134, ht=0.01038, angr=(np.pi-2.510641396715293), name="laptop_air_0_norm")
             objs["laptop_air_1_norm"]     = laptop_dims_to_verts(W=0.32710, lb=0.23781, hb=0.01500, lt=0.22038, ht=0.01000, angr=(np.pi-2.062630110006899), name="laptop_air_1_norm")
             objs["laptop_dell_norm"]      = laptop_dims_to_verts(W=0.30858, lb=0.19788, hb=0.01493, lt=0.18519, ht=0.01200, angr=(np.pi-2.229134520647158), name="laptop_dell_norm")
 
+            objs["bowl_blue_ikea_norm"]          = bowl_dims_to_verts(Dt=0.16539, Dm=0.13123, Db=0.04040, Ht=0.03964, Hb=0.03821, name="bowl_blue_ikea_norm")
+            objs["bowl_brown_ikea_norm"]         = bowl_dims_to_verts(Dt=0.16452, Dm=0.12303, Db=0.06431, Ht=0.04507, Hb=0.02916, name="bowl_brown_ikea_norm")
+            objs["bowl_chinese_blue_norm"]       = bowl_dims_to_verts(Dt=0.17023, Dm=0.13963, Db=0.07944, Ht=0.05247, Hb=0.03653, name="bowl_chinese_blue_norm")
+            objs["bowl_blue_white_chinese_norm"] = bowl_dims_to_verts(Dt=0.15672, Dm=0.12155, Db=0.05886, Ht=0.04064, Hb=0.02452, name="bowl_blue_white_chinese_norm")
+            objs["bowl_shengjun_norm"]           = bowl_dims_to_verts(Dt=0.14231, Dm=0.13025, Db=0.06516, Ht=0.05296, Hb=0.02353, name="bowl_shengjun_norm")
+            objs["bowl_white_small_norm"]        = bowl_dims_to_verts(Dt=0.14231, Dm=0.12155, Db=0.05886, Ht=0.04064, Hb=0.02452, name="bowl_white_small_norm")
             if b_save:
                 save_path = '/mounted_folder/generated_vertices_for_raptor/'
                 if not os.path.exists( save_path ):
@@ -204,12 +240,18 @@ if __name__ == '__main__':
             if b_plot:
                 # plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
                 # plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
-                plot_object_verts(objs["laptop_air_xin_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
-                plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_alienware_norm"][1])
-                plot_object_verts(objs["laptop_mac_pro_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
-                plot_object_verts(objs["laptop_air_0_norm"][0], connected_inds=objs["laptop_air_0_norm"][1])
-                plot_object_verts(objs["laptop_air_1_norm"][0], connected_inds=objs["laptop_air_1_norm"][1])
-                plot_object_verts(objs["laptop_dell_norm"][0], connected_inds=objs["laptop_dell_norm"][1])
+                # plot_object_verts(objs["laptop_air_xin_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
+                # plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_alienware_norm"][1])
+                # plot_object_verts(objs["laptop_mac_pro_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
+                # plot_object_verts(objs["laptop_air_0_norm"][0], connected_inds=objs["laptop_air_0_norm"][1])
+                # plot_object_verts(objs["laptop_air_1_norm"][0], connected_inds=objs["laptop_air_1_norm"][1])
+                # plot_object_verts(objs["laptop_dell_norm"][0], connected_inds=objs["laptop_dell_norm"][1])
+                plot_object_verts(objs["bowl_blue_ikea_norm"][0], connected_inds=objs["bowl_blue_ikea_norm"][1])
+                plot_object_verts(objs["bowl_brown_ikea_norm"][0], connected_inds=objs["bowl_brown_ikea_norm"][1])
+                plot_object_verts(objs["bowl_chinese_blue_norm"][0], connected_inds=objs["bowl_chinese_blue_norm"][1])
+                plot_object_verts(objs["bowl_blue_white_chinese_norm"][0], connected_inds=objs["bowl_blue_white_chinese_norm"][1])
+                plot_object_verts(objs["bowl_shengjun_norm"][0], connected_inds=objs["bowl_shengjun_norm"][1])
+                plot_object_verts(objs["bowl_white_small_norm"][0], connected_inds=objs["bowl_white_small_norm"][1])
                 plt.show()
         print("\n\nDONE!!!")
         
