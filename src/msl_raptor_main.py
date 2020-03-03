@@ -232,7 +232,7 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
                                                                  [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
 
                     # Rescale objects
-                    bb_3d[obj_dict['class_str']], half_width,half_height = scale_3d_points(bb_3d[obj_dict['class_str']], half_width,half_height,category_params[obj_dict['class_str']]['scales_xyz'])
+                    bb_3d[obj_dict['class_str']][:,:3], half_width,half_height = scale_3d_points(bb_3d[obj_dict['class_str']][:,:3], half_width,half_height,category_params[obj_dict['class_str']]['scales_xyz'])
 
                     obj_width[obj_dict['class_str']] = 2*half_width
                     obj_height[obj_dict['class_str']] = 2*half_height
