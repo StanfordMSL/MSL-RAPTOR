@@ -52,9 +52,9 @@ def mug_dims_to_verts(D, H, l, w, h, o, name=None):
     This if for a standard, non-tapered mug
     
     """
-    if name == "mug_vignesh_norm":
-        D *= 0.95
-        l *= 1.1
+    # if name == "mug_vignesh_norm":
+    D *= 0.95
+    l *= 1.1
     origin = np.array([(D + l)/2, H/2, D/2])  
     # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
     cup_verts = np.asarray([[0,   0,       0    ], [D,    0,       0    ], [  0,     0,       D    ], [ D,      0,       D    ],\
