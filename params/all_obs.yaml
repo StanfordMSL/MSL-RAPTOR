@@ -57,6 +57,7 @@ b_enforce_0: []
 id: 6
 ns: 'laptop_dell_norm'
 class_str: 'laptop'
+cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
 bound_box_l: 0.327984
 bound_box_h: 0.157998
 bound_box_w: 0.31608
@@ -98,6 +99,7 @@ b_enforce_0: ['yaw']
 id: 11
 ns: 'laptop_air_1_norm'
 class_str: 'laptop'
+cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
 bound_box_l: 0.34611
 bound_box_h: 0.200257
 bound_box_w: 0.335868
@@ -106,6 +108,7 @@ b_enforce_0: []
 id: 12
 ns: 'laptop_air_0_norm'
 class_str: 'laptop'
+cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
 bound_box_l: 0.388038
 bound_box_h: 0.168736
 bound_box_w: 0.335702
@@ -171,6 +174,7 @@ b_enforce_0: ['yaw']
 id: 20
 ns: 'laptop_mac_pro_norm'
 class_str: 'laptop'
+cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
 bound_box_l: 0.382706
 bound_box_h: 0.147758
 bound_box_w: 0.317864
@@ -195,6 +199,7 @@ b_enforce_0: ['yaw']
 id: 23
 ns: 'laptop_alienware_norm'
 class_str: 'laptop'
+cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
 bound_box_l: 0.417686
 bound_box_h: 0.215843
 bound_box_w: 0.334892
@@ -220,6 +225,7 @@ b_enforce_0: []
 id: 26
 ns: 'laptop_air_xin_norm'
 class_str: 'laptop'
+cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
 bound_box_l: 0.306686
 bound_box_h: 0.168628
 bound_box_w: 0.279084
