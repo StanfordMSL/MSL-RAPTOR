@@ -23,7 +23,7 @@ b_enforce_0: ['yaw']
 ---
 id: 2
 ns: 'mug_vignesh_norm'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 class_str: 'cup'
 bound_box_l: 0.112448
 bound_box_h: 0.102444
@@ -33,7 +33,7 @@ b_enforce_0: []
 id: 3
 ns: 'bowl_blue_ikea_norm'
 class_str: 'bowl'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.165124
 bound_box_h: 0.08048
 bound_box_w: 0.16533
@@ -58,7 +58,7 @@ b_enforce_0: []
 id: 6
 ns: 'laptop_dell_norm'
 class_str: 'laptop'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.327984
 bound_box_h: 0.157998
 bound_box_w: 0.31608
@@ -67,7 +67,7 @@ b_enforce_0: []
 id: 7
 ns: 'bowl_brown_ikea_norm'
 class_str: 'bowl'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.164824
 bound_box_h: 0.074876
 bound_box_w: 0.1635
@@ -84,7 +84,7 @@ b_enforce_0: ['yaw']
 id: 9
 ns: 'mug_white_green_norm'
 class_str: 'cup'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.134662
 bound_box_h: 0.088348
 bound_box_w: 0.102778
@@ -101,7 +101,7 @@ b_enforce_0: ['yaw']
 id: 11
 ns: 'laptop_air_1_norm'
 class_str: 'laptop'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.34611
 bound_box_h: 0.200257
 bound_box_w: 0.335868
@@ -110,7 +110,7 @@ b_enforce_0: []
 id: 12
 ns: 'laptop_air_0_norm'
 class_str: 'laptop'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.388038
 bound_box_h: 0.168736
 bound_box_w: 0.335702
@@ -119,7 +119,7 @@ b_enforce_0: []
 id: 13
 ns: 'mug2_scene3_norm'
 class_str: 'cup'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.146434
 bound_box_h: 0.083732
 bound_box_w: 0.114616
@@ -160,7 +160,7 @@ b_enforce_0: ['yaw']
 id: 18
 ns: 'bowl_chinese_blue_norm'
 class_str: 'bowl'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.170882
 bound_box_h: 0.089998
 bound_box_w: 0.172272
@@ -177,7 +177,7 @@ b_enforce_0: ['yaw']
 id: 20
 ns: 'laptop_mac_pro_norm'
 class_str: 'laptop'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.382706
 bound_box_h: 0.147758
 bound_box_w: 0.317864
@@ -186,7 +186,7 @@ b_enforce_0: []
 id: 21
 ns: 'bowl_shengjun_norm'
 class_str: 'bowl'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.172298
 bound_box_h: 0.08747
 bound_box_w: 0.171082
@@ -195,7 +195,7 @@ b_enforce_0: ['yaw']
 id: 22
 ns: 'bowl_blue_white_chinese_norm'
 class_str: 'bowl'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.156416
 bound_box_h: 0.077216
 bound_box_w: 0.157024
@@ -204,7 +204,7 @@ b_enforce_0: ['yaw']
 id: 23
 ns: 'laptop_alienware_norm'
 class_str: 'laptop'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.417686
 bound_box_h: 0.215843
 bound_box_w: 0.334892
@@ -213,7 +213,7 @@ b_enforce_0: []
 id: 24
 ns: 'mug_daniel_norm'
 class_str: 'cup'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.106928
 bound_box_h: 0.10112
 bound_box_w: 0.074034
@@ -230,7 +230,7 @@ b_enforce_0: []
 id: 26
 ns: 'laptop_air_xin_norm'
 class_str: 'laptop'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.306686
 bound_box_h: 0.168628
 bound_box_w: 0.279084
@@ -255,7 +255,7 @@ b_enforce_0: ['yaw']
 id: 29
 ns: 'mug_anastasia_norm'
 class_str: 'cup'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.12702
 bound_box_h: 0.092322
 bound_box_w: 0.094914
@@ -264,7 +264,7 @@ b_enforce_0: []
 id: 30
 ns: 'bowl_white_small_norm'
 class_str: 'bowl'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.142528
 bound_box_h: 0.065706
 bound_box_w: 0.139422
@@ -289,7 +289,7 @@ b_enforce_0: []
 id: 33
 ns: 'mug_brown_starbucks_norm'
 class_str: 'cup'
-cust_vert_file: '/mounted_folder/generated_vertices_for_raptor/'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
 bound_box_l: 0.113598
 bound_box_h: 0.1063
 bound_box_w: 0.085526
