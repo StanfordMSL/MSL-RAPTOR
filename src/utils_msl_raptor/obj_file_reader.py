@@ -110,7 +110,9 @@ def bowl_dims_to_verts(Dt, Dm, Db, Ht, Hb, name=None):
     This if for a tapered mug 
     Assumes top dims are bigger 
     """
-    Db *= 1.15
+    Dt *= 0.95
+    Dm *= 0.95
+    Db *= 1.1
     origin = np.array([Dt/2, (Ht + Hb)/2, Dt/2])
     # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
     bowl_verts = np.asarray([[Dt/2 - Db/2, 0, Dt/2 - Db/2], [Dt/2 + Db/2, 0, Dt/2 - Db/2], [Dt/2 - Db/2, 0, Dt/2 + Db/2], [Dt/2 + Db/2, 0, Dt/2 + Db/2],\
