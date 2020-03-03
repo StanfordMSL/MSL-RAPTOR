@@ -232,7 +232,8 @@ if __name__ == '__main__':
             objs["bowl_shengjun_norm"]           = bowl_dims_to_verts(Dt=0.14231, Dm=0.13025, Db=0.06516, Ht=0.05296, Hb=0.02353, name="bowl_shengjun_norm")
             objs["bowl_white_small_norm"]        = bowl_dims_to_verts(Dt=0.14231, Dm=0.12155, Db=0.05886, Ht=0.04064, Hb=0.02452, name="bowl_white_small_norm")
             if b_save:
-                save_path = '/mounted_folder/generated_vertices_for_raptor/'
+                # save_path = '/mounted_folder/generated_vertices_for_raptor/'
+                save_path = '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
                 if not os.path.exists( save_path ):
                     os.makedirs( save_path )
 
