@@ -16,3 +16,5 @@ R: [10, 10, 100, 100, 10000.0]
 offset_bb_l: 0.0
 offset_bb_w: 0.0
 offset_bb_h: 0.0
+# Scale the 3D shape used along each dimension
+scales_xyz: [1.0,1.0,1.0]

@@ -192,3 +192,10 @@ def corners_to_aligned_bb(corners):
     w = max(corners[:,1]) - top_l_x
     h = max(corners[:,0]) - top_l_y
     return(top_l_x,top_l_y,w,h)
+
+
+def scale_3d_points(bb_3d, half_width,half_height,scales):
+    bb_3d = bb_3d*scales
+    half_width *= scales[1]
+    half_height *= scales[2]
+    return bb_3d, half_width, half_height
