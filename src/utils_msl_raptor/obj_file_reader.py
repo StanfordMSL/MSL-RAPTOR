@@ -52,13 +52,6 @@ def mug_dims_to_verts(D, H, l, w, h, o, name=None):
     This if for a standard, non-tapered mug
     
     """
-    # if name == "mug_vignesh_norm":
-    # D *= 0.95
-    w *= .1
-    # l *= 0.95
-    hc = o + h/2
-    h *= 0.5
-    o = hc - h/2  # compensates for the change in size of h
     origin = np.array([(D + l)/2, H/2, D/2])  
     # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
     num_radial_points = 6
@@ -154,11 +147,6 @@ def bowl_dims_to_verts(Dt, Dm, Db, Ht, Hb, name=None):
     This if for a tapered mug 
     Assumes top dims are bigger 
     """
-    # Dt *= 0.95
-    # Dm *= 0.95
-    # Db *= 1.1
-    # if name == "bowl_brown_ikea_norm":
-    #     Ht *= 0.5
     origin = np.array([Dt/2, (Ht + Hb)/2, Dt/2])
 
     num_radial_points = 20
@@ -198,15 +186,11 @@ def laptop_dims_to_verts(W, lb, hb, lt, ht, angr, name=None):
     This if for a laptop with its lid opened to a fixed angle
     angr is in radians
     """
-    lb *= 0.90
-    lt *= 0.95
-
-
-    a = lt * np.sin(angr)
-    b = lt * np.cos(angr)
-    aa = ht * np.sin(np.pi/2 - angr)
-    bb = ht * np.cos(np.pi/2 - angr)
-    origin = np.array([(lb + b)/2, ( a  + ht* np.sin(np.pi/2 - angr) )/2, W/2])  
+    a = lt * np.sin(angr)  # vertical portion of top sections "height" edge
+    b = lt * np.cos(angr)  # horizontal portion of top sections "height" edge
+    aa = ht * np.sin(np.pi/2 - angr) # vertical portion of top sections "length" edge
+    bb = ht * np.cos(np.pi/2 - angr) # horizontal portion of top sections "length" edge
+    origin = np.array([(lb + b)/2, ( a  + aa )/2, W/2])  
     # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
     laptop_verts = np.asarray([[b, 0, 0 ], [b + lb,  0,  0 ], [b,  0, W  ], [ b + lb, 0, W ], \
                                [b + bb, hb,  0 ], [b + lb,  hb,  0 ], [b + bb,  hb, W  ], [ b + lb, hb, W ], \
@@ -229,7 +213,6 @@ def laptop_dims_to_verts(W, lb, hb, lt, ht, angr, name=None):
 def plot_object_verts(verts, connected_inds=None):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    # ax.scatter(1000*verts[:,0], 1000*verts[:,1], 1000*verts[:,2], 'b.')
     verts_mm = 1000*verts
     ax.scatter(verts_mm[:,0], verts_mm[:,1], verts_mm[:,2], 'b.')
     if connected_inds is not None:
@@ -268,7 +251,7 @@ if __name__ == '__main__':
                 print("b_enforce_0: []")
         else:
             b_save = True
-            b_plot = True
+            b_plot = False
             objs = {}
 
             objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
@@ -293,7 +276,6 @@ if __name__ == '__main__':
             objs["bowl_shengjun_norm"]           = bowl_dims_to_verts(Dt=0.14231, Dm=0.13025, Db=0.06516, Ht=0.05296, Hb=0.02353, name="bowl_shengjun_norm")
             objs["bowl_white_small_norm"]        = bowl_dims_to_verts(Dt=0.14231, Dm=0.12155, Db=0.05886, Ht=0.04064, Hb=0.02452, name="bowl_white_small_norm")
             if b_save:
-                # save_path = '/mounted_folder/generated_vertices_for_raptor/'
                 save_path = '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
                 if not os.path.exists( save_path ):
                     os.makedirs( save_path )
@@ -302,16 +284,16 @@ if __name__ == '__main__':
                     save_objs_verts_as_txt(verts=objs[key][0], name=key, path=save_path, connected_inds=objs[key][1])
             
             if b_plot:
-                plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
-                plot_object_verts(objs["mug_brown_starbucks_norm"][0], connected_inds=objs["mug_brown_starbucks_norm"][1])
-                plot_object_verts(objs["mug_daniel_norm"][0], connected_inds=objs["mug_daniel_norm"][1])
-                plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
-                # plot_object_verts(objs["laptop_air_xin_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
-                # plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_alienware_norm"][1])
-                # plot_object_verts(objs["laptop_mac_pro_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
-                # plot_object_verts(objs["laptop_air_0_norm"][0], connected_inds=objs["laptop_air_0_norm"][1])
-                # plot_object_verts(objs["laptop_air_1_norm"][0], connected_inds=objs["laptop_air_1_norm"][1])
-                # plot_object_verts(objs["laptop_dell_norm"][0], connected_inds=objs["laptop_dell_norm"][1])
+                # plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
+                # plot_object_verts(objs["mug_brown_starbucks_norm"][0], connected_inds=objs["mug_brown_starbucks_norm"][1])
+                # plot_object_verts(objs["mug_daniel_norm"][0], connected_inds=objs["mug_daniel_norm"][1])
+                # plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
+                plot_object_verts(objs["laptop_air_xin_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
+                plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_alienware_norm"][1])
+                plot_object_verts(objs["laptop_mac_pro_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
+                plot_object_verts(objs["laptop_air_0_norm"][0], connected_inds=objs["laptop_air_0_norm"][1])
+                plot_object_verts(objs["laptop_air_1_norm"][0], connected_inds=objs["laptop_air_1_norm"][1])
+                plot_object_verts(objs["laptop_dell_norm"][0], connected_inds=objs["laptop_dell_norm"][1])
                 # plot_object_verts(objs["bowl_blue_ikea_norm"][0], connected_inds=objs["bowl_blue_ikea_norm"][1])
                 # plot_object_verts(objs["bowl_brown_ikea_norm"][0], connected_inds=objs["bowl_brown_ikea_norm"][1])
                 # plot_object_verts(objs["bowl_chinese_blue_norm"][0], connected_inds=objs["bowl_chinese_blue_norm"][1])
