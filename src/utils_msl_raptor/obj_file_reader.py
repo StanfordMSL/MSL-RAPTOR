@@ -54,8 +54,11 @@ def mug_dims_to_verts(D, H, l, w, h, o, name=None):
     """
     # if name == "mug_vignesh_norm":
     # D *= 0.95
-    # l *= 1.2
-    # h *= 0.9
+    w *= .1
+    # l *= 0.95
+    hc = o + h/2
+    h *= 0.5
+    o = hc - h/2  # compensates for the change in size of h
     origin = np.array([(D + l)/2, H/2, D/2])  
     # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
     num_radial_points = 6
@@ -137,7 +140,7 @@ def bowl_dims_to_verts(Dt, Dm, Db, Ht, Hb, name=None):
     # Db *= 1.1
     origin = np.array([Dt/2, (Ht + Hb)/2, Dt/2])
 
-    num_radial_points = 6
+    num_radial_points = 10
     da = 2*np.pi / num_radial_points
     pnt_offset = np.asarray([Dt/2,   0,      Dt/2   ])
     bowl_verts = []
