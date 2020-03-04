@@ -138,9 +138,11 @@ def bowl_dims_to_verts(Dt, Dm, Db, Ht, Hb, name=None):
     # Dt *= 0.95
     # Dm *= 0.95
     # Db *= 1.1
+    # if name == "bowl_brown_ikea_norm":
+    #     Ht *= 0.5
     origin = np.array([Dt/2, (Ht + Hb)/2, Dt/2])
 
-    num_radial_points = 10
+    num_radial_points = 20
     da = 2*np.pi / num_radial_points
     pnt_offset = np.asarray([Dt/2,   0,      Dt/2   ])
     bowl_verts = []
@@ -265,7 +267,8 @@ if __name__ == '__main__':
             objs["laptop_dell_norm"]      = laptop_dims_to_verts(W=0.30858, lb=0.19788, hb=0.01493, lt=0.18519, ht=0.01200, angr=(np.pi-2.229134520647158), name="laptop_dell_norm")
 
             objs["bowl_blue_ikea_norm"]          = bowl_dims_to_verts(Dt=0.16539, Dm=0.13123, Db=0.04040, Ht=0.03964, Hb=0.03821, name="bowl_blue_ikea_norm")
-            objs["bowl_brown_ikea_norm"]         = bowl_dims_to_verts(Dt=0.16452, Dm=0.12303, Db=0.06431, Ht=0.04507, Hb=0.02916, name="bowl_brown_ikea_norm")
+            objs["bowl_brown_ikea_norm"]         = bowl_dims_to_verts(Dt=0.16452, Dm=0.12303, Db=0.06431, Ht=0.035, Hb=0.023, name="bowl_brown_ikea_norm")
+            # objs["bowl_brown_ikea_norm"]         = bowl_dims_to_verts(Dt=0.16452, Dm=0.12303, Db=0.06431, Ht=0.04507, Hb=0.02916, name="bowl_brown_ikea_norm")
             objs["bowl_chinese_blue_norm"]       = bowl_dims_to_verts(Dt=0.17023, Dm=0.13963, Db=0.07944, Ht=0.05247, Hb=0.03653, name="bowl_chinese_blue_norm")
             objs["bowl_blue_white_chinese_norm"] = bowl_dims_to_verts(Dt=0.15672, Dm=0.12155, Db=0.05886, Ht=0.04064, Hb=0.02452, name="bowl_blue_white_chinese_norm")
             objs["bowl_shengjun_norm"]           = bowl_dims_to_verts(Dt=0.14231, Dm=0.13025, Db=0.06516, Ht=0.05296, Hb=0.02353, name="bowl_shengjun_norm")
