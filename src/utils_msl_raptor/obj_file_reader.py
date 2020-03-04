@@ -229,8 +229,8 @@ if __name__ == '__main__':
                 print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
                 print("b_enforce_0: []")
         else:
-            b_save = False
-            b_plot = True
+            b_save = True
+            b_plot = False
             objs = {}
 
             objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
