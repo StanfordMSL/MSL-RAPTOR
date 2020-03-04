@@ -53,9 +53,9 @@ def mug_dims_to_verts(D, H, l, w, h, o, name=None):
     
     """
     # if name == "mug_vignesh_norm":
-    D *= 0.95
-    l *= 1.2
-    h *= 0.9
+    # D *= 0.95
+    # l *= 1.2
+    # h *= 0.9
     origin = np.array([(D + l)/2, H/2, D/2])  
     # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
     num_radial_points = 6
@@ -132,23 +132,37 @@ def bowl_dims_to_verts(Dt, Dm, Db, Ht, Hb, name=None):
     This if for a tapered mug 
     Assumes top dims are bigger 
     """
-    Dt *= 0.95
-    Dm *= 0.95
-    Db *= 1.1
+    # Dt *= 0.95
+    # Dm *= 0.95
+    # Db *= 1.1
     origin = np.array([Dt/2, (Ht + Hb)/2, Dt/2])
-    # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
-    bowl_verts = np.asarray([[Dt/2 - Db/2, 0, Dt/2 - Db/2], [Dt/2 + Db/2, 0, Dt/2 - Db/2], [Dt/2 - Db/2, 0, Dt/2 + Db/2], [Dt/2 + Db/2, 0, Dt/2 + Db/2],\
-                             [Dt/2 - Dm/2, Hb, Dt/2 - Dm/2], [Dt/2 + Dm/2, Hb, Dt/2 - Dm/2], [Dt/2 - Dm/2, Hb, Dt/2 + Dm/2], [Dt/2 + Dm/2, Hb, Dt/2 + Dm/2],\
-                             [0, Hb + Ht, 0], [Dt, Hb + Ht, 0], [0, Hb + Ht, Dt], [Dt, Hb + Ht, Dt]]) - origin
+
+    num_radial_points = 6
+    da = 2*np.pi / num_radial_points
+    pnt_offset = np.asarray([Dt/2,   0,      Dt/2   ])
+    bowl_verts = []
+    connected_inds = []
+    for i, ang in enumerate(np.linspace(0, 2*np.pi - da, num_radial_points)):
+        R_deltay = np.array([[ np.cos(ang), 0.             , np.sin(ang) ],
+                             [ 0.         , 1.             , 0           ],
+                             [-np.sin(ang), 0.             , np.cos(ang) ]])
+        rotated_point = R_deltay @ np.asarray([0,   Hb + Ht, Dt/2]) + pnt_offset
+        bowl_verts.append(list(rotated_point))
+        rotated_point = R_deltay @ np.asarray([0,   Hb, Dm/2]) + pnt_offset
+        bowl_verts.append(list(rotated_point))
+        rotated_point = R_deltay @ np.asarray([0,   0, Db/2]) + pnt_offset
+        bowl_verts.append(list(rotated_point))
+        if i == 0:
+            connected_inds.extend([[3*i, 3*i+1], [3*i+1, 3*i+2]])
+        else:
+            connected_inds.extend([[3*i, 3*i+1], [3*i+1, 3*i+2], [3*i, 3*(i-1)], [3*i + 1, 3*(i-1)+1], [3*i + 2, 3*(i-1) + 2]])
+    connected_inds.extend([ [0, 3*(num_radial_points-1)], [1, 3*(num_radial_points - 1) + 1], [2, 3*(num_radial_points - 1) + 2]]) # connect first and last
+
+    bowl_verts = np.asarray(bowl_verts) - origin
 
     # turn the cup verts from NOCS frame to MSL-RAPTOR frame (Z up)
     bowl_verts = np.concatenate((bowl_verts[:,0:1], bowl_verts[:,2:3], bowl_verts[:,1:2]), axis=1)
-                            
-    connected_inds = [[0, 1], [0, 2],  [1, 3],  [2, 3], \
-                      [4, 5], [4, 6],  [5, 7],  [6, 7], \
-                      [8, 9], [8, 10], [9, 11], [10, 11], \
-                      [0, 4], [1, 5],  [2, 6],  [3, 7], \
-                      [4, 8], [5, 9],  [6, 10], [7, 11] ]
+
 
     if name is not None:
         print("{} dims =\n{}".format(name, np.asarray(bowl_verts)))
@@ -263,19 +277,19 @@ if __name__ == '__main__':
                     save_objs_verts_as_txt(verts=objs[key][0], name=key, path=save_path, connected_inds=objs[key][1])
             
             if b_plot:
-                plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
+                # plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
                 plot_object_verts(objs["mug_brown_starbucks_norm"][0], connected_inds=objs["mug_brown_starbucks_norm"][1])
-                plot_object_verts(objs["mug_daniel_norm"][0], connected_inds=objs["mug_daniel_norm"][1])
+                # plot_object_verts(objs["mug_daniel_norm"][0], connected_inds=objs["mug_daniel_norm"][1])
                 # plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
                 # plot_object_verts(objs["laptop_air_xin_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
                 # plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_alienware_norm"][1])
-                # plot_object_verts(objs["laptop_mac_pro_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
+                plot_object_verts(objs["laptop_mac_pro_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
                 # plot_object_verts(objs["laptop_air_0_norm"][0], connected_inds=objs["laptop_air_0_norm"][1])
                 # plot_object_verts(objs["laptop_air_1_norm"][0], connected_inds=objs["laptop_air_1_norm"][1])
                 # plot_object_verts(objs["laptop_dell_norm"][0], connected_inds=objs["laptop_dell_norm"][1])
                 # plot_object_verts(objs["bowl_blue_ikea_norm"][0], connected_inds=objs["bowl_blue_ikea_norm"][1])
                 # plot_object_verts(objs["bowl_brown_ikea_norm"][0], connected_inds=objs["bowl_brown_ikea_norm"][1])
-                # plot_object_verts(objs["bowl_chinese_blue_norm"][0], connected_inds=objs["bowl_chinese_blue_norm"][1])
+                plot_object_verts(objs["bowl_chinese_blue_norm"][0], connected_inds=objs["bowl_chinese_blue_norm"][1])
                 # plot_object_verts(objs["bowl_blue_white_chinese_norm"][0], connected_inds=objs["bowl_blue_white_chinese_norm"][1])
                 # plot_object_verts(objs["bowl_shengjun_norm"][0], connected_inds=objs["bowl_shengjun_norm"][1])
                 # plot_object_verts(objs["bowl_white_small_norm"][0], connected_inds=objs["bowl_white_small_norm"][1])
