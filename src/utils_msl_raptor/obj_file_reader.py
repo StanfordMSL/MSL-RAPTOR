@@ -108,7 +108,7 @@ def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
     Assumes top dims are bigger 
     """
     origin = np.array([(Dt + lt)/2, H/2, Dt/2])
-    num_radial_points = 6
+    num_radial_points = 20
     da = 2*np.pi / num_radial_points
     pnt_offset = np.asarray([Dt/2,   0,      Dt/2   ])
     cup_verts = []
@@ -143,26 +143,6 @@ def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
                                    [4, 6], [5, 7] ]) + handle_pnt0
 
     connected_inds.extend(list(handle_conenctions))
-
-
-    # # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
-    # cup_verts = np.asarray([[Dt/2 - Db/2, 0, Dt/2 - Db/2], [Dt/2 - Db/2, 0, Dt/2 + Db/2], [Dt/2 + Db/2, 0, Dt/2 - Db/2], [Dt/2 + Db/2, 0, Dt/2 + Db/2],\
-    #                         [0, H, 0], [0, H, Dt], [Dt, H, 0], [Dt, H, Dt],\
-    #                         [Dt/2 + Db/2, ob1, Dt/2 - w/2], [Dt/2 + Db/2, ob1, Dt/2 + w/2],\
-    #                         [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 - w/2], [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 + w/2],
-    #                         [Dt + lt, H - ot, Dt/2 - w/2], [Dt + lt, H - ot, Dt/2 + w/2],\
-    #                         [Dt, H - ot, Dt/2 - w/2], [Dt, H - ot, Dt/2 + w/2]]) - origin
-
-    # # turn the cup verts from NOCS frame to MSL-RAPTOR frame (Z up)
-    # cup_verts = np.concatenate((cup_verts[:,0:1], cup_verts[:,2:3], cup_verts[:,1:2]), axis=1)
-                            
-    # connected_inds = [[0, 1], [0, 2], [1, 3],  [2, 3], \
-    #                   [4, 5], [4, 6], [5, 7],  [6, 7], \
-    #                   [0, 4], [1, 5], [2, 6],  [3, 7], \
-    #                   [8, 9], [10, 11], [12, 13],  [6, 15], \
-    #                   [8, 10], [9, 11], [10, 12],  [11, 13], \
-    #                   [12, 14], [13, 15] ]
-
 
     if name is not None:
         print("{} dims =\n{}".format(name, np.asarray(cup_verts)))
