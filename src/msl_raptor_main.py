@@ -206,7 +206,7 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
                         file_path = obj_dict['cust_vert_file'] + obj_dict['ns']
                         loaded_verts = np.loadtxt(file_path)
 
-                        loaded_verts *= np.reshape(obj_dict['cust_vert_scale'], (1,3)).astype(float)
+                        # loaded_verts *= np.reshape(obj_dict['cust_vert_scale'], (1,3)).astype(float)
 
                         Angle_x = float(obj_dict['cust_vert_rpy'][0])
                         Angle_y = float(obj_dict['cust_vert_rpy'][1])
@@ -221,6 +221,7 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
                                                 [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
                                                 [ 0.             , 0.             , 1.              ]])
                         R_delta = R_deltax @ R_deltay @ R_deltaz
+                        R_delta = np.eye(3)
 
                         loaded_verts = (R_delta @ loaded_verts.T).T
                         bb_3d[obj_dict['class_str']] = np.concatenate(( loaded_verts, np.ones((loaded_verts.shape[0],1)) ), axis=1)
