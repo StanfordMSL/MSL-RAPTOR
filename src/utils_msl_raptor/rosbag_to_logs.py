@@ -241,6 +241,15 @@ class rosbags_to_logs:
                 if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
                     continue
 
+                # if self.rb_name == "msl_raptor_output_from_bag_scene_2.bag" and t_gt > 2.3 and t_gt < 18:
+                #     """ FIX ERROR IN GROUNT TRUTH!!!! """
+                #     continue
+                #     tf_w_ado_gt[0:3, 0:3] = R_deltaz @ tf_w_ado_gt[0:3, 0:3]
+                # if self.rb_name == "msl_raptor_output_from_bag_scene_4.bag" and t_gt > 4.35 and t_gt < 7.7:
+                #     """ FIX ERROR IN GROUNT TRUTH!!!! """
+                #     continue
+
+
                 log_data = {}
                 box_length, box_width, box_height, diam = self.bb_3d_dict_all[name]
                 vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
@@ -256,12 +265,6 @@ class rosbags_to_logs:
                     break # this can happen at the end of a bag
 
                 tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[gt_ind])
-
-                pdb.set_trace()
-                if self.rb_name == "msl_raptor_output_from_bag_scene_2.bag" and t_gt > 2.3 and t_gt < 18:
-                    """ FIX ERROR IN GROUNT TRUTH!!!! """
-                    tf_w_ego_gt[0:3, 0:3] = R_deltaz @ tf_w_ego_gt[0:3, 0:3]
-
 
                 pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
                 tf_w_ego_est = pose_to_tf(pose_msg)
