@@ -205,6 +205,24 @@ def init_objects(objects_sizes_yaml,objects_used_path,classes_names_file,categor
                         print("USING CUSTOM VERTS!!! (for {})".format(obj_dict['ns']))
                         file_path = obj_dict['cust_vert_file'] + obj_dict['ns']
                         loaded_verts = np.loadtxt(file_path)
+
+                        loaded_verts *= np.reshape(obj_dict['cust_vert_scale'], (1,3)).astype(float)
+
+                        Angle_x = float(obj_dict['cust_vert_rpy'][0])
+                        Angle_y = float(obj_dict['cust_vert_rpy'][1])
+                        Angle_z = float(obj_dict['cust_vert_rpy'][2])
+                        R_deltax = np.array([[ 1.             , 0.             , 0.              ],
+                                                [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
+                                                [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
+                        R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
+                                                [ 0.             , 1.             , 0               ],
+                                                [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
+                        R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
+                                                [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
+                                                [ 0.             , 0.             , 1.              ]])
+                        R_delta = R_deltax @ R_deltay @ R_deltaz
+
+                        loaded_verts = (R_delta @ loaded_verts.T).T
                         bb_3d[obj_dict['class_str']] = np.concatenate(( loaded_verts, np.ones((loaded_verts.shape[0],1)) ), axis=1)
 
                         half_width = (np.max(bb_3d[obj_dict['class_str']][:, 0]) - np.min(bb_3d[obj_dict['class_str']][:, 0])) / 2
