@@ -207,7 +207,7 @@ id: 21
 ns: 'bowl_shengjun_norm'
 class_str: 'bowl'
 cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
-cust_vert_scale: [1.0, 1.0, 1.0]
+cust_vert_scale: [1.1, 1.1, 1.2]
 cust_vert_rpy: [0.0, 0.0, 0.0]
 bound_box_l: 0.172298
 bound_box_h: 0.08747
