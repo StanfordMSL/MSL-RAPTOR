@@ -198,6 +198,8 @@ def laptop_dims_to_verts(W, lb, hb, lt, ht, angr, name=None):
     aa = ht * np.sin(np.pi/2 - angr) # vertical portion of top sections "length" edge
     bb = ht * np.cos(np.pi/2 - angr) # horizontal portion of top sections "length" edge
     origin = np.array([(lb + b)/2, ( a  + aa )/2, W/2])  
+    if name == "laptop_mac_pro_norm":
+        origin[0] += 0.08
     # The cup's origin is at the center of the axis-aligned 3D bouning box, with Y directed up and X directed in handle direction
     laptop_verts = np.asarray([[b, 0, 0 ], [b + lb,  0,  0 ], [b,  0, W  ], [ b + lb, 0, W ], \
                                [b + bb, hb,  0 ], [b + lb,  hb,  0 ], [b + bb,  hb, W  ], [ b + lb, hb, W ], \
@@ -257,8 +259,8 @@ if __name__ == '__main__':
                 print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
                 print("b_enforce_0: []")
         else:
-            b_save = False
-            b_plot = True
+            b_save = True
+            b_plot = False
             objs = {}
 
             objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
@@ -284,7 +286,7 @@ if __name__ == '__main__':
             # objs["bowl_brown_ikea_norm"]         = bowl_dims_to_verts(Dt=0.16452, Dm=0.12303, Db=0.06431, Ht=0.04507, Hb=0.02916, name="bowl_brown_ikea_norm")
             objs["bowl_chinese_blue_norm"]       = bowl_dims_to_verts(Dt=0.17023, Dm=0.13963, Db=0.07944, Ht=0.05247, Hb=0.03653, name="bowl_chinese_blue_norm")
             objs["bowl_blue_white_chinese_norm"] = bowl_dims_to_verts(Dt=0.15672, Dm=0.12155, Db=0.05886, Ht=0.04064, Hb=0.02452, name="bowl_blue_white_chinese_norm")
-            objs["bowl_shengjun_norm"]           = bowl_dims_to_verts(Dt=0.14231, Dm=0.13025, Db=0.06516, Ht=0.05296, Hb=0.02353, name="bowl_shengjun_norm")
+            objs["bowl_shengjun_norm"]           = bowl_dims_to_verts(Dt=0.14231, Dm=0.13025, Db=0.06516, Ht=0.04096, Hb=0.02353, name="bowl_shengjun_norm")
             objs["bowl_white_small_norm"]        = bowl_dims_to_verts(Dt=0.14231, Dm=0.12155, Db=0.05886, Ht=0.04064, Hb=0.02452, name="bowl_white_small_norm")
             if b_save:
                 save_path = '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
