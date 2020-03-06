@@ -95,12 +95,14 @@ def mug_dims_to_verts(D, H, l, w, h, o, name=None):
     return (cup_verts, connected_inds)
            
 
-def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
+def mug_tapered_dims_to_verts(Dt, Db, H, w, l0, h0, l1, h1, l2, h2, l3, h3, ot, name=None):
     """
     This if for a tapered mug 
     Assumes top dims are bigger 
     """
-    origin = np.array([(Dt + lt)/2, H/2, Dt/2])
+    D = np.max([Dt, Db])
+    l = np.max([l1, l2, l3]) + l0
+    origin = np.array([(D + l)/2, H/2, D/2])
     num_radial_points = 20
     da = 2*np.pi / num_radial_points
     pnt_offset = np.asarray([Dt/2,   0,      Dt/2   ])
@@ -120,10 +122,15 @@ def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
             connected_inds.extend([[2*i, 2*i+1], [2*i, 2*i - 2], [2*i + 1, 2*i-1]])
     connected_inds.extend([ [0, 2*(num_radial_points-1)], [1, 2*(num_radial_points - 1) + 1]]) # connect first and last
 
-    cup_verts.extend([[Dt/2 + Db/2, ob1, Dt/2 - w/2], [Dt/2 + Db/2, ob1, Dt/2 + w/2],\
-                     [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 - w/2], [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 + w/2],
-                     [Dt + lt, H - ot, Dt/2 - w/2], [Dt + lt, H - ot, Dt/2 + w/2],\
-                     [Dt, H - ot, Dt/2 - w/2], [Dt, H - ot, Dt/2 + w/2]])
+    # cup_verts.extend([[Dt/2 + Db/2, ob1, Dt/2 - w/2], [Dt/2 + Db/2, ob1, Dt/2 + w/2],\
+    #                  [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 - w/2], [Dt/2 + Db/2 + lb, ob1 + ob2, Dt/2 + w/2],
+    #                  [Dt + lt, H - ot, Dt/2 - w/2], [Dt + lt, H - ot, Dt/2 + w/2],\
+    #                  [Dt, H - ot, Dt/2 - w/2], [Dt, H - ot, Dt/2 + w/2]])
+    cup_verts.extend([[D/2 + Db/2 + l0, h0, D/2 - w/2], [D/2 + Db/2 + l0, h0, D/2 + w/2],\
+                      [D/2 + Db/2 + l1, h0 + h1, D/2 - w/2], [D/2 + Db/2 + l1, h0 + h1, D/2 + w/2],\
+                      [D/2 + Db/2 + l2, h0 + h2, D/2 - w/2], [D/2 + Db/2 + l2, h0 + h2, D/2 + w/2],\
+                      [D/2 + Db/2 + l3, h0 + h3, D/2 - w/2], [D/2 + Db/2 + l3, h0 + h3, D/2 + w/2],\
+                      [Dt, H - ot, Dt/2 - w/2], [Dt, H - ot, Dt/2 + w/2]])
     cup_verts = np.asarray(cup_verts) - origin
    
                             
@@ -131,9 +138,9 @@ def mug_tapered_dims_to_verts(Dt, Db, H, lt, lb, w, ob1, ob2, ot, name=None):
     cup_verts = np.concatenate((cup_verts[:,0:1], cup_verts[:,2:3], cup_verts[:,1:2]), axis=1)
 
     handle_pnt0 = num_radial_points*2
-    handle_conenctions = np.array([[0, 1], [2, 3], [4, 5],  [6, 7], \
-                                   [0, 2], [1, 3], [2, 4],  [3, 5], \
-                                   [4, 6], [5, 7] ]) + handle_pnt0
+    handle_conenctions = np.array([[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], \
+                                   [0, 2], [1, 3], [2, 4], [3, 5], \
+                                   [4, 6], [5, 7], [6, 8], [7, 9] ]) + handle_pnt0
 
     connected_inds.extend(list(handle_conenctions))
 
@@ -250,16 +257,20 @@ if __name__ == '__main__':
                 print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
                 print("b_enforce_0: []")
         else:
-            b_save = True
-            b_plot = False
+            b_save = False
+            b_plot = True
             objs = {}
 
             objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
             objs["mug_brown_starbucks_norm"] = mug_dims_to_verts(D=0.08599, H=0.10509, l=0.02830, h=0.07339, w=0.01394, o=0.01649, name="mug_brown_starbucks_norm")
             objs["mug_daniel_norm"]          = mug_dims_to_verts(D=0.07354, H=0.10509, l=0.03313, h=0.05665, w=0.01089, o=0.02797, name="mug_daniel_norm")
             objs["mug_vignesh_norm"]         = mug_dims_to_verts(D=0.08126, H=0.10097, l=0.03192, h=0.06865, w=0.01823, o=0.01752, name="mug_vignesh_norm")
-            objs["mug_white_green_norm"]     = mug_dims_to_verts(D=0.10265, H=0.08295, l=0.03731, h=0.05508, w=0.01917, o=0.02352, name="mug_white_green_norm")
-            objs["mug2_scene3_norm"]         = mug_tapered_dims_to_verts(Dt=0.11442, Db=0.0687, H=0.08295, lt=0.02803, lb=0.0390, w=0.0165, ob1=0.01728, ob2=0.02403, ot=0.00954, name="mug2_scene3_norm")
+            
+            # objs["mug_white_green_norm"]     = mug_dims_to_verts(D=0.10265, H=0.08295, l=0.03731, h=0.05508, w=0.01917, o=0.02352, name="mug_white_green_norm")
+
+            # mug_tapered_dims_to_verts(Dt, Db, H, w, l0, h0, l1, h1, l2, h2, l3, h3, ot, name=None)
+            objs["mug_white_green_norm"] = mug_tapered_dims_to_verts(Dt=0.10265, Db=0.08176, H=0.08295, l0=0.00219, h0=0.01812, l1=0.03941, h1=0.0285, l2=0.04081, h2=0.04881, l3=0.02638, h3=0.06128, ot=0.00729, w=0.01917, name="mug_white_green_norm")
+            # objs["mug2_scene3_norm"]         = mug_tapered_dims_to_verts(Dt=0.11442, Db=0.0687, H=0.08295, lt=0.02803, lb=0.0390, w=0.0165, ob1=0.01728, ob2=0.02403, ot=0.00954, name="mug2_scene3_norm")
 
             objs["laptop_air_xin_norm"]   = laptop_dims_to_verts(W=0.27497, lb=0.20273, hb=0.01275, lt=0.19536, ht=0.01073, angr=0.987935358216449, name="laptop_air_xin_norm")
             objs["laptop_alienware_norm"] = laptop_dims_to_verts(W=0.33020, lb=0.25560, hb=0.02397, lt=0.28086, ht=0.02253, angr=0.879851927765118, name="laptop_alienware_norm")
@@ -284,16 +295,17 @@ if __name__ == '__main__':
                     save_objs_verts_as_txt(verts=objs[key][0], name=key, path=save_path, connected_inds=objs[key][1])
             
             if b_plot:
+                plot_object_verts(objs["mug_white_green_norm"][0], connected_inds=objs["mug_white_green_norm"][1])
                 # plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
                 # plot_object_verts(objs["mug_brown_starbucks_norm"][0], connected_inds=objs["mug_brown_starbucks_norm"][1])
                 # plot_object_verts(objs["mug_daniel_norm"][0], connected_inds=objs["mug_daniel_norm"][1])
                 # plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
-                plot_object_verts(objs["laptop_air_xin_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
-                plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_alienware_norm"][1])
-                plot_object_verts(objs["laptop_mac_pro_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
-                plot_object_verts(objs["laptop_air_0_norm"][0], connected_inds=objs["laptop_air_0_norm"][1])
-                plot_object_verts(objs["laptop_air_1_norm"][0], connected_inds=objs["laptop_air_1_norm"][1])
-                plot_object_verts(objs["laptop_dell_norm"][0], connected_inds=objs["laptop_dell_norm"][1])
+                # plot_object_verts(objs["laptop_air_xin_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
+                # plot_object_verts(objs["laptop_alienware_norm"][0], connected_inds=objs["laptop_alienware_norm"][1])
+                # plot_object_verts(objs["laptop_mac_pro_norm"][0], connected_inds=objs["laptop_mac_pro_norm"][1])
+                # plot_object_verts(objs["laptop_air_0_norm"][0], connected_inds=objs["laptop_air_0_norm"][1])
+                # plot_object_verts(objs["laptop_air_1_norm"][0], connected_inds=objs["laptop_air_1_norm"][1])
+                # plot_object_verts(objs["laptop_dell_norm"][0], connected_inds=objs["laptop_dell_norm"][1])
                 # plot_object_verts(objs["bowl_blue_ikea_norm"][0], connected_inds=objs["bowl_blue_ikea_norm"][1])
                 # plot_object_verts(objs["bowl_brown_ikea_norm"][0], connected_inds=objs["bowl_brown_ikea_norm"][1])
                 # plot_object_verts(objs["bowl_chinese_blue_norm"][0], connected_inds=objs["bowl_chinese_blue_norm"][1])
