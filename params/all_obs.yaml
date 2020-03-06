@@ -259,7 +259,7 @@ id: 26
 ns: 'laptop_air_xin_norm'
 class_str: 'laptop'
 cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
-cust_vert_scale: [1.1, 1.1, 1.1]
+cust_vert_scale: [1.0, 1.0, 1.0]
 cust_vert_rpy: [0.0, 0.0, 0.0]
 bound_box_l: 0.306686
 bound_box_h: 0.168628
