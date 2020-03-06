@@ -286,7 +286,7 @@ id: 29
 ns: 'mug_anastasia_norm'
 class_str: 'cup'
 cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
-cust_vert_scale: [1.0, 1.0, 1.0]
+cust_vert_scale: [1.1, 1.1, 1.1]
 cust_vert_rpy: [0.0, 0.0, 0.0]
 bound_box_l: 0.12702
 bound_box_h: 0.092322

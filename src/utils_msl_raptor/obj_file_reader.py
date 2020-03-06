@@ -260,19 +260,26 @@ if __name__ == '__main__':
                 print("b_enforce_0: []")
         else:
             b_save = True
-            b_plot = False
+            b_plot = True
             objs = {}
 
-            objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
-            objs["mug_brown_starbucks_norm"] = mug_dims_to_verts(D=0.08599, H=0.10509, l=0.02830, h=0.07339, w=0.01394, o=0.01649, name="mug_brown_starbucks_norm")
-            objs["mug_daniel_norm"]          = mug_dims_to_verts(D=0.07354, H=0.10509, l=0.03313, h=0.05665, w=0.01089, o=0.02797, name="mug_daniel_norm")
+            # objs["mug_anastasia_norm"]       = mug_dims_to_verts(D=0.09140, H=0.09173, l=0.03210, h=0.05816, w=0.01353, o=0.02460, name="mug_anastasia_norm")
+            # objs["mug_brown_starbucks_norm"] = mug_dims_to_verts(D=0.08599, H=0.10509, l=0.02830, h=0.07339, w=0.01394, o=0.01649, name="mug_brown_starbucks_norm")
+            # objs["mug_daniel_norm"]          = mug_dims_to_verts(D=0.07354, H=0.10509, l=0.03313, h=0.05665, w=0.01089, o=0.02797, name="mug_daniel_norm")
             objs["mug_vignesh_norm"]         = mug_dims_to_verts(D=0.08126, H=0.10097, l=0.03192, h=0.06865, w=0.01823, o=0.01752, name="mug_vignesh_norm")
             
             # objs["mug_white_green_norm"]     = mug_dims_to_verts(D=0.10265, H=0.08295, l=0.03731, h=0.05508, w=0.01917, o=0.02352, name="mug_white_green_norm")
 
             # mug_tapered_dims_to_verts(Dt, Db, H, w, l0, h0, l1, h1, l2, h2, l3, h3, ot, name=None)
             objs["mug_white_green_norm"] = mug_tapered_dims_to_verts(Dt=0.10265, Db=0.08176, H=0.08295, l0=0.00219, h0=0.01812, l1=0.03941, h1=0.0285, l2=0.04081, h2=0.04881, l3=0.02638, h3=0.06128, ot=0.00729, w=0.01917, name="mug_white_green_norm")
-            # objs["mug_daniel_norm"]      = mug_tapered_dims_to_verts(D=0.07354, H=0.10509, l=0.03313, h=0.05665, w=0.01089, o=0.02797, name="mug_daniel_norm")
+            objs["mug_daniel_norm"]      = mug_tapered_dims_to_verts(Dt=0.07354, Db=0.06892, H=0.10509, l0=0.00173, h0=0.02226, l1=0.02707, h1=0.02477, l2=0.030451, h2=0.04281, l3=0.02225, h3=0.06595, ot=0.01396, w=0.01089, name="mug_daniel_norm")
+            
+            
+            objs["mug_brown_starbucks_norm"] = mug_tapered_dims_to_verts(Dt=0.08599, Db=0.07882, H=0.10509, l0=0.0, h0=0.01848, l1=0.03167, h1=0.00153, l2=0.03167, h2=0.06914, l3=0.02338, h3=0.07418, ot=0.01344, w=0.01394, name="mug_brown_starbucks_norm")
+            
+            
+            objs["mug_anastasia_norm"]       = mug_tapered_dims_to_verts(Dt=0.09140, Db=0.08579, H=0.09173, l0=0.00236, h0=0.02083, l1=0.03307, h1=0.02369, l2=0.03426, h2=0.04829, l3=0.02501, h3=0.06151, ot=0.00777, w=0.01353, name="mug_anastasia_norm")
+            # objs["mug_vignesh_norm"]    = mug_mug_tapered_dims_to_vertsdims_to_verts(D=0.08126, H=0.10097, l=0.03192, h=0.06865, w=0.01823, o=0.01752, name="mug_vignesh_norm")
            
            
             # objs["mug2_scene3_norm"]         = mug_tapered_dims_to_verts(Dt=0.11442, Db=0.0687, H=0.08295, lt=0.02803, lb=0.0390, w=0.0165, ob1=0.01728, ob2=0.02403, ot=0.00954, name="mug2_scene3_norm")
@@ -300,9 +307,9 @@ if __name__ == '__main__':
                     save_objs_verts_as_txt(verts=objs[key][0], name=key, path=save_path, connected_inds=objs[key][1])
             
             if b_plot:
-                plot_object_verts(objs["mug_white_green_norm"][0], connected_inds=objs["mug_white_green_norm"][1])
+                # plot_object_verts(objs["mug_white_green_norm"][0], connected_inds=objs["mug_white_green_norm"][1])
                 # plot_object_verts(objs["mug_anastasia_norm"][0], connected_inds=objs["mug_anastasia_norm"][1])
-                # plot_object_verts(objs["mug_brown_starbucks_norm"][0], connected_inds=objs["mug_brown_starbucks_norm"][1])
+                plot_object_verts(objs["mug_brown_starbucks_norm"][0], connected_inds=objs["mug_brown_starbucks_norm"][1])
                 # plot_object_verts(objs["mug_daniel_norm"][0], connected_inds=objs["mug_daniel_norm"][1])
                 # plot_object_verts(objs["mug2_scene3_norm"][0], connected_inds=objs["mug2_scene3_norm"][1])
                 # plot_object_verts(objs["laptop_air_xin_norm"][0], connected_inds=objs["laptop_air_xin_norm"][1])
