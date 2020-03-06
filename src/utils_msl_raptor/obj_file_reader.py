@@ -272,6 +272,9 @@ if __name__ == '__main__':
 
             # mug_tapered_dims_to_verts(Dt, Db, H, w, l0, h0, l1, h1, l2, h2, l3, h3, ot, name=None)
             objs["mug_white_green_norm"] = mug_tapered_dims_to_verts(Dt=0.10265, Db=0.08176, H=0.08295, l0=0.00219, h0=0.01812, l1=0.03941, h1=0.0285, l2=0.04081, h2=0.04881, l3=0.02638, h3=0.06128, ot=0.00729, w=0.01917, name="mug_white_green_norm")
+            # objs["mug_daniel_norm"]      = mug_tapered_dims_to_verts(D=0.07354, H=0.10509, l=0.03313, h=0.05665, w=0.01089, o=0.02797, name="mug_daniel_norm")
+           
+           
             # objs["mug2_scene3_norm"]         = mug_tapered_dims_to_verts(Dt=0.11442, Db=0.0687, H=0.08295, lt=0.02803, lb=0.0390, w=0.0165, ob1=0.01728, ob2=0.02403, ot=0.00954, name="mug2_scene3_norm")
 
             objs["laptop_air_xin_norm"]   = laptop_dims_to_verts(W=0.27497, lb=0.20273, hb=0.01275, lt=0.19536, ht=0.01073, angr=0.987935358216449, name="laptop_air_xin_norm")
