@@ -1,0 +1,16 @@
+b_camera: False
+b_use_gt_bb: False
+b_use_gt_pose_init: True
+b_use_gt_detect_bb: True
+b_use_track_checks: False
+b_enforce_0_yaw: False
+b_use_tensorrt: False
+b_verbose: False
+detection_period: 1000
+b_rosbag: True
+bag_in_folder: "/mounted_folder/nocs/train"
+bag_in_name: "scene_1"
+bag_out_folder: "/mounted_folder/raptor_processed_bags"
+b_record: True
+bag_start_delay: 2.0
+b_pub_3d_bb_proj: False

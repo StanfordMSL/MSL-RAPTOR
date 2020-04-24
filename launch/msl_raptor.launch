@@ -1,28 +1,18 @@
 <launch>
-  <arg name="id"                  default="7" />
-  <arg name="robot_type"          default="quad" />
+  <arg name="id"                   />
+  <arg name="robot_type"           />
   <arg name="ns"                  value="/$(arg robot_type)$(arg id)" />
-  <arg name="b_camera"            default="true" />
-  <arg name="b_use_gt_bb"         default="false" />
-  <arg name="b_use_gt_pose_init"  default="false" />
-  <arg name="b_use_gt_detect_bb"    default="false" />
-  <arg name="b_use_track_checks"  default="true" />
-  <arg name="b_enforce_0_yaw"     default="true" />
-  <arg name="b_use_tensorrt"      default="true" />
-  <arg name="b_verbose"           default="false" />
-  <arg name="detection_period"    default="5" /> <!-- period to use to redo safety detection in seconds -->
   <arg name="b_rosbag"            default="false" />  <!-- boolean if we are reading data from a rosbag -->
   <arg name="shared_folder"       default="/mounted_folder" />  <!-- path to the mounted folder -->
-  <arg name="rb_path_in"          default="$(arg shared_folder)/rosbags_for_post_process" />  <!-- path to the rosbag -->
-  <arg name="rb_path_out"         default="$(arg shared_folder)/raptor_processed_bags" />  <!-- path to the rosbag -->
-  <arg name="rb_name"             default="rosbag_for_post_process_2019-12-18-15-19-48" /> <!-- name of the rosbag -->
+  <arg name="bag_in_folder"          default="$(arg shared_folder)/rosbags_for_post_process" />  <!-- path to the rosbag -->
+  <arg name="bag_out_folder"         default="$(arg shared_folder)/raptor_processed_bags" />  <!-- path to the rosbag -->
+  <arg name="bag_in_name"             default="rosbag_for_post_process_2019-12-18-15-19-48" /> <!-- name of the rosbag -->
   <arg name="b_record"            default="false" />  <!-- boolean if we are recording data in rosbag -->
-  <arg name="rb_start_delay"      default="2.0" /> <!-- how long to delay the start of the rosbag -->
+  <arg name="bag_start_delay"      default="2.0" /> <!-- how long to delay the start of the rosbag -->
   <arg name="classes_names_file"  default="$(find msl_raptor)/params/objects/classes_coco_mslquad.names" /> <!-- yaml file containing all the object sizes -->
   <arg name="object_sizes_file"   default="$(find msl_raptor)/params/objects/object_params.yaml" /> <!-- yaml file containing all the object sizes -->
   <arg name="object_used_filepath" default="$(find msl_raptor)/params/objects/objects_used/" /> <!-- yaml file containing the names of objects used -->
   <arg name="object_used_file"    default="objects_used.txt" /> <!-- yaml file containing the names of objects used -->
-  <arg name="b_pub_3d_bb_proj"    default="false" />
 
 
   <group if="$(arg b_rosbag)">
@@ -39,18 +29,10 @@
   <!-- Launch our main node -->
   <node name="MSL_RAPTOR" pkg="msl_raptor" type="msl_raptor_main.py" output="screen">
     <param name="ns"  value="$(arg ns)"/> 
-    <param name="b_use_gt_bb"  value="$(arg b_use_gt_bb)"/> 
-    <param name="b_use_gt_pose_init"  value="$(arg b_use_gt_pose_init)"/> 
-    <param name="b_use_gt_detect_bb"  value="$(arg b_use_gt_detect_bb)"/> 
-    <param name="b_use_track_checks"  value="$(arg b_use_track_checks)"/> 
-    <param name="b_enforce_0_yaw"  value="$(arg b_enforce_0_yaw)"/> 
-    <param name="detection_period"  value="$(arg detection_period)"/> 
-    <param name="b_use_tensorrt"  value="$(arg b_use_tensorrt)"/>
-    <param name="b_verbose"  value="$(arg b_verbose)"/>
+    <rosparam file="$(find msl_raptor)/params/experiment.yaml" />
     <param name="object_sizes_file"  value="$(arg object_sizes_file)"/>
     <param name="object_used_file"  value="$(arg object_used_filepath)$(arg object_used_file)"/>
     <param name="classes_names_file"  value="$(arg classes_names_file)"/>
-    <param name="b_pub_3d_bb_proj"  value="$(arg b_pub_3d_bb_proj)"/>
     <rosparam command="load" file="$(find msl_raptor)/params/setup/$(arg robot_type)$(arg id).yaml" />
 
   </node>
@@ -72,19 +54,19 @@
 
   <!-- IF using rosbag, launch our node then play the rosbag (using a delay to ensure msl_raptor starts first) -->
   <group if="$(arg b_rosbag)">
-    <node pkg="rosbag" type="play" name="player" args="--clock $(arg rb_path_in)/$(arg rb_name).bag" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
+    <node pkg="rosbag" type="play" name="player" args="--clock $(arg bag_in_folder)/$(arg bag_in_name).bag" launch-prefix="bash -c 'sleep $(arg bag_start_delay); $0 $@' " />
   </group>
 
   <!-- IF we should record a rosbag of results -->
   <group if="$(arg b_record)">
     <group if="$(arg b_record)">
       <!-- if FROM a rosbag (i.e. post-processed), then use the name of the source rosbag to name the newly output bag -->
-      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-O $(arg rb_path_out)/msl_raptor_output_from_bag_$(arg rb_name) -a"/>
+      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-O $(arg bag_out_folder)/msl_raptor_output_from_bag_$(arg bag_in_name) -a"/>
     </group>
     <group unless="$(arg b_rosbag)">
       <!-- if NOT from a rosbag (i.e. live), then use the current timestamp to name the bag -->
-     <!-- <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ /clock /tf ns/mavros/vision_pose/pose ns/mavros/local_position/pose ns/bb_data ns/msl_raptor_state ns/tracked_objects_poses ns/camera/camera_info /ns/camera/image_raw"/> -->
-     <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ /clock /tf ns/mavros/vision_pose/pose ns/mavros/local_position/pose ns/bb_data ns/msl_raptor_state ns/tracked_objects_poses ns/camera/camera_info /camera/image_raw"/>
+     <!-- <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg bag_out_folder)/msl_raptor_output_live_ /clock /tf ns/mavros/vision_pose/pose ns/mavros/local_position/pose ns/bb_data ns/msl_raptor_state ns/tracked_objects_poses ns/camera/camera_info /ns/camera/image_raw"/> -->
+     <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg bag_out_folder)/msl_raptor_output_live_ /clock /tf ns/mavros/vision_pose/pose ns/mavros/local_position/pose ns/bb_data ns/msl_raptor_state ns/tracked_objects_poses ns/camera/camera_info /camera/image_raw"/>
 
   </group>
   </group>

@@ -38,31 +38,31 @@ class rosbags_to_logs:
     The code currently also runs the quantitative metric analysis in the processes, but this is optional and will be done 
     again in the result_analyser. 
     """
-    def __init__(self, rb_name=None, data_source='raptor', ego_quad_ns="/quad7", ego_yaml="quad7", ado_yaml="all_obj", b_save_3dbb_imgs=False):
-        # Parse rb_name
-        us_split = rb_name.split("_")
-        if rb_name[-4:] == '.bag' or "_".join(us_split[0:3]) == 'msl_raptor_output':
+    def __init__(self, bag_in_name=None, data_source='raptor', ego_quad_ns="/quad7", ego_yaml="quad7", ado_yaml="all_obj", b_save_3dbb_imgs=False):
+        # Parse bag_in_name
+        us_split = bag_in_name.split("_")
+        if bag_in_name[-4:] == '.bag' or "_".join(us_split[0:3]) == 'msl_raptor_output':
             # This means rosbag name is one that was post-processed
-            if len(rb_name) > 4 and rb_name[-4:] == ".bag":
-                self.rb_name = rb_name
+            if len(bag_in_name) > 4 and bag_in_name[-4:] == ".bag":
+                self.bag_in_name = bag_in_name
             else:
-                self.rb_name = rb_name + ".bag"
-        elif len(rb_name) > 4 and "_".join(us_split[0:4]) == 'rosbag_for_post_process':
+                self.bag_in_name = bag_in_name + ".bag"
+        elif len(bag_in_name) > 4 and "_".join(us_split[0:4]) == 'rosbag_for_post_process':
             # we assume this is the rosbag that fed into raptor
-            rb_name = "msl_raptor_output_from_bag_rosbag_for_post_process_" + us_split[4]
-            if rb_name[-4:] == ".bag":
-                self.rb_name = rb_name
+            bag_in_name = "msl_raptor_output_from_bag_rosbag_for_post_process_" + us_split[4]
+            if bag_in_name[-4:] == ".bag":
+                self.bag_in_name = bag_in_name
             else:
-                self.rb_name = rb_name + ".bag"
+                self.bag_in_name = bag_in_name + ".bag"
         else:
-            raise RuntimeError("We do not recognize bag file! {} not understood".format(rb_name))
+            raise RuntimeError("We do not recognize bag file! {} not understood".format(bag_in_name))
         
         self.rosbag_in_dir = "/mounted_folder/raptor_processed_bags"
         self.log_out_dir = "/mounted_folder/" + data_source.lower() + "_logs"
         makedirs(self.log_out_dir)
 
         try:
-            self.bag = rosbag.Bag(self.rosbag_in_dir + '/' + self.rb_name, 'r')
+            self.bag = rosbag.Bag(self.rosbag_in_dir + '/' + self.bag_in_name, 'r')
         except Exception as e:
             raise RuntimeError("Unable to Process Rosbag!!\n{}".format(e))
 
@@ -142,7 +142,7 @@ class rosbags_to_logs:
         #########################################################################################
         self.process_rb()
         
-        base_path = self.log_out_dir + "/log_" + self.rb_name[:-4].split("_")[-1] 
+        base_path = self.log_out_dir + "/log_" + self.bag_in_name[:-4].split("_")[-1] 
         self.logger = RaptorLogger(mode="write", names=self.ado_names, base_path=base_path)
 
         self.raptor_metrics = PoseMetricTracker(px_thresh=5, prct_thresh=10, trans_thresh=0.05, ang_thresh=5, names=self.ado_names, bb_3d_dict=self.bb_3d_dict_all)
@@ -238,14 +238,14 @@ class rosbags_to_logs:
                                 [ 0.             , 0.             , 1.              ]])
             for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds in corespondences:
 
-                if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
+                if self.bag_in_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
                     continue
 
-                # if self.rb_name == "msl_raptor_output_from_bag_scene_2.bag" and t_gt > 2.3 and t_gt < 18:
+                # if self.bag_in_name == "msl_raptor_output_from_bag_scene_2.bag" and t_gt > 2.3 and t_gt < 18:
                 #     """ FIX ERROR IN GROUNT TRUTH!!!! """
                 #     continue
                 #     tf_w_ado_gt[0:3, 0:3] = R_deltaz @ tf_w_ado_gt[0:3, 0:3]
-                # if self.rb_name == "msl_raptor_output_from_bag_scene_4.bag" and t_gt > 4.35 and t_gt < 7.7:
+                # if self.bag_in_name == "msl_raptor_output_from_bag_scene_4.bag" and t_gt > 4.35 and t_gt < 7.7:
                 #     """ FIX ERROR IN GROUNT TRUTH!!!! """
                 #     continue
 
@@ -364,7 +364,7 @@ class rosbags_to_logs:
                 for img_msg_time, img_msg in zip(self.img_time_buffer, self.img_msg_buffer):
                     if img_msg_time < -0.04:
                         continue
-                    if self.rb_name in self.bags_and_cut_times and img_msg_time + self.t0 > self.bags_and_cut_times[self.rb_name]:
+                    if self.bag_in_name in self.bags_and_cut_times and img_msg_time + self.t0 > self.bags_and_cut_times[self.bag_in_name]:
                         break
                     if img_msg_time in t_img_to_t_est_dict:
                         # we have a bb for this frame
@@ -407,7 +407,7 @@ class rosbags_to_logs:
         """
         Reads all data from the rosbag (since time ordering is not guaranteed). Processes each message based on topic
         """
-        print("Processing {}".format(self.rb_name))
+        print("Processing {}".format(self.bag_in_name))
         for i, (topic, msg, t) in enumerate(self.bag.read_messages()):
             t_split = topic.split("/")
             if topic in self.topic_func_dict:
@@ -595,7 +595,7 @@ class rosbags_to_logs:
 if __name__ == '__main__':
     try:
         if len(sys.argv) == 6:
-            my_rb_name = sys.argv[1]
+            my_bag_name = sys.argv[1]
             my_data_source = sys.argv[2]
             my_ego_yaml = sys.argv[3]
             my_ado_yaml = sys.argv[4]
@@ -603,7 +603,7 @@ if __name__ == '__main__':
         else:
             raise RuntimeError("Incorrect arguments! needs <rosbag_name> <data_source> <ego_yaml> <ado_yaml> <b_save_3dbb_imgs> (leave off .bag and .yaml extensions)")
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
-        program = rosbags_to_logs(rb_name=my_rb_name, data_source=my_data_source, ego_yaml=my_ego_yaml, ado_yaml=my_ado_yaml, b_save_3dbb_imgs=my_b_save_3dbb_imgs)
+        program = rosbags_to_logs(bag_in_name=my_bag_name, data_source=my_data_source, ego_yaml=my_ego_yaml, ado_yaml=my_ado_yaml, b_save_3dbb_imgs=my_b_save_3dbb_imgs)
         
     except:
         import traceback
