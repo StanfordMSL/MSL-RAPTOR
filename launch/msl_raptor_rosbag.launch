@@ -1,0 +1,41 @@
+<!-- Example launch file for using MSL-RAPTOR and play a bag recording -->
+<launch>
+  <arg name="id"                   />
+  <arg name="robot_type"           />
+  <arg name="ns"                  value="/$(arg robot_type)$(arg id)" />
+  <arg name="classes_names_file"  default="$(find msl_raptor)/params/objects/classes_coco_mslquad.names" /> <!-- yaml file containing all the object sizes -->
+  <arg name="object_sizes_file"   default="$(find msl_raptor)/params/objects/object_params.yaml" /> <!-- yaml file containing all the object sizes -->
+  <arg name="object_used_filepath" default="$(find msl_raptor)/params/objects/objects_used/" /> <!-- yaml file containing the names of objects used -->
+  <arg name="object_used_file"    default="objects_used.txt" /> <!-- yaml file containing the names of objects used -->
+  <arg name="experiment_param_file"    default="experiment.yaml" /> <!-- yaml file containing the names of objects used -->
+
+  <arg name="bag_in_folder"          default="/mounted_folder/rosbags_for_post_process" />  <!-- path to the rosbag -->
+  <arg name="bag_out_folder"         default="/mounted_folder/raptor_processed_bags" />  <!-- path to the rosbag -->
+  <arg name="bag_in_name"             default="rosbag_for_post_process_2019-12-18-15-19-48" /> <!-- name of the rosbag -->
+  <arg name="b_record"            default="false" />  <!-- boolean if we are recording data in rosbag -->
+  <arg name="bag_start_delay"      default="2.0" /> <!-- how long to delay the start of the rosbag -->
+
+  <include file="$(find msl_raptor)/launch/msl_raptor.launch">
+   <arg name="id"      value="$(arg id)"             />
+   <arg name="robot_type"    value="$(arg robot_type)"        />
+   <arg name="classes_names_file"  value="$(arg classes_names_file)"  /> <!-- yaml file containing all the object sizes -->
+   <arg name="object_sizes_file"   value="$(arg object_sizes_file)"  /> <!-- yaml file containing all the object sizes -->
+   <arg name="object_used_filepath" value="$(arg object_used_filepath)" /> <!-- yaml file containing the names of objects used -->
+   <arg name="object_used_file"    value="$(arg object_used_file)"  /> <!-- yaml file containing the names of objects used -->
+   <arg name="experiment_param_file"    value="$(arg experiment_param_file)"  /> <!-- yaml file containing the names of objects used -->
+   <arg name="b_record"    value="$(arg b_record)"  /> <!-- boolean indicating if the outputs should be recorded -->
+   <arg name="bag_out_folder"    value="$(arg bag_out_folder)"  /> <!-- path where recordings should be saved-->
+  </include>
+
+
+  <param name="use_sim_time" value="true" />   <!--use the rosbag time instead of the computer's time. If using this use clock option in rosbag-->
+
+  <node pkg="tf" type="static_transform_publisher" name="trans_pub_map_world"
+        args="0 0 0 0 0 0 /map /world 10"> 
+  </node>
+
+
+  <!-- IF using rosbag, launch our node then play the rosbag (using a delay to ensure msl_raptor starts first) -->
+  <node pkg="rosbag" type="play" name="player" args="--clock $(arg bag_in_folder)/$(arg bag_in_name).bag" launch-prefix="bash -c 'sleep $(arg bag_start_delay); $0 $@' " />
+
+</launch>
