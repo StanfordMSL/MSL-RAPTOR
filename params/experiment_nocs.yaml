@@ -1,8 +1,8 @@
 b_use_gt_bb: False
 b_use_gt_pose_init: true
-b_use_gt_detect_bb: False
+b_use_gt_detect_bb: True
 b_use_track_checks: False
 b_use_tensorrt: False
 b_verbose: False
-detection_period: 5
+detection_period: 1000
 b_pub_3d_bb_proj: False
