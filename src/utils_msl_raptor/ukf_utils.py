@@ -211,13 +211,13 @@ def pose_to_3d_bb_proj(tf_w_ado, tf_w_ego, vertices_ado, camera):
 
     return projected_vertices
 
-def load_category_params():
+def load_class_params():
     params = {}
-    for f in listdir("/root/msl_raptor_ws/src/msl_raptor/params/category_params"):
+    for f in listdir("/root/msl_raptor_ws/src/msl_raptor/params/objects/class_params"):
         class_str = f.split('_')[0]
         yaml_file = class_str+'_ukf_params.yaml'
 
-        with open( "/root/msl_raptor_ws/src/msl_raptor/params/category_params/"+ f) as stream:
+        with open( "/root/msl_raptor_ws/src/msl_raptor/params/objects/class_params/"+ f) as stream:
             try:
                 params[class_str] = yaml.safe_load(stream)
             except yaml.YAMLError as exc:

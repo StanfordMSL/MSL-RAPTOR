@@ -439,7 +439,7 @@ class rosbags_to_logs:
 
 
     def read_yaml(self, ego_yaml="quad7", ado_yaml="all_obs"):
-        yaml_path="/root/msl_raptor_ws/src/msl_raptor/params/"
+        yaml_path="/root/msl_raptor_ws/src/msl_raptor/params/setup/"
         with open(yaml_path + ego_yaml + '.yaml', 'r') as stream:
             try:
                 # this means its the ego robot, dont add it to ado (but get its camera params)
