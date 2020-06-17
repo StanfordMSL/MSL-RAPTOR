@@ -69,10 +69,57 @@
 using namespace std;
 using namespace gtsam;
 
+void gtsam_raptor_rosbag(string bag_name);
+
 int main(int argc, char** argv) {
 
+  string bag_name = "/mounted_folder/nocs/test/scene_1.bag";
+  gtsam_raptor_rosbag(bag_name);
+  cout << "done!" << endl;
+
+  // Create an empty nonlinear factor graph
+  NonlinearFactorGraph graph;
+
+  // Add a prior on the first pose, setting it to the origin
+  // A prior factor consists of a mean and a noise model (covariance matrix)
+  Pose2 priorMean(0.0, 0.0, 0.0);  // prior at origin
+  auto priorNoise = noiseModel::Diagonal::Sigmas(Vector3(0.3, 0.3, 0.1));
+  graph.addPrior(1, priorMean, priorNoise);
+
+  // Add odometry factors
+  Pose2 odometry(2.0, 0.0, 0.0);
+  // For simplicity, we will use the same noise model for each odometry factor
+  auto odometryNoise = noiseModel::Diagonal::Sigmas(Vector3(0.2, 0.2, 0.1));
+  // Create odometry (Between) factors between consecutive poses
+  graph.emplace_shared<BetweenFactor<Pose2> >(1, 2, odometry, odometryNoise);
+  graph.emplace_shared<BetweenFactor<Pose2> >(2, 3, odometry, odometryNoise);
+  graph.print("\nFactor Graph:\n");  // print
+
+  // Create the data structure to hold the initialEstimate estimate to the solution
+  // For illustrative purposes, these have been deliberately set to incorrect values
+  Values initial;
+  initial.insert(1, Pose2(0.5, 0.0, 0.2));
+  initial.insert(2, Pose2(2.3, 0.1, -0.2));
+  initial.insert(3, Pose2(4.1, 0.1, 0.1));
+  initial.print("\nInitial Estimate:\n");  // print
+
+  // optimize using Levenberg-Marquardt optimization
+  Values result = LevenbergMarquardtOptimizer(graph, initial).optimize();
+  result.print("Final Result:\n");
+
+  // Calculate and print marginal covariances for all variables
+  cout.precision(2);
+  Marginals marginals(graph, result);
+  cout << "x1 covariance:\n" << marginals.marginalCovariance(1) << endl;
+  cout << "x2 covariance:\n" << marginals.marginalCovariance(2) << endl;
+  cout << "x3 covariance:\n" << marginals.marginalCovariance(3) << endl;
+
+  return 0;
+}
+
+void gtsam_raptor_rosbag(string bag_name) {
   rosbag::Bag bag;
-  bag.open("/mounted_folder/nocs/test/scene_1.bag");  // BagMode is Read by default
+  bag.open(bag_name);  // BagMode is Read by default
   string tf = "/tf";
   string bowl_pose_est = "bowl_white_small_norm/mavros/local_position/pose";
   string bowl_pose_gt = "bowl_white_small_norm/mavros/vision_pose/pose";
@@ -92,6 +139,7 @@ int main(int argc, char** argv) {
   geometry_msgs::PoseStamped::ConstPtr geo_msg = nullptr;
   sensor_msgs::CameraInfo::ConstPtr cam_info_msg = nullptr;
   sensor_msgs::Image::ConstPtr img_msg = nullptr;
+  double time = 0.0;
 
   int num_msgs = 0;
   for(rosbag::MessageInstance const m: rosbag::View(bag))
@@ -100,6 +148,7 @@ int main(int argc, char** argv) {
         // cout << "REMEMBEr: NEED TO LOOK INTO GEO_MSG STRUCTure!!!" << endl;
 
     num_msgs++;
+    time = m.getTime().toSec();
     if (m.getTopic() == tf || ("/" + m.getTopic() == tf)) {
       tf_msg = m.instantiate<tf::tfMessage>();
       if (tf_msg != nullptr) {
@@ -191,49 +240,10 @@ int main(int argc, char** argv) {
       }
     }
     else {
-      cout << "Unexpected message type found. Topic: " << m.getTopic()  << endl;
+      cout << "Unexpected message type found. Topic: " << m.getTopic() << " Type: " << m.getDataType() << endl;
     }
     
   }
   cout << "Number of messages in bag = " << num_msgs << endl;
   bag.close();
-
-  // Create an empty nonlinear factor graph
-  NonlinearFactorGraph graph;
-
-  // Add a prior on the first pose, setting it to the origin
-  // A prior factor consists of a mean and a noise model (covariance matrix)
-  Pose2 priorMean(0.0, 0.0, 0.0);  // prior at origin
-  auto priorNoise = noiseModel::Diagonal::Sigmas(Vector3(0.3, 0.3, 0.1));
-  graph.addPrior(1, priorMean, priorNoise);
-
-  // Add odometry factors
-  Pose2 odometry(2.0, 0.0, 0.0);
-  // For simplicity, we will use the same noise model for each odometry factor
-  auto odometryNoise = noiseModel::Diagonal::Sigmas(Vector3(0.2, 0.2, 0.1));
-  // Create odometry (Between) factors between consecutive poses
-  graph.emplace_shared<BetweenFactor<Pose2> >(1, 2, odometry, odometryNoise);
-  graph.emplace_shared<BetweenFactor<Pose2> >(2, 3, odometry, odometryNoise);
-  graph.print("\nFactor Graph:\n");  // print
-
-  // Create the data structure to hold the initialEstimate estimate to the solution
-  // For illustrative purposes, these have been deliberately set to incorrect values
-  Values initial;
-  initial.insert(1, Pose2(0.5, 0.0, 0.2));
-  initial.insert(2, Pose2(2.3, 0.1, -0.2));
-  initial.insert(3, Pose2(4.1, 0.1, 0.1));
-  initial.print("\nInitial Estimate:\n");  // print
-
-  // optimize using Levenberg-Marquardt optimization
-  Values result = LevenbergMarquardtOptimizer(graph, initial).optimize();
-  result.print("Final Result:\n");
-
-  // Calculate and print marginal covariances for all variables
-  cout.precision(2);
-  Marginals marginals(graph, result);
-  cout << "x1 covariance:\n" << marginals.marginalCovariance(1) << endl;
-  cout << "x2 covariance:\n" << marginals.marginalCovariance(2) << endl;
-  cout << "x3 covariance:\n" << marginals.marginalCovariance(3) << endl;
-
-  return 0;
 }
