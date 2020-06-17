@@ -56,10 +56,60 @@
 // for each variable, held in a Values container.
 #include <gtsam/nonlinear/Values.h>
 
+// Reading Rosbag Includes - http://wiki.ros.org/rosbag/Code%20API
+#include <rosbag/bag.h>
+#include <rosbag/view.h>
+#include <std_msgs/Int32.h>
+#include <std_msgs/String.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/Image.h>
+#include <tf/tfMessage.h>
+
 using namespace std;
 using namespace gtsam;
 
 int main(int argc, char** argv) {
+
+  rosbag::Bag bag;
+  bag.open("/mounted_folder/nocs/test/scene_1.bag");  // BagMode is Read by default
+  string tf = "/tf";
+  string bowl_pose_est = "bowl_white_small_norm/mavros/local_position/pose";
+  string bowl_pose_gt = "bowl_white_small_norm/mavros/vision_pose/pose";
+  string camera_pose_est = "camera_canon_len_norm/mavros/local_position/pose";
+  string camera_pose_gt = "camera_canon_len_norm/mavros/vision_pose/pose";
+  string can_pose_est = "can_arizona_tea_norm/mavros/local_position/pose";
+  string can_pose_gt = "can_arizona_tea_norm/mavros/vision_pose/pose";
+  string laptop_pose_est = "laptop_air_xin_norm/mavros/local_position/pose";
+  string laptop_pose_gt = "laptop_air_xin_norm/mavros/vision_pose/pose";
+  string mug_pose_est = "mug_daniel_norm/mavros/local_position/pose";
+  string mug_pose_gt = "mug_daniel_norm/mavros/vision_pose/pose";
+  string cam_info = "/quad7/camera/camera_info";
+  string img = "/quad7/camera/image_raw";
+  string ego_pose_est = "/quad7/mavros/local_position/pose";
+  string ego_pose_gt = "/quad7/mavros/vision_pose/pose";
+  tf::tfMessage::ConstPtr tf_msg = nullptr;
+  geometry_msgs::PoseStamped::ConstPtr geo_msg = nullptr;
+  sensor_msgs::CameraInfo::ConstPtr cam_info_msg = nullptr;
+  sensor_msgs::Image::ConstPtr img_msg = nullptr;
+
+
+  for(rosbag::MessageInstance const m: rosbag::View(bag))
+  {
+    // std_msgs::Int32::ConstPtr i = m.instantiate<std_msgs::Int32>();
+
+    bool b_recognized_msg = false;
+    if (m.getTopic() == bowl_pose_gt || ("/" + m.getTopic() == bowl_pose_gt)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        cout << "REMEMBEr: NEED TO LOOK INTO GEO_MSG STRUCTure!!!" << endl;
+        cout << geo_msg->pose << endl;
+      }
+    }
+    
+  }
+  bag.close();
+
   // Create an empty nonlinear factor graph
   NonlinearFactorGraph graph;
 
