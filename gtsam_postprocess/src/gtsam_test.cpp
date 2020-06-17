@@ -93,21 +93,109 @@ int main(int argc, char** argv) {
   sensor_msgs::CameraInfo::ConstPtr cam_info_msg = nullptr;
   sensor_msgs::Image::ConstPtr img_msg = nullptr;
 
-
+  int num_msgs = 0;
   for(rosbag::MessageInstance const m: rosbag::View(bag))
   {
     // std_msgs::Int32::ConstPtr i = m.instantiate<std_msgs::Int32>();
+        // cout << "REMEMBEr: NEED TO LOOK INTO GEO_MSG STRUCTure!!!" << endl;
 
-    bool b_recognized_msg = false;
-    if (m.getTopic() == bowl_pose_gt || ("/" + m.getTopic() == bowl_pose_gt)) {
+    num_msgs++;
+    if (m.getTopic() == tf || ("/" + m.getTopic() == tf)) {
+      tf_msg = m.instantiate<tf::tfMessage>();
+      if (tf_msg != nullptr) {
+        // cout << tf_msg->transforms << endl;
+      }
+    }
+    else if (m.getTopic() == bowl_pose_est || ("/" + m.getTopic() == bowl_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        cout << "REMEMBEr: NEED TO LOOK INTO GEO_MSG STRUCTure!!!" << endl;
-        cout << geo_msg->pose << endl;
+        // cout << geo_msg->pose << endl;
       }
+    }
+    else if (m.getTopic() == bowl_pose_gt || ("/" + m.getTopic() == bowl_pose_gt)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == camera_pose_est || ("/" + m.getTopic() == camera_pose_est)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == camera_pose_gt || ("/" + m.getTopic() == camera_pose_gt)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == can_pose_est || ("/" + m.getTopic() == can_pose_est)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == can_pose_gt || ("/" + m.getTopic() == can_pose_gt)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == laptop_pose_est || ("/" + m.getTopic() == laptop_pose_est)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == laptop_pose_gt || ("/" + m.getTopic() == laptop_pose_gt)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == mug_pose_est || ("/" + m.getTopic() == mug_pose_est)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == mug_pose_gt || ("/" + m.getTopic() == mug_pose_gt)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == cam_info || ("/" + m.getTopic() == cam_info)) {
+      cam_info_msg = m.instantiate<sensor_msgs::CameraInfo>();
+      if (cam_info_msg != nullptr) {
+        // cout << cam_info_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == img || ("/" + m.getTopic() == img)) {
+      img_msg = m.instantiate<sensor_msgs::Image>();
+      if (img_msg != nullptr) {
+        // cout << img_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == ego_pose_est || ("/" + m.getTopic() == ego_pose_est)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else if (m.getTopic() == ego_pose_gt || ("/" + m.getTopic() == ego_pose_gt)) {
+      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+      if (geo_msg != nullptr) {
+        // cout << geo_msg->pose << endl;
+      }
+    }
+    else {
+      cout << "Unexpected message type found. Topic: " << m.getTopic()  << endl;
     }
     
   }
+  cout << "Number of messages in bag = " << num_msgs << endl;
   bag.close();
 
   // Create an empty nonlinear factor graph
