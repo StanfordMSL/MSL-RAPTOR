@@ -71,48 +71,50 @@ using namespace gtsam;
 
 void gtsam_raptor_rosbag(string bag_name);
 
-int main(int argc, char** argv) {
+typedef vector<tuple<double, geometry_msgs::PoseStamped::ConstPtr, geometry_msgs::PoseStamped::ConstPtr>> ObjectDataVec;
 
+int main(int argc, char** argv) {
+  // https://github.com/borglab/gtsam/blob/develop/examples/VisualISAM2Example.cpp
   string bag_name = "/mounted_folder/nocs/test/scene_1.bag";
   gtsam_raptor_rosbag(bag_name);
   cout << "done!" << endl;
 
-  // Create an empty nonlinear factor graph
-  NonlinearFactorGraph graph;
+  // // Create an empty nonlinear factor graph
+  // NonlinearFactorGraph graph;
 
-  // Add a prior on the first pose, setting it to the origin
-  // A prior factor consists of a mean and a noise model (covariance matrix)
-  Pose2 priorMean(0.0, 0.0, 0.0);  // prior at origin
-  auto priorNoise = noiseModel::Diagonal::Sigmas(Vector3(0.3, 0.3, 0.1));
-  graph.addPrior(1, priorMean, priorNoise);
+  // // Add a prior on the first pose, setting it to the origin
+  // // A prior factor consists of a mean and a noise model (covariance matrix)
+  // Pose2 priorMean(0.0, 0.0, 0.0);  // prior at origin
+  // auto priorNoise = noiseModel::Diagonal::Sigmas(Vector3(0.3, 0.3, 0.1));
+  // graph.addPrior(1, priorMean, priorNoise);
 
-  // Add odometry factors
-  Pose2 odometry(2.0, 0.0, 0.0);
-  // For simplicity, we will use the same noise model for each odometry factor
-  auto odometryNoise = noiseModel::Diagonal::Sigmas(Vector3(0.2, 0.2, 0.1));
-  // Create odometry (Between) factors between consecutive poses
-  graph.emplace_shared<BetweenFactor<Pose2> >(1, 2, odometry, odometryNoise);
-  graph.emplace_shared<BetweenFactor<Pose2> >(2, 3, odometry, odometryNoise);
-  graph.print("\nFactor Graph:\n");  // print
+  // // Add odometry factors
+  // Pose2 odometry(2.0, 0.0, 0.0);
+  // // For simplicity, we will use the same noise model for each odometry factor
+  // auto odometryNoise = noiseModel::Diagonal::Sigmas(Vector3(0.2, 0.2, 0.1));
+  // // Create odometry (Between) factors between consecutive poses
+  // graph.emplace_shared<BetweenFactor<Pose2> >(1, 2, odometry, odometryNoise);
+  // graph.emplace_shared<BetweenFactor<Pose2> >(2, 3, odometry, odometryNoise);
+  // graph.print("\nFactor Graph:\n");  // print
 
-  // Create the data structure to hold the initialEstimate estimate to the solution
-  // For illustrative purposes, these have been deliberately set to incorrect values
-  Values initial;
-  initial.insert(1, Pose2(0.5, 0.0, 0.2));
-  initial.insert(2, Pose2(2.3, 0.1, -0.2));
-  initial.insert(3, Pose2(4.1, 0.1, 0.1));
-  initial.print("\nInitial Estimate:\n");  // print
+  // // Create the data structure to hold the initialEstimate estimate to the solution
+  // // For illustrative purposes, these have been deliberately set to incorrect values
+  // Values initial;
+  // initial.insert(1, Pose2(0.5, 0.0, 0.2));
+  // initial.insert(2, Pose2(2.3, 0.1, -0.2));
+  // initial.insert(3, Pose2(4.1, 0.1, 0.1));
+  // initial.print("\nInitial Estimate:\n");  // print
 
-  // optimize using Levenberg-Marquardt optimization
-  Values result = LevenbergMarquardtOptimizer(graph, initial).optimize();
-  result.print("Final Result:\n");
+  // // optimize using Levenberg-Marquardt optimization
+  // Values result = LevenbergMarquardtOptimizer(graph, initial).optimize();
+  // result.print("Final Result:\n");
 
-  // Calculate and print marginal covariances for all variables
-  cout.precision(2);
-  Marginals marginals(graph, result);
-  cout << "x1 covariance:\n" << marginals.marginalCovariance(1) << endl;
-  cout << "x2 covariance:\n" << marginals.marginalCovariance(2) << endl;
-  cout << "x3 covariance:\n" << marginals.marginalCovariance(3) << endl;
+  // // Calculate and print marginal covariances for all variables
+  // cout.precision(2);
+  // Marginals marginals(graph, result);
+  // cout << "x1 covariance:\n" << marginals.marginalCovariance(1) << endl;
+  // cout << "x2 covariance:\n" << marginals.marginalCovariance(2) << endl;
+  // cout << "x3 covariance:\n" << marginals.marginalCovariance(3) << endl;
 
   return 0;
 }
@@ -135,20 +137,33 @@ void gtsam_raptor_rosbag(string bag_name) {
   string img = "/quad7/camera/image_raw";
   string ego_pose_est = "/quad7/mavros/local_position/pose";
   string ego_pose_gt = "/quad7/mavros/vision_pose/pose";
+
   tf::tfMessage::ConstPtr tf_msg = nullptr;
   geometry_msgs::PoseStamped::ConstPtr geo_msg = nullptr;
   sensor_msgs::CameraInfo::ConstPtr cam_info_msg = nullptr;
   sensor_msgs::Image::ConstPtr img_msg = nullptr;
-  double time = 0.0;
+  double time = 0.0, time0 = -1, ave_dt = 0, last_time = 0;
+
+  ObjectDataVec ego_data;
+  ObjectDataVec bowl_data;
+  tuple<ObjectDataVec, ObjectDataVec, ObjectDataVec, ObjectDataVec, ObjectDataVec> ado_data;
 
   int num_msgs = 0;
   for(rosbag::MessageInstance const m: rosbag::View(bag))
   {
     // std_msgs::Int32::ConstPtr i = m.instantiate<std_msgs::Int32>();
-        // cout << "REMEMBEr: NEED TO LOOK INTO GEO_MSG STRUCTure!!!" << endl;
-
     num_msgs++;
-    time = m.getTime().toSec();
+    if(time0 < 0) {
+      time0 = m.getTime().toSec();
+      time = 0.0;
+    }
+    else {
+      last_time = time;
+      time = m.getTime().toSec() - time0;
+      ave_dt += time - last_time;
+    }
+    cout << time << endl;
+
     if (m.getTopic() == tf || ("/" + m.getTopic() == tf)) {
       tf_msg = m.instantiate<tf::tfMessage>();
       if (tf_msg != nullptr) {
@@ -156,12 +171,15 @@ void gtsam_raptor_rosbag(string bag_name) {
       }
     }
     else if (m.getTopic() == bowl_pose_est || ("/" + m.getTopic() == bowl_pose_est)) {
+      // INDEX 0
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        get<0>(get<0>(ado_data)) = time;
+        get<1>(get<0>(ado_data)) = geo_msg.pose;
       }
     }
     else if (m.getTopic() == bowl_pose_gt || ("/" + m.getTopic() == bowl_pose_gt)) {
+      // INDEX 0
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
         // cout << geo_msg->pose << endl;
@@ -216,10 +234,10 @@ void gtsam_raptor_rosbag(string bag_name) {
       }
     }
     else if (m.getTopic() == cam_info || ("/" + m.getTopic() == cam_info)) {
-      cam_info_msg = m.instantiate<sensor_msgs::CameraInfo>();
-      if (cam_info_msg != nullptr) {
-        // cout << cam_info_msg->pose << endl;
+      if(cam_info_msg != nullptr) {
+        continue;
       }
+      cam_info_msg = m.instantiate<sensor_msgs::CameraInfo>();
     }
     else if (m.getTopic() == img || ("/" + m.getTopic() == img)) {
       img_msg = m.instantiate<sensor_msgs::Image>();
@@ -244,6 +262,8 @@ void gtsam_raptor_rosbag(string bag_name) {
     }
     
   }
+  ave_dt /= num_msgs - 1;
   cout << "Number of messages in bag = " << num_msgs << endl;
+  cout << "Average timestep = " << ave_dt << endl;
   bag.close();
 }
