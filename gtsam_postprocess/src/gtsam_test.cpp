@@ -69,7 +69,9 @@
 using namespace std;
 using namespace gtsam;
 
-void preprocess_rosbag(string bag_name);
+typedef vector<tuple<double, geometry_msgs::PoseStamped::ConstPtr>> object_data_vec_t;
+
+object_data_vec_t* preprocess_rosbag(string bag_name);
 
 // typedef vector<tuple<double, geometry_msgs::PoseStamped::ConstPtr, geometry_msgs::PoseStamped::ConstPtr>> ObjectDataVec;
 
@@ -119,7 +121,7 @@ int main(int argc, char** argv) {
   return 0;
 }
 
-void preprocess_rosbag(string bag_name) {
+object_data_vec_t* preprocess_rosbag(string bag_name) {
   rosbag::Bag bag;
   bag.open(bag_name);  // BagMode is Read by default
   string tf = "/tf";
@@ -144,13 +146,7 @@ void preprocess_rosbag(string bag_name) {
   sensor_msgs::Image::ConstPtr img_msg = nullptr;
   double time = 0.0, time0 = -1, ave_dt = 0, last_time = 0;
 
-  typedef vector<tuple<double, geometry_msgs::PoseStamped::ConstPtr>> object_data_vec_t;
-
   object_data_vec_t ego_data_est, ego_data_gt, bowl_data_est, bowl_data_gt, camera_data_est, camera_data_gt, can_data_est, can_data_gt, laptop_data_est, laptop_data_gt, mug_data_est, mug_data_gt;
-
-  // ObjectDataVec ego_data;
-  // ObjectDataVec bowl_data;
-  // tuple<ObjectDataVec, ObjectDataVec, ObjectDataVec, ObjectDataVec, ObjectDataVec> ado_data;
 
   int num_msgs = 0;
   for(rosbag::MessageInstance const m: rosbag::View(bag))
@@ -261,10 +257,13 @@ void preprocess_rosbag(string bag_name) {
     else {
       cout << "Unexpected message type found. Topic: " << m.getTopic() << " Type: " << m.getDataType() << endl;
     }
+    cout << "test_debug" << endl;
     
   }
   ave_dt /= num_msgs - 1;
   cout << "Number of messages in bag = " << num_msgs << endl;
   cout << "Average timestep = " << ave_dt << endl;
   bag.close();
+  vector<object_data_vec_t> all_data {ego_data_est, ego_data_gt, bowl_data_est, bowl_data_gt, camera_data_est, camera_data_gt, can_data_est, can_data_gt, laptop_data_est, laptop_data_gt, mug_data_est, mug_data_gt};
+  return &all_data;
 }
