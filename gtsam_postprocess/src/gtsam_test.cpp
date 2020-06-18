@@ -69,14 +69,14 @@
 using namespace std;
 using namespace gtsam;
 
-void gtsam_raptor_rosbag(string bag_name);
+void preprocess_rosbag(string bag_name);
 
-typedef vector<tuple<double, geometry_msgs::PoseStamped::ConstPtr, geometry_msgs::PoseStamped::ConstPtr>> ObjectDataVec;
+// typedef vector<tuple<double, geometry_msgs::PoseStamped::ConstPtr, geometry_msgs::PoseStamped::ConstPtr>> ObjectDataVec;
 
 int main(int argc, char** argv) {
   // https://github.com/borglab/gtsam/blob/develop/examples/VisualISAM2Example.cpp
   string bag_name = "/mounted_folder/nocs/test/scene_1.bag";
-  gtsam_raptor_rosbag(bag_name);
+  preprocess_rosbag(bag_name);
   cout << "done!" << endl;
 
   // // Create an empty nonlinear factor graph
@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
   return 0;
 }
 
-void gtsam_raptor_rosbag(string bag_name) {
+void preprocess_rosbag(string bag_name) {
   rosbag::Bag bag;
   bag.open(bag_name);  // BagMode is Read by default
   string tf = "/tf";
@@ -144,9 +144,13 @@ void gtsam_raptor_rosbag(string bag_name) {
   sensor_msgs::Image::ConstPtr img_msg = nullptr;
   double time = 0.0, time0 = -1, ave_dt = 0, last_time = 0;
 
-  ObjectDataVec ego_data;
-  ObjectDataVec bowl_data;
-  tuple<ObjectDataVec, ObjectDataVec, ObjectDataVec, ObjectDataVec, ObjectDataVec> ado_data;
+  typedef vector<tuple<double, geometry_msgs::PoseStamped::ConstPtr>> object_data_vec_t;
+
+  object_data_vec_t ego_data_est, ego_data_gt, bowl_data_est, bowl_data_gt, camera_data_est, camera_data_gt, can_data_est, can_data_gt, laptop_data_est, laptop_data_gt, mug_data_est, mug_data_gt;
+
+  // ObjectDataVec ego_data;
+  // ObjectDataVec bowl_data;
+  // tuple<ObjectDataVec, ObjectDataVec, ObjectDataVec, ObjectDataVec, ObjectDataVec> ado_data;
 
   int num_msgs = 0;
   for(rosbag::MessageInstance const m: rosbag::View(bag))
@@ -162,7 +166,7 @@ void gtsam_raptor_rosbag(string bag_name) {
       time = m.getTime().toSec() - time0;
       ave_dt += time - last_time;
     }
-    cout << time << endl;
+    // cout << time << endl;
 
     if (m.getTopic() == tf || ("/" + m.getTopic() == tf)) {
       tf_msg = m.instantiate<tf::tfMessage>();
@@ -171,66 +175,63 @@ void gtsam_raptor_rosbag(string bag_name) {
       }
     }
     else if (m.getTopic() == bowl_pose_est || ("/" + m.getTopic() == bowl_pose_est)) {
-      // INDEX 0
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        get<0>(get<0>(ado_data)) = time;
-        get<1>(get<0>(ado_data)) = geo_msg.pose;
+        bowl_data_est.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == bowl_pose_gt || ("/" + m.getTopic() == bowl_pose_gt)) {
-      // INDEX 0
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        bowl_data_gt.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == camera_pose_est || ("/" + m.getTopic() == camera_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        camera_data_est.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == camera_pose_gt || ("/" + m.getTopic() == camera_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        camera_data_gt.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == can_pose_est || ("/" + m.getTopic() == can_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        can_data_est.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == can_pose_gt || ("/" + m.getTopic() == can_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        can_data_gt.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == laptop_pose_est || ("/" + m.getTopic() == laptop_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        laptop_data_est.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == laptop_pose_gt || ("/" + m.getTopic() == laptop_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        laptop_data_gt.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == mug_pose_est || ("/" + m.getTopic() == mug_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        mug_data_est.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == mug_pose_gt || ("/" + m.getTopic() == mug_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        mug_data_gt.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == cam_info || ("/" + m.getTopic() == cam_info)) {
@@ -248,13 +249,13 @@ void gtsam_raptor_rosbag(string bag_name) {
     else if (m.getTopic() == ego_pose_est || ("/" + m.getTopic() == ego_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        ego_data_est.push_back(make_tuple(time, geo_msg));
       }
     }
     else if (m.getTopic() == ego_pose_gt || ("/" + m.getTopic() == ego_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        // cout << geo_msg->pose << endl;
+        ego_data_gt.push_back(make_tuple(time, geo_msg));
       }
     }
     else {
