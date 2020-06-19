@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 3.0)
 project(gtsam_test CXX)
 
-set(CMAKE_VERBOSE_MAKEFILE 1)
+set(CMAKE_VERBOSE_MAKEFILE 0)
+
+# Set for debugging
+set(CMAKE_BUILD_TYPE Debug)
+# set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 # Find GTSAM, either from a local build, or from a Debian/Ubuntu package.
 find_package(GTSAM REQUIRED)

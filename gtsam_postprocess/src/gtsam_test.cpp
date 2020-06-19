@@ -69,59 +69,25 @@
 using namespace std;
 using namespace gtsam;
 
-typedef vector<tuple<double, geometry_msgs::PoseStamped::ConstPtr>> object_data_vec_t;
+typedef vector<tuple<double, geometry_msgs::Pose>> object_data_vec_t;  // vector of tuples(double, ros pose message)
+typedef vector<tuple<double, geometry_msgs::Pose, geometry_msgs::Pose>> object_est_gt_data_vec_t; //vector of tuples(double, ros pose message, ros pose message)
 
-object_data_vec_t* preprocess_rosbag(string bag_name);
+void preprocess_rosbag(string bag_name, vector<object_est_gt_data_vec_t>& all_data);
+void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& ego_data);
 
-// typedef vector<tuple<double, geometry_msgs::PoseStamped::ConstPtr, geometry_msgs::PoseStamped::ConstPtr>> ObjectDataVec;
 
 int main(int argc, char** argv) {
   // https://github.com/borglab/gtsam/blob/develop/examples/VisualISAM2Example.cpp
   string bag_name = "/mounted_folder/nocs/test/scene_1.bag";
-  preprocess_rosbag(bag_name);
+  
+  vector<object_est_gt_data_vec_t> all_data;
+  preprocess_rosbag(bag_name, all_data);
+
   cout << "done!" << endl;
-
-  // // Create an empty nonlinear factor graph
-  // NonlinearFactorGraph graph;
-
-  // // Add a prior on the first pose, setting it to the origin
-  // // A prior factor consists of a mean and a noise model (covariance matrix)
-  // Pose2 priorMean(0.0, 0.0, 0.0);  // prior at origin
-  // auto priorNoise = noiseModel::Diagonal::Sigmas(Vector3(0.3, 0.3, 0.1));
-  // graph.addPrior(1, priorMean, priorNoise);
-
-  // // Add odometry factors
-  // Pose2 odometry(2.0, 0.0, 0.0);
-  // // For simplicity, we will use the same noise model for each odometry factor
-  // auto odometryNoise = noiseModel::Diagonal::Sigmas(Vector3(0.2, 0.2, 0.1));
-  // // Create odometry (Between) factors between consecutive poses
-  // graph.emplace_shared<BetweenFactor<Pose2> >(1, 2, odometry, odometryNoise);
-  // graph.emplace_shared<BetweenFactor<Pose2> >(2, 3, odometry, odometryNoise);
-  // graph.print("\nFactor Graph:\n");  // print
-
-  // // Create the data structure to hold the initialEstimate estimate to the solution
-  // // For illustrative purposes, these have been deliberately set to incorrect values
-  // Values initial;
-  // initial.insert(1, Pose2(0.5, 0.0, 0.2));
-  // initial.insert(2, Pose2(2.3, 0.1, -0.2));
-  // initial.insert(3, Pose2(4.1, 0.1, 0.1));
-  // initial.print("\nInitial Estimate:\n");  // print
-
-  // // optimize using Levenberg-Marquardt optimization
-  // Values result = LevenbergMarquardtOptimizer(graph, initial).optimize();
-  // result.print("Final Result:\n");
-
-  // // Calculate and print marginal covariances for all variables
-  // cout.precision(2);
-  // Marginals marginals(graph, result);
-  // cout << "x1 covariance:\n" << marginals.marginalCovariance(1) << endl;
-  // cout << "x2 covariance:\n" << marginals.marginalCovariance(2) << endl;
-  // cout << "x3 covariance:\n" << marginals.marginalCovariance(3) << endl;
-
   return 0;
 }
 
-object_data_vec_t* preprocess_rosbag(string bag_name) {
+void preprocess_rosbag(string bag_name, vector<object_est_gt_data_vec_t>& all_data) {
   rosbag::Bag bag;
   bag.open(bag_name);  // BagMode is Read by default
   string tf = "/tf";
@@ -162,7 +128,6 @@ object_data_vec_t* preprocess_rosbag(string bag_name) {
       time = m.getTime().toSec() - time0;
       ave_dt += time - last_time;
     }
-    // cout << time << endl;
 
     if (m.getTopic() == tf || ("/" + m.getTopic() == tf)) {
       tf_msg = m.instantiate<tf::tfMessage>();
@@ -173,61 +138,62 @@ object_data_vec_t* preprocess_rosbag(string bag_name) {
     else if (m.getTopic() == bowl_pose_est || ("/" + m.getTopic() == bowl_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        bowl_data_est.push_back(make_tuple(time, geo_msg));
+        bowl_data_est.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else if (m.getTopic() == bowl_pose_gt || ("/" + m.getTopic() == bowl_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        bowl_data_gt.push_back(make_tuple(time, geo_msg));
+        bowl_data_gt.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else if (m.getTopic() == camera_pose_est || ("/" + m.getTopic() == camera_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        camera_data_est.push_back(make_tuple(time, geo_msg));
+        camera_data_est.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else if (m.getTopic() == camera_pose_gt || ("/" + m.getTopic() == camera_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        camera_data_gt.push_back(make_tuple(time, geo_msg));
+        camera_data_gt.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else if (m.getTopic() == can_pose_est || ("/" + m.getTopic() == can_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        can_data_est.push_back(make_tuple(time, geo_msg));
+        can_data_est.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else if (m.getTopic() == can_pose_gt || ("/" + m.getTopic() == can_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        can_data_gt.push_back(make_tuple(time, geo_msg));
+        can_data_gt.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else if (m.getTopic() == laptop_pose_est || ("/" + m.getTopic() == laptop_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        laptop_data_est.push_back(make_tuple(time, geo_msg));
+        laptop_data_est.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else if (m.getTopic() == laptop_pose_gt || ("/" + m.getTopic() == laptop_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        laptop_data_gt.push_back(make_tuple(time, geo_msg));
+        laptop_data_gt.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else if (m.getTopic() == mug_pose_est || ("/" + m.getTopic() == mug_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        mug_data_est.push_back(make_tuple(time, geo_msg));
+        mug_data_est.push_back(make_tuple(time, geo_msg->pose));
+        cout << get<1>(mug_data_est.back()) << endl;
       }
     }
     else if (m.getTopic() == mug_pose_gt || ("/" + m.getTopic() == mug_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        mug_data_gt.push_back(make_tuple(time, geo_msg));
+        mug_data_gt.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else if (m.getTopic() == cam_info || ("/" + m.getTopic() == cam_info)) {
@@ -245,25 +211,69 @@ object_data_vec_t* preprocess_rosbag(string bag_name) {
     else if (m.getTopic() == ego_pose_est || ("/" + m.getTopic() == ego_pose_est)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        ego_data_est.push_back(make_tuple(time, geo_msg));
+        ego_data_est.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else if (m.getTopic() == ego_pose_gt || ("/" + m.getTopic() == ego_pose_gt)) {
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
-        ego_data_gt.push_back(make_tuple(time, geo_msg));
+        ego_data_gt.push_back(make_tuple(time, geo_msg->pose));
       }
     }
     else {
       cout << "Unexpected message type found. Topic: " << m.getTopic() << " Type: " << m.getDataType() << endl;
     }
-    cout << "test_debug" << endl;
-    
   }
   ave_dt /= num_msgs - 1;
   cout << "Number of messages in bag = " << num_msgs << endl;
   cout << "Average timestep = " << ave_dt << endl;
   bag.close();
-  vector<object_data_vec_t> all_data {ego_data_est, ego_data_gt, bowl_data_est, bowl_data_gt, camera_data_est, camera_data_gt, can_data_est, can_data_gt, laptop_data_est, laptop_data_gt, mug_data_est, mug_data_gt};
-  return &all_data;
+
+  // object_est_gt_data_vec_t* ego_data = sync_est_and_gt(ego_data_est, ego_data_gt);
+  // &all_data[0] = &ego_data;
+
+
+  object_est_gt_data_vec_t ego_data, bowl_data, camera_data, can_data, laptop_data, mug_data;
+  // sync_est_and_gt(mug_data_est, mug_data_gt, mug_data);
+  // cout << "test 1" <<endl;
+  // cout << get<0>(mug_data[0]) <<endl;
+  // cout << get<1>(mug_data[0]) <<endl;
+  // cout << "test 2" <<endl;
+  // all_data.push_back(mug_data);
+  // cout << "test 3" <<endl;
+  sync_est_and_gt(ego_data_est, ego_data_gt, ego_data);
+  all_data.push_back(ego_data);
+  sync_est_and_gt(bowl_data_est, bowl_data_gt, bowl_data);
+  all_data.push_back(bowl_data);
+  sync_est_and_gt(camera_data_est, camera_data_gt, camera_data);
+  all_data.push_back(camera_data);
+  sync_est_and_gt(can_data_est, can_data_gt, can_data);
+  all_data.push_back(can_data);
+  sync_est_and_gt(laptop_data_est, laptop_data_gt, laptop_data);
+  all_data.push_back(laptop_data);
+  sync_est_and_gt(mug_data_est, mug_data_gt, mug_data);
+  all_data.push_back(mug_data);
+  // object_est_gt_data_vec_t test_data;
+  // test_data.push_back(make_tuple(5, get<1>(ego_data_gt[0]), get<1>(ego_data_gt[0])));
+
+}
+
+void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data) {
+  // data.push_back(make_tuple(5, get<1>(data_est[0]), get<1>(data_est[0])));
+  // now "sync" the gt and est for each object
+  
+  double dt_thresh = 0.02, t_gt, t_est;
+  uint next_est_time_ind = 0;
+  for (uint i = 0; i < data_gt.size(); i++) {
+    t_gt = get<0>(data_gt[i]);
+    for (uint j = next_est_time_ind; j < data_est.size(); j++) {
+      t_est = get<0>(data_est[j]);
+      if(dt_thresh > abs(t_gt - t_est)) {
+        data.push_back(make_tuple((t_gt + t_est)/2, get<1>(data_gt[i]), get<1>(data_est[j])));
+        next_est_time_ind = j + 1;
+        break;
+      }
+    }
+  }
+  // return &data;
 }
