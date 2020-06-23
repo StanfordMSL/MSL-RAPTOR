@@ -69,7 +69,7 @@
 #include <sensor_msgs/Image.h>
 #include <tf/tfMessage.h>
 #include <algorithm>
- 
+#include <random>
 
 using namespace std;
 using namespace gtsam;
@@ -445,7 +445,11 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
 }
 
 void add_init_est_noise(Pose3 &ego_pose_est) {
-  Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(0.05, -0.10, 0.20));
+  // noise = np.array([random.uniform(-0.02, 0.02) for i in range(3)]) 
+  std::random_device rd;  //Will be used to obtain a seed for the random number engine
+  std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+  std::uniform_real_distribution<> dis(-0.02, 0.02);
+  Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen)));
   ego_pose_est = ego_pose_est.compose(delta);
 }
 
