@@ -11,8 +11,11 @@
  *  - We have full odometry between poses
  */
 
-// We will use Pose2 variables (x, y, theta) to represent the robot positions
-#include <gtsam/geometry/Pose2.h>
+// // We will use Pose2 variables (x, y, theta) to represent the robot positions
+// #include <gtsam/geometry/Pose2.h>
+
+// We will use Pose3 variables (x, y, z, Rot3) to represent the robot/landmark positions
+#include <gtsam/geometry/Pose3.h>
 
 // In GTSAM, measurement functions are represented as 'factors'. Several common factors
 // have been provided with the library for solving robotics/SLAM/Bundle Adjustment problems.
@@ -23,6 +26,7 @@
 // When the factors are created, we will add them to a Factor Graph. As the factors we are using
 // are nonlinear factors, we will need a Nonlinear Factor Graph.
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
+#include <gtsam/nonlinear/NonlinearEquality.h>  // used when we dont apriori know # of factors - https://gtsam.org/doxygen/index.html
 
 // Finally, once all of the factors have been added to our factor graph, we will want to
 // solve/optimize to graph to find the best (Maximum A Posteriori) set of variable values.
@@ -74,37 +78,120 @@ typedef vector<tuple<double, geometry_msgs::Pose>> object_data_vec_t;  // vector
 typedef tuple<double, int, geometry_msgs::Pose, geometry_msgs::Pose> data_tuple; 
 typedef vector<data_tuple> object_est_gt_data_vec_t; //vector of tuples(double, int (id), ros pose message, ros pose message)
 
-void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map);
-void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& ego_data, int object_id);
+void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map);
+void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh);
+void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& ego_data, object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh);
+void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& ego_data, int object_id, double dt_thresh);
 
+
+// Helper functions
+void add_init_est_noise(Pose3 &ego_pose_est);
+Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose);
 
 int main(int argc, char** argv) {
   // https://github.com/borglab/gtsam/blob/develop/examples/VisualISAM2Example.cpp
   string bag_name = "/mounted_folder/nocs/test/scene_1.bag";
-
-
+  double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
   map<std::string, int> object_id_map = {
-        {"ego", 0},
-        {"bowl", 1},
-        {"camera", 2},
-        {"can", 3},
-        {"laptop", 4},
-        {"mug", 5}
+        {"ego", 1},
+        {"bowl", 2},
+        {"camera", 3},
+        {"can", 4},
+        {"laptop", 5},
+        {"mug", 6}
   };
   
-  object_est_gt_data_vec_t all_data;
-  preprocess_rosbag(bag_name, all_data, object_id_map);
-  std::sort(all_data.begin(), all_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
+  object_est_gt_data_vec_t obj_data, ego_data;
+  preprocess_rosbag(bag_name, ego_data, obj_data, object_id_map, dt_thresh);
+  std::sort(obj_data.begin(), obj_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
       return get<0>(lhs) < get<0>(rhs);
    });   // this should sort the vector by time (i.e. first element in each tuple)
 
-  // Create an iSAM2 object. Unlike iSAM1, which performs periodic batch steps
-  // to maintain proper linearization and efficient variable ordering, iSAM2
-  // performs partial relinearization/reordering at each step. A parameter
-  // structure is available that allows the user to set various properties, such
-  // as the relinearization threshold and type of linear solver. For this
-  // example, we we set the relinearization threshold small so the iSAM2 result
-  // will approach the batch result.
+  run_batch_slam(ego_data, obj_data, object_id_map, dt_thresh);
+  // run_isam(all_data, object_id_map);
+
+  cout << "done!" << endl;
+  return 0;
+}
+
+void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh) {
+  // note: object id serves as landmark id
+  // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
+
+
+  // create graph object, add first pose at origin with key '1'
+  NonlinearFactorGraph graph;
+  Pose3 first_pose;
+  int ego_pose_index = 1;
+  graph.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), Pose3());
+
+
+  // create Values object to contain initial estimates of camera poses and landmark locations
+  Values initial_estimate;
+
+  // Eventually I will use the ukf's covarience here, but for now use a constant one
+  auto constNoiseMatrix = noiseModel::Diagonal::Sigmas(
+          (Vector(6) << Vector3::Constant(0.1), Vector3::Constant(0.3))
+              .finished());
+
+  int obj_list_ind = 0;
+  for(int t_ind = 0; t_ind < ego_data.size(); t_ind++) {
+    // loop through ego poses, adding factors to various landmarks as we go
+    ego_pose_index = 1 + t_ind;
+
+    double ego_time = get<0>(ego_data[t_ind]);
+    // geometry_msgs::Pose ego_gt = get<2>(ego_data[t_ind]);
+    geometry_msgs::Pose ego_est = get<3>(ego_data[t_ind]);
+
+    if (obj_list_ind >= obj_data.size()) {
+      cout << "encorperated all observations into graph" << endl;
+      break;
+    }
+
+    map<int, Pose3> tf_w_ado_t0_map;
+    Pose3 ego_pose_est, tf_w_ado0, tf_w_ado;
+
+
+    while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
+      // this means this object's measurement is from this ego pose index
+      int obj_id = get<1>(obj_data[obj_list_ind]);
+      Pose3 relative_pose = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind]));
+      graph.emplace_shared<BetweenFactor<Pose3> >(Symbol('x', ego_pose_index), Symbol('l', obj_id), relative_pose, constNoiseMatrix);
+
+      if(t_ind == 0) {
+        // if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
+        tf_w_ado_t0_map[obj_id] = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // tf_w_ado
+        cout << "Object: " << obj_id << "\n" << get<2>(obj_data[obj_list_ind]) << endl;
+
+        // add initial estimate for landmark
+        initial_estimate.insert(Symbol('l', obj_id), tf_w_ado_t0_map[obj_id]);
+        ego_pose_est = Pose3();
+      }
+      else {
+        // use gt position of landmark now & at t0 to get gt position of ego. add noise to get initial pose estimate
+        tf_w_ado0 = tf_w_ado_t0_map[obj_id];  // gt object psoe at t0
+        tf_w_ado = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // current gt object pose
+        ego_pose_est =  tf_w_ado * tf_w_ado0.inverse(); // gt ego pose
+        add_init_est_noise(ego_pose_est);
+      }
+      obj_list_ind++;
+    }
+    // add initial estimate for just added ego pose
+    initial_estimate.insert(Symbol('x', ego_pose_index), ego_pose_est);
+
+    // cout << "tmp" << endl;
+  }
+  cout << "done building batch slam graph!" << endl;
+}
+
+void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map) {
+  // // Create an iSAM2 object. Unlike iSAM1, which performs periodic batch steps
+  // // to maintain proper linearization and efficient variable ordering, iSAM2
+  // // performs partial relinearization/reordering at each step. A parameter
+  // // structure is available that allows the user to set various properties, such
+  // // as the relinearization threshold and type of linear solver. For this
+  // // example, we we set the relinearization threshold small so the iSAM2 result
+  // // will approach the batch result.
   // ISAM2Params parameters;
   // parameters.relinearizeThreshold = 0.01;
   // parameters.relinearizeSkip = 1;
@@ -120,8 +207,7 @@ int main(int argc, char** argv) {
   //   for (size_t j = 0; j < points.size(); ++j) {
   //     PinholeCamera<Cal3_S2> camera(poses[i], *K);
   //     Point2 measurement = camera.project(points[j]);
-  //     graph.emplace_shared<GenericProjectionFactor<Pose3, Point3, Cal3_S2> >(
-  //         measurement, measurementNoise, Symbol('x', i), Symbol('l', j), K);
+  //     graph.emplace_shared<GenericProjectionFactor<Pose3, Point3, Cal3_S2> >(measurement, measurementNoise, Symbol('x', i), Symbol('l', j), K);
   //   }
 
   //   // Add an initial guess for the current pose
@@ -169,12 +255,9 @@ int main(int argc, char** argv) {
   //     initialEstimate.clear();
   //   }
   // }
-
-  cout << "done!" << endl;
-  return 0;
 }
 
-void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map) {
+void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& ego_data, object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh) {
   rosbag::Bag bag;
   bag.open(bag_name);  // BagMode is Read by default
   string tf = "/tf";
@@ -275,7 +358,7 @@ void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& all_data, map<
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
         mug_data_est.push_back(make_tuple(time, geo_msg->pose));
-        cout << get<1>(mug_data_est.back()) << endl;
+        // cout << get<1>(mug_data_est.back()) << endl;
       }
     }
     else if (m.getTopic() == mug_pose_gt || ("/" + m.getTopic() == mug_pose_gt)) {
@@ -321,51 +404,31 @@ void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& all_data, map<
   // &all_data[0] = &ego_data;
 
 
-  object_est_gt_data_vec_t ego_data, bowl_data, camera_data, can_data, laptop_data, mug_data;
-  // sync_est_and_gt(mug_data_est, mug_data_gt, mug_data);
-  // cout << "test 1" <<endl;
-  // cout << get<0>(mug_data[0]) <<endl;
-  // cout << get<1>(mug_data[0]) <<endl;
-  // cout << "test 2" <<endl;
-  // all_data.push_back(mug_data);
-  // cout << "test 3" <<endl;
-  vector<object_est_gt_data_vec_t> all_data_sep_by_obj;
+  object_est_gt_data_vec_t bowl_data, camera_data, can_data, laptop_data, mug_data;
 
-  sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, object_id_map["ego"]);
-  // all_data_sep_by_obj.push_back(ego_data);
-  all_data.insert( all_data.end(), ego_data.begin(), ego_data.end() );
+  sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, object_id_map["ego"], dt_thresh);
 
-  sync_est_and_gt(bowl_data_est, bowl_data_gt, bowl_data, object_id_map["bowl"]);
-  // all_data_sep_by_obj.push_back(bowl_data);
-  all_data.insert( all_data.end(), bowl_data.begin(), bowl_data.end() );
+  sync_est_and_gt(bowl_data_est, bowl_data_gt, bowl_data, object_id_map["bowl"], dt_thresh);
+  obj_data.insert( obj_data.end(), bowl_data.begin(), bowl_data.end() );
 
-  sync_est_and_gt(camera_data_est, camera_data_gt, camera_data, object_id_map["camera"]);
-  all_data.insert( all_data.end(), camera_data.begin(), camera_data.end() );
-  // all_data_sep_by_obj.push_back(camera_data);
+  sync_est_and_gt(camera_data_est, camera_data_gt, camera_data, object_id_map["camera"], dt_thresh);
+  obj_data.insert( obj_data.end(), camera_data.begin(), camera_data.end() );
 
-  sync_est_and_gt(can_data_est, can_data_gt, can_data, object_id_map["can"]);
-  all_data.insert( all_data.end(), can_data.begin(), can_data.end() );
-  // all_data_sep_by_obj.push_back(can_data);
+  sync_est_and_gt(can_data_est, can_data_gt, can_data, object_id_map["can"], dt_thresh);
+  obj_data.insert( obj_data.end(), can_data.begin(), can_data.end() );
 
-  sync_est_and_gt(laptop_data_est, laptop_data_gt, laptop_data, object_id_map["laptop"]);
-  all_data.insert( all_data.end(), laptop_data.begin(), laptop_data.end() );
-  // all_data_sep_by_obj.push_back(laptop_data);
+  sync_est_and_gt(laptop_data_est, laptop_data_gt, laptop_data, object_id_map["laptop"], dt_thresh);
+  obj_data.insert( obj_data.end(), laptop_data.begin(), laptop_data.end() );
 
-  sync_est_and_gt(mug_data_est, mug_data_gt, mug_data, object_id_map["mug"]);
-  all_data.insert( all_data.end(), mug_data.begin(), mug_data.end() );
-  // all_data_sep_by_obj.push_back(mug_data);
-
-
-  // object_est_gt_data_vec_t test_data;
-  // test_data.push_back(make_tuple(5, get<1>(ego_data_gt[0]), get<1>(ego_data_gt[0])));
-
+  sync_est_and_gt(mug_data_est, mug_data_gt, mug_data, object_id_map["mug"], dt_thresh);
+  obj_data.insert( obj_data.end(), mug_data.begin(), mug_data.end() );
 }
 
-void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data, int object_id) {
+void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data, int object_id, double dt_thresh) {
   // data.push_back(make_tuple(5, get<1>(data_est[0]), get<1>(data_est[0])));
   // now "sync" the gt and est for each object
   
-  double dt_thresh = 0.02, t_gt, t_est;
+  double t_gt, t_est;
   uint next_est_time_ind = 0;
   for (uint i = 0; i < data_gt.size(); i++) {
     t_gt = get<0>(data_gt[i]);
@@ -379,4 +442,19 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
     }
   }
   // return &data;
+}
+
+void add_init_est_noise(Pose3 &ego_pose_est) {
+  Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(0.05, -0.10, 0.20));
+  ego_pose_est = ego_pose_est.compose(delta);
+}
+
+Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose) {
+  // Convert a ros pose structure to gtsam's Pose3 class
+  Point3 t = Point3(ros_pose.position.x, ros_pose.position.y, ros_pose.position.z);
+  Rot3 R = Rot3( Quaternion(ros_pose.orientation.w, 
+                            ros_pose.orientation.x, 
+                            ros_pose.orientation.y, 
+                            ros_pose.orientation.z) );
+  return Pose3(R, t);
 }
