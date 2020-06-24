@@ -78,7 +78,7 @@ void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_
 void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh);
 
 // Helper functions
-void add_init_est_noise(Pose3 &ego_pose_est);
+Pose3 add_init_est_noise(const Pose3 &ego_pose_est);
 Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose);
 
 
@@ -102,6 +102,9 @@ int main(int argc, char** argv) {
   object_est_gt_data_vec_t obj_data, ego_data;
   preprocess_rosbag(bag_name, ego_data, obj_data, object_id_map, dt_thresh);
   std::sort(obj_data.begin(), obj_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
+      if (get<0>(lhs) == get<0>(rhs)) {
+        return get<1>(lhs) < get<1>(rhs);
+      }
       return get<0>(lhs) < get<0>(rhs);
    });   // this should sort the vector by time (i.e. first element in each tuple)
 
@@ -132,7 +135,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
           (Vector(6) << Vector3::Constant(0.01), Vector3::Constant(0.03)).finished());
 
   int obj_list_ind = 0;
-  map<int, Pose3> tf_w_ado_map; // note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+  map<int, Pose3> tf_w_ado_gt_map, tf_w_ado_est_map; // note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
   for(int t_ind = 0; t_ind < ego_data.size(); t_ind++) {
     // loop through ego poses, adding factors to various landmarks as we go
     ego_pose_index = 1 + t_ind;
@@ -145,10 +148,11 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       break;
     }
 
-    Pose3 tf_w_ego_gt, tf_ego_ado_gt;
+    Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
     
-    if(t_ind > 10)
-      break;
+    // if(t_ind > 10)
+    // if(t_ind != 0 && t_ind != 1008)
+    //   break;
     cout << "\n-----------------------------------------" << endl;
     cout << "t_ind = " << t_ind << endl;
 
@@ -157,11 +161,13 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       int obj_id = get<1>(obj_data[obj_list_ind]);
       Pose3 tf_ego_ado_est = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind]));
       graph.emplace_shared<BetweenFactor<Pose3> >(Symbol('x', ego_pose_index), Symbol('l', obj_id), tf_ego_ado_est, constNoiseMatrix);
+      cout << "creating factor x" << ego_pose_index << " <--> l" <<obj_id << endl;
 
       if(t_ind == 0) {
         // if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
-        tf_w_ado_map[obj_id] = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // tf_w_ado
-        // cout << "Object Inital Pose (tf_w_ado): " << obj_id << "\n" << tf_w_ado_map[obj_id] << endl;
+        tf_w_ado_gt_map[obj_id] = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // tf_w_ado_gt
+        tf_w_ado_est_map[obj_id] = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind])); // tf_w_ado_gt
+        // cout << "Object Inital Pose (tf_w_ado): " << obj_id << "\n" << tf_w_ado_gt_map[obj_id] << endl;
 
         // add initial estimate for landmark
         initial_estimate.insert(Symbol('l', obj_id), tf_ego_ado_est); // since by construction at t=0 the world and ego pose are both the origin, this is valid
@@ -169,20 +175,33 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       }
       else {
         // use gt position of landmark now & at t0 to get gt position of ego. add noise to get initial pose estimate
-        // cout << "Object Inital Pose again (tf_w_ado): " << obj_id << "\n" << tf_w_ado_map[obj_id] << endl; 
+        // cout << "Object Inital Pose again (tf_w_ado): " << obj_id << "\n" << tf_w_ado_gt_map[obj_id] << endl; 
         tf_ego_ado_gt = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // current relative gt object pose
 
-        // cout << "tf_w_ado (obj_id " << obj_id << "): " << tf_w_ado_map[obj_id] << endl;
+        // cout << "tf_w_ado (obj_id " << obj_id << "): " << tf_w_ado_gt_map[obj_id] << endl;
         // cout << "tf_ego_ado_gt (obj_id " << obj_id << "): " << tf_ego_ado_gt << endl;
-        tf_w_ego_gt = tf_w_ado_map[obj_id] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
+        tf_w_ego_gt = tf_w_ado_gt_map[obj_id] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
+        tf_w_ego_est = tf_w_ado_est_map[obj_id] * tf_ego_ado_est.inverse(); // gt ego pose in world frame
         // cout << "tf_w_ego_gt (obj_id " << obj_id << "): " << tf_w_ego_gt << endl;
       }
       obj_list_ind++;
     }
     // add initial estimate for just added ego pose
-    add_init_est_noise(tf_w_ego_gt);
-    initial_estimate.insert(Symbol('x', ego_pose_index), tf_w_ego_gt);
-    cout << "tf_w_ego_gt: " << tf_w_ego_gt << endl;
+    // if (t_ind ==2) {
+    //   Pose3 faked_pose = Pose3(Rot3(0.999993,    0.00237718,  -0.00286737,
+    //                                 -0.00237591, 0.999997,     0.000447028,
+    //                                 0.00286843, -0.000440212, 0.999996),   Point3(0.00532343, -0.00116282, -0.0041541));
+    //   initial_estimate.insert(Symbol('x', ego_pose_index), faked_pose);
+    //   cout << "faked pose for initialization (t_ind = " << t_ind << ", " << "ego_pose_index = " << ego_pose_index << "): " << faked_pose << endl;
+    // }
+    // else {
+    //   Pose3 noisy_pose = add_init_est_noise(tf_w_ego_gt);
+    //   cout << "tf after noise: " << noisy_pose << endl;
+    //   initial_estimate.insert(Symbol('x', ego_pose_index), noisy_pose);
+    // }
+    // cout << "tf_w_ego_gt: " << tf_w_ego_gt << endl;
+
+    initial_estimate.insert(Symbol('x', ego_pose_index), tf_w_ego_est);
 
     // cout << "tmp" << endl;
   }
@@ -455,7 +474,7 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
   // return &data;
 }
 
-void add_init_est_noise(Pose3 &ego_pose_est) {
+Pose3 add_init_est_noise(const Pose3 &ego_pose_est) {
   // noise = np.array([random.uniform(-0.02, 0.02) for i in range(3)]) 
   std::random_device rd;  //Will be used to obtain a seed for the random number engine
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
@@ -463,8 +482,10 @@ void add_init_est_noise(Pose3 &ego_pose_est) {
   // Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen)));
   Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(0.00,0.00,0.00));
   cout << "noise:" << delta << "tf before noise: " << ego_pose_est << endl;
-  ego_pose_est = ego_pose_est.compose(delta);
-  cout << "tf after noise: " << ego_pose_est << endl;
+  return ego_pose_est * delta;
+  // ego_pose_est = ego_pose_est.compose(delta);
+  
+  // cout << "tf after noise: " << ego_pose_est << endl;
 
 }
 
