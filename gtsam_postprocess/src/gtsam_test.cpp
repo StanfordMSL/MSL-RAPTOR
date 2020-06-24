@@ -129,8 +129,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 
   // Eventually I will use the ukf's covarience here, but for now use a constant one
   auto constNoiseMatrix = noiseModel::Diagonal::Sigmas(
-          (Vector(6) << Vector3::Constant(0.01), Vector3::Constant(0.03))
-              .finished());
+          (Vector(6) << Vector3::Constant(0.01), Vector3::Constant(0.03)).finished());
 
   int obj_list_ind = 0;
   map<int, Pose3> tf_w_ado_map; // note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
@@ -146,7 +145,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       break;
     }
 
-    Pose3 tf_w_ego_gt, tf_ego_ado;
+    Pose3 tf_w_ego_gt, tf_ego_ado_gt;
     
     if(t_ind > 10)
       break;
@@ -175,15 +174,15 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 
         // cout << "tf_w_ado (obj_id " << obj_id << "): " << tf_w_ado_map[obj_id] << endl;
         // cout << "tf_ego_ado_gt (obj_id " << obj_id << "): " << tf_ego_ado_gt << endl;
-        tf_w_ego_gt = tf_w_ado_map[obj_id] * tf_ego_ado.inverse(); // gt ego pose in world frame
-        cout << "tf_w_ego_gt (obj_id " << obj_id << "): " << tf_w_ego_gt << endl;
+        tf_w_ego_gt = tf_w_ado_map[obj_id] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
+        // cout << "tf_w_ego_gt (obj_id " << obj_id << "): " << tf_w_ego_gt << endl;
       }
       obj_list_ind++;
     }
     // add initial estimate for just added ego pose
     add_init_est_noise(tf_w_ego_gt);
     initial_estimate.insert(Symbol('x', ego_pose_index), tf_w_ego_gt);
-    // cout << "tf_w_ego_gt (obj_id " << obj_id << "): " << tf_w_ego_gt << endl;
+    cout << "tf_w_ego_gt: " << tf_w_ego_gt << endl;
 
     // cout << "tmp" << endl;
   }
@@ -460,9 +459,13 @@ void add_init_est_noise(Pose3 &ego_pose_est) {
   // noise = np.array([random.uniform(-0.02, 0.02) for i in range(3)]) 
   std::random_device rd;  //Will be used to obtain a seed for the random number engine
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
-  std::uniform_real_distribution<> dis(-0.02, 0.02);
-  Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen)));
-  // ego_pose_est = ego_pose_est.compose(delta);
+  std::uniform_real_distribution<> dis(-0.00005, 0.00005);
+  // Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen)));
+  Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(0.00,0.00,0.00));
+  cout << "noise:" << delta << "tf before noise: " << ego_pose_est << endl;
+  ego_pose_est = ego_pose_est.compose(delta);
+  cout << "tf after noise: " << ego_pose_est << endl;
+
 }
 
 Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose) {
