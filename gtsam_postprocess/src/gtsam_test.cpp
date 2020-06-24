@@ -5,14 +5,8 @@
  */
 
 /**
- * Example of a simple 2D localization example
- *  - Robot poses are facing along the X axis (horizontal, to the right in 2D)
- *  - The robot moves 2 meters each step
- *  - We have full odometry between poses
+ * Attempt to read in a rosbag produced by MSL-RAPTOR and further process it with gtsam
  */
-
-// // We will use Pose2 variables (x, y, theta) to represent the robot positions
-// #include <gtsam/geometry/Pose2.h>
 
 // We will use Pose3 variables (x, y, z, Rot3) to represent the robot/landmark positions
 #include <gtsam/geometry/Pose3.h>
@@ -50,16 +44,10 @@
 // (X1, X2, L1). Here we will use Symbols
 #include <gtsam/inference/Symbol.h>
 
-// We want to use iSAM2 to solve the structure-from-motion problem
-// incrementally, so include iSAM2 here
+// We want to use iSAM2 incrementally, so include iSAM2 here
 #include <gtsam/nonlinear/ISAM2.h>
 
-// iSAM2 requires as input a set of new factors to be added stored in a factor
-// graph, and initial guesses for any new variables used in the added factors
-#include <gtsam/nonlinear/NonlinearFactorGraph.h>
-#include <gtsam/nonlinear/Values.h>
-
-// Reading Rosbag Includes - http://wiki.ros.org/rosbag/Code%20API
+// Includes for Reading Rosbag - http://wiki.ros.org/rosbag/Code%20API
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 #include <std_msgs/Int32.h>
@@ -68,29 +56,39 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 #include <tf/tfMessage.h>
+
+// Misc Includes
 #include <algorithm>
 #include <random>
 
 using namespace std;
 using namespace gtsam;
 
+// Type Defs for loading rosbag data
 typedef vector<tuple<double, geometry_msgs::Pose>> object_data_vec_t;  // vector of tuples(double, ros pose message)
 typedef tuple<double, int, geometry_msgs::Pose, geometry_msgs::Pose> data_tuple; 
 typedef vector<data_tuple> object_est_gt_data_vec_t; //vector of tuples(double, int (id), ros pose message, ros pose message)
 
-void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map);
-void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh);
+// Rosbg Loading & Processing Functions
 void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& ego_data, object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh);
 void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& ego_data, int object_id, double dt_thresh);
 
+// GTSAM-RAPTOR Function
+void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map);
+void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh);
 
 // Helper functions
 void add_init_est_noise(Pose3 &ego_pose_est);
 Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose);
 
+
 int main(int argc, char** argv) {
+  // useful gtsam examples:
   // https://github.com/borglab/gtsam/blob/develop/examples/VisualISAM2Example.cpp
-  string bag_name = "/mounted_folder/nocs/test/scene_1.bag";
+  // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp
+  // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample_large.cpp
+
+  string bag_name = "/mounted_folder/nocs/test/scene_1.bag"; // Rosbag location & name
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
   map<std::string, int> object_id_map = {
         {"ego", 1},
@@ -131,7 +129,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 
   // Eventually I will use the ukf's covarience here, but for now use a constant one
   auto constNoiseMatrix = noiseModel::Diagonal::Sigmas(
-          (Vector(6) << Vector3::Constant(0.1), Vector3::Constant(0.3))
+          (Vector(6) << Vector3::Constant(0.01), Vector3::Constant(0.03))
               .finished());
 
   int obj_list_ind = 0;
@@ -140,7 +138,6 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
     ego_pose_index = 1 + t_ind;
 
     double ego_time = get<0>(ego_data[t_ind]);
-    // geometry_msgs::Pose ego_gt = get<2>(ego_data[t_ind]);
     geometry_msgs::Pose ego_est = get<3>(ego_data[t_ind]);
 
     if (obj_list_ind >= obj_data.size()) {
@@ -148,40 +145,46 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       break;
     }
 
-    map<int, Pose3> tf_w_ado_t0_map;
-    Pose3 ego_pose_est, tf_w_ado0, tf_w_ado;
-
+    map<int, Pose3> tf_w_ado_map;
+    Pose3 tf_w_ego_gt, tf_ego_ado, tf_w_ado;
 
     while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
       // this means this object's measurement is from this ego pose index
       int obj_id = get<1>(obj_data[obj_list_ind]);
       Pose3 relative_pose = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind]));
       graph.emplace_shared<BetweenFactor<Pose3> >(Symbol('x', ego_pose_index), Symbol('l', obj_id), relative_pose, constNoiseMatrix);
-
+      cout << "t_ind = " << t_ind << endl;
       if(t_ind == 0) {
         // if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
-        tf_w_ado_t0_map[obj_id] = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // tf_w_ado
-        cout << "Object: " << obj_id << "\n" << get<2>(obj_data[obj_list_ind]) << endl;
+        tf_w_ado_map[obj_id] = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // tf_w_ado
+        cout << "Object Inital Pose (tf_w_ado): " << obj_id << "\n" << get<2>(obj_data[obj_list_ind]) << endl;
 
         // add initial estimate for landmark
-        initial_estimate.insert(Symbol('l', obj_id), tf_w_ado_t0_map[obj_id]);
-        ego_pose_est = Pose3();
+        initial_estimate.insert(Symbol('l', obj_id), relative_pose);
+        tf_w_ego_gt = Pose3();
       }
       else {
         // use gt position of landmark now & at t0 to get gt position of ego. add noise to get initial pose estimate
-        tf_w_ado0 = tf_w_ado_t0_map[obj_id];  // gt object psoe at t0
-        tf_w_ado = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // current gt object pose
-        ego_pose_est =  tf_w_ado * tf_w_ado0.inverse(); // gt ego pose
-        add_init_est_noise(ego_pose_est);
+        tf_w_ado = tf_w_ado_map[obj_id];  // gt object relative pose at t0 = world pose (since we make our coordinate system based on our initial ego pose)
+        tf_ego_ado = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // current relative gt object pose
+        tf_w_ego_gt = tf_w_ado * tf_ego_ado.inverse(); // gt ego pose in world frame
+        cout << tf_w_ego_gt << endl;
       }
       obj_list_ind++;
     }
     // add initial estimate for just added ego pose
-    initial_estimate.insert(Symbol('x', ego_pose_index), ego_pose_est);
+    add_init_est_noise(tf_w_ego_gt);
+    initial_estimate.insert(Symbol('x', ego_pose_index), tf_w_ego_gt);
 
     // cout << "tmp" << endl;
   }
   cout << "done building batch slam graph!" << endl;
+
+  // create Levenberg-Marquardt optimizer for resulting factor graph, optimize
+  LevenbergMarquardtOptimizer optimizer(graph, initial_estimate);
+  Values result = optimizer.optimize();
+
+  result.print("Final result:\n");
 }
 
 void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map) {
@@ -358,7 +361,7 @@ void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& ego_data, obje
       geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
       if (geo_msg != nullptr) {
         mug_data_est.push_back(make_tuple(time, geo_msg->pose));
-        // cout << get<1>(mug_data_est.back()) << endl;
+        cout << get<1>(mug_data_est.back()) << endl;
       }
     }
     else if (m.getTopic() == mug_pose_gt || ("/" + m.getTopic() == mug_pose_gt)) {
