@@ -47,6 +47,9 @@
 // We want to use iSAM2 incrementally, so include iSAM2 here
 #include <gtsam/nonlinear/ISAM2.h>
 
+#include <gtsam/geometry/Cal3_S2Stereo.h>
+#include <gtsam/slam/StereoFactor.h>
+
 // Includes for Reading Rosbag - http://wiki.ros.org/rosbag/Code%20API
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
@@ -81,8 +84,13 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est);
 Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose);
 
+int vo_test();
+
 
 int main(int argc, char** argv) {
+  // vo_test();
+  // return 0;
+
   // useful gtsam examples:
   // https://github.com/borglab/gtsam/blob/develop/examples/VisualISAM2Example.cpp
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp
@@ -135,6 +143,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
           (Vector(6) << Vector3::Constant(0.01), Vector3::Constant(0.03)).finished());
 
   int obj_list_ind = 0;
+  bool b_landmarks_observed = false; // set to true if we observe at least 1 landmark (so we know if we should try to estimate a pose)
   map<int, Pose3> tf_w_ado_gt_map, tf_w_ado_est_map; // note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
   for(int t_ind = 0; t_ind < ego_data.size(); t_ind++) {
     // loop through ego poses, adding factors to various landmarks as we go
@@ -150,18 +159,21 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 
     Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
     
-    // if(t_ind > 10)
-    // if(t_ind != 0 && t_ind != 1008)
+    // if(t_ind > 183)
+    //   cout << "t_ind = " << t_ind << ", obj_list_ind = " << obj_list_ind << "bools: " << (obj_list_ind < obj_data.size()) << " and " << (abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh) << endl;
+
+    // if(t_ind > 184)
     //   break;
     cout << "\n-----------------------------------------" << endl;
     cout << "t_ind = " << t_ind << endl;
 
     while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
       // this means this object's measurement is from this ego pose index
+      b_landmarks_observed = true;
       int obj_id = get<1>(obj_data[obj_list_ind]);
       Pose3 tf_ego_ado_est = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind]));
       graph.emplace_shared<BetweenFactor<Pose3> >(Symbol('x', ego_pose_index), Symbol('l', obj_id), tf_ego_ado_est, constNoiseMatrix);
-      cout << "creating factor x" << ego_pose_index << " <--> l" <<obj_id << endl;
+      cout << "creating factor x" << ego_pose_index << " <--> l" << obj_id << endl;
 
       if(t_ind == 0) {
         // if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
@@ -200,8 +212,10 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
     //   initial_estimate.insert(Symbol('x', ego_pose_index), noisy_pose);
     // }
     // cout << "tf_w_ego_gt: " << tf_w_ego_gt << endl;
-
-    initial_estimate.insert(Symbol('x', ego_pose_index), tf_w_ego_est);
+    if (b_landmarks_observed)
+      // only calculate our pose if we actually see objects
+      initial_estimate.insert(Symbol('x', ego_pose_index), tf_w_ego_est);
+    b_landmarks_observed = false;
 
     // cout << "tmp" << endl;
   }
@@ -212,6 +226,10 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
   Values result = optimizer.optimize();
 
   result.print("Final result:\n");
+
+
+  cout << "initial error = " << graph.error(initial_estimate) << endl;
+  cout << "final error = " << graph.error(result) << endl;
 }
 
 void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map) {
@@ -497,4 +515,79 @@ Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose) {
                             ros_pose.orientation.y, 
                             ros_pose.orientation.z) );
   return Pose3(R, t);
+}
+
+
+
+
+/* ----------------------------------------------------------------------------
+
+ * GTSAM Copyright 2010, Georgia Tech Research Corporation,
+ * Atlanta, Georgia 30332-0415
+ * All Rights Reserved
+ * Authors: Frank Dellaert, et al. (see THANKS for the full author list)
+
+ * See LICENSE for the license information
+
+ * -------------------------------------------------------------------------- */
+
+/**
+ * @file StereoVOExample.cpp
+ * @brief A stereo visual odometry example
+ * @date May 25, 2014
+ * @author Stephen Camp
+ */
+
+/**
+ * A 3D stereo visual odometry example
+ *  - robot starts at origin
+ *  -moves forward 1 meter
+ *  -takes stereo readings on three landmarks
+ */
+
+int vo_test() {
+  // create graph object, add first pose at origin with key '1'
+  NonlinearFactorGraph graph;
+  Pose3 first_pose;
+  graph.emplace_shared<NonlinearEquality<Pose3> >(1, Pose3());
+
+  // create factor noise model with 3 sigmas of value 1
+  const auto model = noiseModel::Isotropic::Sigma(3, 1);
+  // create stereo camera calibration object with .2m between cameras
+  const Cal3_S2Stereo::shared_ptr K(
+      new Cal3_S2Stereo(1000, 1000, 0, 320, 240, 0.2));
+
+  //create and add stereo factors between first pose (key value 1) and the three landmarks
+  graph.emplace_shared<GenericStereoFactor<Pose3,Point3> >(StereoPoint2(520, 480, 440), model, 1, 4, K);
+  graph.emplace_shared<GenericStereoFactor<Pose3,Point3> >(StereoPoint2(120, 80, 440), model, 1, 5, K);
+  graph.emplace_shared<GenericStereoFactor<Pose3,Point3> >(StereoPoint2(320, 280, 140), model, 1, 6, K);
+
+  //create and add stereo factors between second pose and the three landmarks
+  graph.emplace_shared<GenericStereoFactor<Pose3,Point3> >(StereoPoint2(570, 520, 490), model, 2, 4, K);
+  graph.emplace_shared<GenericStereoFactor<Pose3,Point3> >(StereoPoint2(70, 20, 490), model, 2, 5, K);
+  graph.emplace_shared<GenericStereoFactor<Pose3,Point3> >(StereoPoint2(320, 270, 115), model, 2, 6, K);
+  //create and add stereo factors between second pose and the three landmarks
+  graph.emplace_shared<GenericStereoFactor<Pose3,Point3> >(StereoPoint2(610, 620, 540), model, 3, 4, K);
+  graph.emplace_shared<GenericStereoFactor<Pose3,Point3> >(StereoPoint2(20, 1, 540), model, 3, 5, K);
+  graph.emplace_shared<GenericStereoFactor<Pose3,Point3> >(StereoPoint2(320, 260, 1185), model, 3, 6, K);
+
+  // create Values object to contain initial estimates of camera poses and
+  // landmark locations
+  Values initial_estimate;
+
+  // create and add iniital estimates
+  initial_estimate.insert(1, first_pose);
+  initial_estimate.insert(2, Pose3(Rot3(), Point3(0.1, -0.1, 1.1)));
+  initial_estimate.insert(3, Pose3(Rot3(), Point3(0.2, -0.2, 2.2)));
+  initial_estimate.insert(4, Point3(1, 1, 5));
+  initial_estimate.insert(5, Point3(-1, 1, 5));
+  initial_estimate.insert(6, Point3(0, -0.5, 5));
+
+  // create Levenberg-Marquardt optimizer for resulting factor graph, optimize
+  LevenbergMarquardtOptimizer optimizer(graph, initial_estimate);
+  Values result = optimizer.optimize();
+
+  result.print("Final result:\n");
+
+  return 0;
 }
