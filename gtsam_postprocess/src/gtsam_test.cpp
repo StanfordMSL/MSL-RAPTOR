@@ -159,11 +159,6 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 
     Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
     
-    // if(t_ind > 183)
-    //   cout << "t_ind = " << t_ind << ", obj_list_ind = " << obj_list_ind << "bools: " << (obj_list_ind < obj_data.size()) << " and " << (abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh) << endl;
-
-    // if(t_ind > 184)
-    //   break;
     cout << "\n-----------------------------------------" << endl;
     cout << "t_ind = " << t_ind << endl;
 
@@ -230,6 +225,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 
   cout << "initial error = " << graph.error(initial_estimate) << endl;
   cout << "final error = " << graph.error(result) << endl;
+
 }
 
 void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map) {
