@@ -79,24 +79,20 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
 
 // GTSAM-RAPTOR Function
 void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map);
-void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh);
+void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, const map<std::string, int> &object_id_map, double dt_thresh);
 
 // Helper functions
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est);
 Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose);
 void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad);
 
-int vo_test();
-
 
 int main(int argc, char** argv) {
-  // vo_test();
-  // return 0;
-
   // useful gtsam examples:
   // https://github.com/borglab/gtsam/blob/develop/examples/VisualISAM2Example.cpp
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample_large.cpp
+  // Note: tf_A_B is a transform that when right multipled by a vector in frame B produces the same vector in frame A: p_A = tf_A_B * p_B
 
   string bag_name = "/mounted_folder/nocs/test/scene_1.bag"; // Rosbag location & name
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
@@ -117,18 +113,18 @@ int main(int argc, char** argv) {
       }
       return get<0>(lhs) < get<0>(rhs);
    });   // this should sort the vector by time (i.e. first element in each tuple)
+  //  DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
 
   run_batch_slam(ego_data, obj_data, object_id_map, dt_thresh);
   // run_isam(all_data, object_id_map);
 
-  cout << "done!" << endl;
+  cout << "done with main!" << endl;
   return 0;
 }
 
-void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh) {
-  // note: object id serves as landmark id
+void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, const map<std::string, int> &object_id_map, double dt_thresh) {
+  // note: object id serves as landmark id, landmark is same as saying "ado"
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
-
 
   // STEP 0) Create graph & value objects, add first pose at origin with key '1'
   NonlinearFactorGraph graph;
@@ -170,9 +166,10 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
     cout << "t_ind = " << t_ind << endl;
 
     while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
-      // this means this object's measurement is from this ego pose index
-      b_landmarks_observed = true;
-      Pose3 tf_ego_ado_est = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind]));
+      // DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
+      // first condition means we have more data to process, second means this observation is cooresponding with this ego pose
+      b_landmarks_observed = true; // set to true because we have at least 1 object seen
+      Pose3 tf_ego_ado_est = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind])); // estimated ado pose
       Symbol ado_sym = Symbol('l', get<1>(obj_data[obj_list_ind]));
       
       // 1A)
