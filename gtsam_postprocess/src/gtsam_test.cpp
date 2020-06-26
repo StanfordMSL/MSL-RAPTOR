@@ -61,6 +61,7 @@
 #include <tf/tfMessage.h>
 
 // Misc Includes
+#include <math.h>
 #include <algorithm>
 #include <random>
 
@@ -204,13 +205,15 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
   Values result = optimizer.optimize();
 
   result.print("Final result:\n");
-  cout << "initial error = " << graph.error(initial_estimate) << endl;
-  cout << "final error = " << graph.error(result) << endl;
+  cout << "initial error = " << graph.error(initial_estimate) << endl;  // iterate over all the factors_ to accumulate the log probabilities
+  cout << "final error = " << graph.error(result) << endl;  // iterate over all the factors_ to accumulate the log probabilities
 
   // Reshape<3, 4> extracted_pose_3x4 = reshape(extracted_pose_1x12);
   // cout << "extracted_pose_3x4: " << extracted_pose_3x4 << endl;
   Values::ConstFiltered<Pose3> poses = result.filter<Pose3>();
   int i = 0;
+  vector<double> t_diff_pre, rot_diff_pre, t_diff_post, rot_diff_post;
+  double ave_t_diff_pre = 0, ave_rot_diff_pre = 0, ave_t_diff_post = 0, ave_rot_diff_post = 0;
   for(const auto& key_value: poses) {
     // cout << key_value.value.rotation().matrix() << "\n" << endl;
     // cout << key_value.value.translation().matrix() << "\n" << endl;
@@ -230,18 +233,34 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
     cout << "pre-process est pose:" << tf_w_est_preslam << endl;
     cout << "post-process est pose:" << tf_w_est_postslam << endl;
     
-    double t_diff_pre, rot_diff_pre,t_diff_post, rot_diff_post; 
-    calc_pose_delta(tf_w_est_preslam, tf_gt_w, &t_diff_pre, &rot_diff_pre);
-    calc_pose_delta(tf_w_est_postslam, tf_gt_w, &t_diff_post, &rot_diff_post);
+    double t_diff_pre_val, rot_diff_pre_val, t_diff_post_val, rot_diff_post_val; 
+    calc_pose_delta(tf_w_est_preslam, tf_gt_w, &t_diff_pre_val, &rot_diff_pre_val);
+    calc_pose_delta(tf_w_est_postslam, tf_gt_w, &t_diff_post_val, &rot_diff_post_val);
+    t_diff_pre.push_back(t_diff_pre_val);
+    rot_diff_pre.push_back(rot_diff_pre_val);
+    t_diff_post.push_back(t_diff_post_val);
+    rot_diff_post.push_back(rot_diff_post_val);
+    ave_t_diff_pre += t_diff_pre_val;
+    ave_rot_diff_pre += rot_diff_pre_val;
+    ave_t_diff_post += t_diff_post_val;
+    ave_rot_diff_post += rot_diff_post_val;
 
-    cout << "delta pre-slam: t = " << t_diff_pre << ", ang (deg) = " << rot_diff_pre * 180.0/3.1415 << endl;
-    cout << "delta post-slam: t = " << t_diff_post << ", ang (deg) = " << rot_diff_post * 180.0/3.1415 << endl;
+    cout << "delta pre-slam: t = " << t_diff_pre_val << ", ang (deg) = " << (rot_diff_pre_val * 180.0/M_PI) << endl;
+    cout << "delta post-slam: t = " << t_diff_post_val << ", ang (deg) = " << (rot_diff_post_val * 180.0/M_PI) << endl;
 
     i++;
     if (i > 6) {
       break;
     }
   }
+  ave_t_diff_pre /= double(i);
+  ave_rot_diff_pre /= double(i);
+  ave_t_diff_post /= double(i);
+  ave_rot_diff_post /= double(i);
+  cout << "-----------------------------------------------------" << endl;
+  cout << "-----------------------------------------------------" << endl;
+  cout << "Averages t_pre = " << ave_t_diff_pre << ", t_post = " << ave_t_diff_post << endl;
+  cout << "Averages rot_pre = " << ave_rot_diff_pre << ", rot_post = " << ave_rot_diff_post << endl;
   cout << "tmp" << endl;
 }
 
@@ -249,7 +268,23 @@ void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, doub
   // angle is in radians
   Pose3 delta = p1.compose(p2);
   *trans_diff = delta.translation().squaredNorm();
-  *rot_diff_rad = acos( (delta.rotation().matrix().trace() - 1) / 2.0);
+  double tmp = (delta.rotation().matrix().trace() - 1) / 2.0;
+  double thresh = 0.001;
+  if (tmp > 1 && (tmp - 1) < thresh) {
+    *rot_diff_rad = 0;
+  }
+  else if (tmp > 1) {
+    runtime_error("ERROR: cant have acos input > 1!!");
+  }
+  else if (tmp < -1 && (abs(tmp) - 1) < thresh){
+    *rot_diff_rad = M_PI;
+  }
+  else if (tmp < -1 && (abs(tmp) - 1) < thresh){
+    runtime_error("ERROR: cant have acos input < -1!!");
+  }
+  else {
+    *rot_diff_rad = acos( tmp );
+  }
 }
 
 void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map) {
