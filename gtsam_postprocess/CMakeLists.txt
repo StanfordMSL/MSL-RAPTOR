@@ -48,4 +48,7 @@ target_link_libraries(gtsam_test PUBLIC
 # execute_process (COMMAND bash -c "clear")
 
 # This clears the terminal when cmake is called
-add_custom_target(CLEARING_TERMINAL_NOW ALL COMMAND clear)
+add_custom_target(clearing_terminal ALL
+    COMMAND clear
+    DEPENDS ${gtsam_test}
+)
