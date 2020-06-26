@@ -49,6 +49,7 @@
 
 #include <gtsam/geometry/Cal3_S2Stereo.h>
 #include <gtsam/slam/StereoFactor.h>
+#include <gtsam/nonlinear/utilities.h>
 
 // Includes for Reading Rosbag - http://wiki.ros.org/rosbag/Code%20API
 #include <rosbag/bag.h>
@@ -145,6 +146,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
   int obj_list_ind = 0;
   bool b_landmarks_observed = false; // set to true if we observe at least 1 landmark (so we know if we should try to estimate a pose)
   map<int, Pose3> tf_w_ado_gt_map, tf_w_ado_est_map; // note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+  map<Symbol, Pose3> tf_w_ego_gt_map;
   for(int t_ind = 0; t_ind < ego_data.size(); t_ind++) {
     // loop through ego poses, adding factors to various landmarks as we go
     ego_pose_index = 1 + t_ind;
@@ -210,6 +212,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
     if (b_landmarks_observed)
       // only calculate our pose if we actually see objects
       initial_estimate.insert(Symbol('x', ego_pose_index), tf_w_ego_est);
+      tf_w_ego_gt_map[Symbol('x', ego_pose_index)] = tf_w_ego_gt;
     b_landmarks_observed = false;
 
     // cout << "tmp" << endl;
@@ -225,6 +228,47 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 
   cout << "initial error = " << graph.error(initial_estimate) << endl;
   cout << "final error = " << graph.error(result) << endl;
+
+  result.at(Symbol('x',1)).print("\n\nx1 result:\n");
+  result.at(Symbol('x',5)).print("\n\nx5 result:\n");
+
+  // Matrix extractPose3(const Values& values) 
+  // Matrix value = extractPose3(result.at(Symbol('x',1)));
+  // Matrix my_value = utilities::extractPose3(result.at(Symbol('x',1)));
+  Values result_poses = utilities::allPose3s(result);
+  Matrix all_poses_mat = utilities::extractPose3(result);
+
+  cout << "# poses = " << all_poses_mat.rows() << endl; 
+
+  int pose_idx = 5, num_el_in_mat = 12; // doesnt include the bottom row of the tf --> 12 els
+  // Matrix extracted_pose = all_poses_mat.block(pose_idx, 0, 1, num_el_in_mat);
+  Matrix extracted_pose_1x12 = all_poses_mat.row(pose_idx); // return a 1 x 12 matrix (does not copy)
+  cout << "extracted_pose_1x12: " << extracted_pose_1x12 << endl;
+  // Pose3 extr_pose3 = Pose3(Rot3(), Point3())
+
+  // Reshape<3, 4> extracted_pose_3x4 = reshape(extracted_pose_1x12);
+  // cout << "extracted_pose_3x4: " << extracted_pose_3x4 << endl;
+  Values::ConstFiltered<Pose3> poses = result.filter<Pose3>();
+  int i = 0;
+  for(const auto& key_value: poses) {
+    // cout << key_value.value.rotation().matrix() << "\n" << endl;
+    // cout << key_value.value.translation().matrix() << "\n" << endl;
+    Pose3 tf_w_ego_est = key_value.value;
+    Pose3 tf_w_ego_gt = tf_w_ego_gt_map[key_value.key];
+    
+    Pose3 delta = tf_w_ego_est.compose(tf_w_ego_gt);
+    cout << "delta for key: " << DefaultKeyFormatter(key_value.key) << "||" << Symbol(key_value.key) << "\n" << delta << endl;
+
+    // cout << tmp.matrix() << endl;
+    i++;
+    if (i > 6) {
+      break;
+    }
+  }
+
+  // cout << poses.keys() << endl;
+
+  cout << "tmp" << endl;
 
 }
 
