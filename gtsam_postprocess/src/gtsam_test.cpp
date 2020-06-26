@@ -172,8 +172,8 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       Pose3 tf_ego_ado_est = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind])); // estimated ado pose
       Symbol ado_sym = Symbol('l', get<1>(obj_data[obj_list_ind]));
       
-      // 1A)
-      graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, tf_ego_ado_est, constNoiseMatrix);
+      // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
+      graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
       cout << "creating factor " << ego_sym << " <--> " << ado_sym << endl;
 
       if(t_ind == 0) {
@@ -181,8 +181,8 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
         tf_w_gt_map[ado_sym] = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // tf_w_ado_gt
         tf_w_est_preslam_map[ado_sym] = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind])); // tf_w_ado_est
 
-        // add initial estimate for landmark
-        initial_estimate.insert(ado_sym, tf_ego_ado_est); // since by construction at t=0 the world and ego pose are both the origin, this is valid
+        // add initial estimate for landmark (in world frame)
+        initial_estimate.insert(ado_sym, Pose3(tf_ego_ado_est)); // since by construction at t=0 the world and ego pose are both the origin, this relative measurement is also in world frame
         tf_w_ego_gt = Pose3();
       }
       else {
@@ -195,8 +195,9 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
     }
     if (b_landmarks_observed)
       // 1D) only calculate our pose if we actually see objects
-      initial_estimate.insert(ego_sym, tf_w_ego_est);
-      tf_w_gt_map[ego_sym] = tf_w_ego_gt;
+      initial_estimate.insert(ego_sym, Pose3(tf_w_ego_est));
+      tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_est);
+      tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
     b_landmarks_observed = false;
   }
   cout << "done building batch slam graph (w/ initializations)!" << endl;
