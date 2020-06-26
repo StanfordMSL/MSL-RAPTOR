@@ -26,6 +26,10 @@ include_directories(
     ${tf_INCLUDE_DIRS}
 )
 
+
+# custom command to clear terminal when "make" is called
+# add_custom_target(tmp clear)
+
 add_executable(gtsam_test src/gtsam_test.cpp)
 
 # By using CMake exported targets, a simple "link" dependency introduces the
@@ -39,3 +43,9 @@ target_link_libraries(gtsam_test PUBLIC
     ${sensor_msgs_LIBRARIES} 
     ${tf_LIBRARIES} 
 )
+
+# # This clears the terminal when cmake is called
+# execute_process (COMMAND bash -c "clear")
+
+# This clears the terminal when cmake is called
+add_custom_target(CLEARING_TERMINAL_NOW ALL COMMAND clear)
