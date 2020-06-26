@@ -84,7 +84,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 // Helper functions
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est);
 Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose);
-void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad);
+void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad, bool b_degrees);
 
 
 int main(int argc, char** argv) {
@@ -94,7 +94,8 @@ int main(int argc, char** argv) {
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample_large.cpp
   // Note: tf_A_B is a transform that when right multipled by a vector in frame B produces the same vector in frame A: p_A = tf_A_B * p_B
 
-  string bag_name = "/mounted_folder/nocs/test/scene_1.bag"; // Rosbag location & name
+  string bag_name = "/mounted_folder/nocs/test/scene_1.bag"; // Rosbag location & name for GT data
+  // string bag_name = "/mounted_folder/raptor_processed_bags/nocs_test/msl_raptor_output_from_bag_scene_1.bag"; // Rosbag location & name for EST data
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
   map<std::string, int> object_id_map = {
         {"ego", 1},
@@ -114,7 +115,7 @@ int main(int argc, char** argv) {
       return get<0>(lhs) < get<0>(rhs);
    });   // this should sort the vector by time (i.e. first element in each tuple)
   //  DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
-
+  return 5;
   run_batch_slam(ego_data, obj_data, object_id_map, dt_thresh);
   // run_isam(all_data, object_id_map);
 
@@ -215,6 +216,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
   int i = 0;
   vector<double> t_diff_pre, rot_diff_pre, t_diff_post, rot_diff_post;
   double ave_t_diff_pre = 0, ave_rot_diff_pre = 0, ave_t_diff_post = 0, ave_rot_diff_post = 0;
+  bool b_degrees = true;
   for(const auto& key_value: poses) {
     cout << "-----------------------------------------------------" << endl;
     // Extract Symbol and Pose from dict & store in map
@@ -224,15 +226,15 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
     tf_w_est_postslam_map[sym] = tf_w_est_postslam;
 
     // Find corresponding gt pose and preslam pose
-    Pose3 tf_w_gt = tf_w_gt_map[sym], tf_gt_w = tf_w_gt.inverse();
+    Pose3 tf_w_gt = tf_w_gt_map[sym], tf_w_gt_inv = tf_w_gt.inverse();
     Pose3 tf_w_est_preslam = tf_w_est_preslam_map[sym];
     cout << "gt pose:" << tf_w_gt << endl;
     cout << "pre-process est pose:" << tf_w_est_preslam << endl;
     cout << "post-process est pose:" << tf_w_est_postslam << endl;
     
     double t_diff_pre_val, rot_diff_pre_val, t_diff_post_val, rot_diff_post_val; 
-    calc_pose_delta(tf_w_est_preslam, tf_gt_w, &t_diff_pre_val, &rot_diff_pre_val);
-    calc_pose_delta(tf_w_est_postslam, tf_gt_w, &t_diff_post_val, &rot_diff_post_val);
+    calc_pose_delta(tf_w_est_preslam, tf_w_gt_inv, &t_diff_pre_val, &rot_diff_pre_val, b_degrees);
+    calc_pose_delta(tf_w_est_postslam, tf_w_gt_inv, &t_diff_post_val, &rot_diff_post_val, b_degrees);
     t_diff_pre.push_back(t_diff_pre_val);
     rot_diff_pre.push_back(rot_diff_pre_val);
     t_diff_post.push_back(t_diff_post_val);
@@ -242,8 +244,8 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
     ave_t_diff_post += t_diff_post_val;
     ave_rot_diff_post += rot_diff_post_val;
 
-    cout << "delta pre-slam: t = " << t_diff_pre_val << ", ang (deg) = " << (rot_diff_pre_val * 180.0/M_PI) << endl;
-    cout << "delta post-slam: t = " << t_diff_post_val << ", ang (deg) = " << (rot_diff_post_val * 180.0/M_PI) << endl;
+    cout << "delta pre-slam: t = " << t_diff_pre_val << ", ang = " << rot_diff_pre_val << " deg" << endl;
+    cout << "delta post-slam: t = " << t_diff_post_val << ", ang = " << rot_diff_post_val << " deg" << endl;
 
     i++;
   }
@@ -254,16 +256,19 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
   cout << "-----------------------------------------------------" << endl;
   cout << "-----------------------------------------------------" << endl;
   cout << "Averages t_pre = " << ave_t_diff_pre << ", t_post = " << ave_t_diff_post << endl;
-  cout << "Averages rot_pre = " << ave_rot_diff_pre << ", rot_post = " << ave_rot_diff_post << endl;
-  cout << "tmp" << endl;
+  cout << "Averages rot_pre = " << ave_rot_diff_pre << " deg, rot_post = " << ave_rot_diff_post << " deg" << endl;
 }
 
-void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad){
-  // angle is in radians
+void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad, bool b_degrees){
+  // b_degrees is true if we want degrees, false for radians 
   Pose3 delta = p1.compose(p2);
   *trans_diff = delta.translation().squaredNorm();
   double tmp = (delta.rotation().matrix().trace() - 1) / 2.0;
   double thresh = 0.001;
+  double unit_multiplier = 1;
+  if (b_degrees){
+    unit_multiplier = 180.0 / M_PI;
+  }
   if (tmp > 1 && (tmp - 1) < thresh) {
     *rot_diff_rad = 0;
   }
@@ -271,13 +276,13 @@ void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, doub
     runtime_error("ERROR: cant have acos input > 1!!");
   }
   else if (tmp < -1 && (abs(tmp) - 1) < thresh){
-    *rot_diff_rad = M_PI;
+    *rot_diff_rad = M_PI * unit_multiplier;
   }
   else if (tmp < -1 && (abs(tmp) - 1) < thresh){
     runtime_error("ERROR: cant have acos input < -1!!");
   }
   else {
-    *rot_diff_rad = acos( tmp );
+    *rot_diff_rad = acos( tmp ) * unit_multiplier;
   }
 }
 
@@ -385,7 +390,6 @@ void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& ego_data, obje
   int num_msgs = 0;
   for(rosbag::MessageInstance const m: rosbag::View(bag))
   {
-    // std_msgs::Int32::ConstPtr i = m.instantiate<std_msgs::Int32>();
     num_msgs++;
     if(time0 < 0) {
       time0 = m.getTime().toSec();
@@ -395,6 +399,11 @@ void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& ego_data, obje
       last_time = time;
       time = m.getTime().toSec() - time0;
       ave_dt += time - last_time;
+    }
+    
+    // cout << m.getDataType() << endl;
+    if( abs(time - 2.2) < 0.04 && m.getDataType() == "geometry_msgs/PoseStamped"){
+      cout << "topic: " << m.getTopic() << "msg: " << m.instantiate<geometry_msgs::PoseStamped>()->pose << endl;
     }
 
     if (m.getTopic() == tf || ("/" + m.getTopic() == tf)) {
@@ -533,12 +542,17 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
       t_est = get<0>(data_est[j]);
       if(dt_thresh > abs(t_gt - t_est)) {
         data.push_back(make_tuple((t_gt + t_est)/2, object_id, get<1>(data_gt[i]), get<1>(data_est[j])));
+        if (object_id != 1) { // no pose data for ego robot, all zeros
+          double t_diff, rot_diff; 
+          calc_pose_delta(ros_geo_pose_to_gtsam_pose3(get<1>(data_gt[i])).inverse(), 
+                          ros_geo_pose_to_gtsam_pose3(get<1>(data_est[j])), &t_diff, &rot_diff, true);
+          cout << "time = " << t_est << ". id = " << object_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
+        }
         next_est_time_ind = j + 1;
         break;
       }
     }
   }
-  // return &data;
 }
 
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est) {
@@ -565,32 +579,3 @@ Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose) {
                             ros_pose.orientation.z) );
   return Pose3(R, t);
 }
-
-
-// Potentially useful access methods:
-//   result.at(Symbol('x',1)).print("\n\nx1 result:\n");
-//   result.at(Symbol('x',5)).print("\n\nx5 result:\n");
-
-//   // Matrix extractPose3(const Values& values) 
-//   // Matrix value = extractPose3(result.at(Symbol('x',1)));
-//   // Matrix my_value = utilities::extractPose3(result.at(Symbol('x',1)));
-//   Values result_poses = utilities::allPose3s(result);
-//   Matrix all_poses_mat = utilities::extractPose3(result);
-
-//   cout << "# poses = " << all_poses_mat.rows() << endl; 
-
-//   int pose_idx = 5, num_el_in_mat = 12; // doesnt include the bottom row of the tf --> 12 els
-//   // Matrix extracted_pose = all_poses_mat.block(pose_idx, 0, 1, num_el_in_mat);
-//   Matrix extracted_pose_1x12 = all_poses_mat.row(pose_idx); // return a 1 x 12 matrix (does not copy)
-//   cout << "extracted_pose_1x12: " << extracted_pose_1x12 << endl;
-//   // Pose3 extr_pose3 = Pose3(Rot3(), Point3())
-// Reshape<3, 4> extracted_pose_3x4 = reshape(extracted_pose_1x12);
-// cout << "extracted_pose_3x4: " << extracted_pose_3x4 << endl;
-
-  // for(const auto& key_value: poses) {
-    //  Symbol sym = Symbol(key_value.key);
-    // Pose3 tf_w_est_postslam = key_value.value;
-    // cout << key_value.value.rotation().matrix() << "\n" << endl;
-    // cout << key_value.value.translation().matrix() << "\n" << endl;
-    // cout << key_value.value.matrix() << endl;
-    // }
