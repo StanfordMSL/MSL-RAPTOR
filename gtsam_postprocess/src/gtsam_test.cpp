@@ -130,27 +130,30 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
 
 
-  // create graph object, add first pose at origin with key '1'
+  // STEP 0) Create graph & value objects, add first pose at origin with key '1'
   NonlinearFactorGraph graph;
   Pose3 first_pose;
   int ego_pose_index = 1;
   Symbol ego_sym = Symbol('x', ego_pose_index);
   graph.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), Pose3());
-
-
-  // create Values object to contain initial estimates of camera poses and landmark locations
-  Values initial_estimate;
+  Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
 
   // Eventually I will use the ukf's covarience here, but for now use a constant one
   auto constNoiseMatrix = noiseModel::Diagonal::Sigmas(
           (Vector(6) << Vector3::Constant(0.01), Vector3::Constant(0.03)).finished());
 
-  int obj_list_ind = 0;
+  int obj_list_ind = 0; // this needs to be flexible since I dont know how many landmarks I see at each time, if any
   bool b_landmarks_observed = false; // set to true if we observe at least 1 landmark (so we know if we should try to estimate a pose)
-  // map<Symbol, Pose3> tf_w_ado_gt_map, tf_w_ado_est_map, tf_w_ego_gt_map, tf_w_ego_est_map, tf_w_ado_est_map_processes, tf_w_ego_est_map_processes; // note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+  
+  // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
   map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+  
+  // STEP 1) loop through ego poses, at each time do the following:
+  //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
+  //  - 1B) If first timestep, use the fact that x1 is defined to be origin to set ground truth pose of landmarks. Also use first estimate as initial estimate for landmark pose
+  //  - 1C) Otherwise, use gt / estimate of landmark poses from t0 and current time to gt / estimate of current camera pose (SUBSTITUE FOR ODOMETRY!!)
+  //  - 1D) Use estimate of current camera pose for value initalization
   for(int t_ind = 0; t_ind < ego_data.size(); t_ind++) {
-    // loop through ego poses, adding factors to various landmarks as we go
     ego_pose_index = 1 + t_ind;
     ego_sym = Symbol('x', ego_pose_index);
     double ego_time = get<0>(ego_data[t_ind]);
@@ -171,11 +174,13 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       b_landmarks_observed = true;
       Pose3 tf_ego_ado_est = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind]));
       Symbol ado_sym = Symbol('l', get<1>(obj_data[obj_list_ind]));
+      
+      // 1A)
       graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, tf_ego_ado_est, constNoiseMatrix);
       cout << "creating factor " << ego_sym << " <--> " << ado_sym << endl;
 
       if(t_ind == 0) {
-        // if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
+        // 1B) if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
         tf_w_gt_map[ado_sym] = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // tf_w_ado_gt
         tf_w_est_preslam_map[ado_sym] = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind])); // tf_w_ado_est
 
@@ -184,7 +189,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
         tf_w_ego_gt = Pose3();
       }
       else {
-        // use gt position of landmark now & at t0 to get gt position of ego. add noise to get initial pose estimate
+        // 1C) use gt position of landmark now & at t0 to get gt position of ego. Same for estimated position
         tf_ego_ado_gt = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // current relative gt object pose
         tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
         tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // gt ego pose in world frame
@@ -192,15 +197,14 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       obj_list_ind++;
     }
     if (b_landmarks_observed)
-      // only calculate our pose if we actually see objects
+      // 1D) only calculate our pose if we actually see objects
       initial_estimate.insert(ego_sym, tf_w_ego_est);
       tf_w_gt_map[ego_sym] = tf_w_ego_gt;
     b_landmarks_observed = false;
-
   }
-  cout << "done building batch slam graph!" << endl;
+  cout << "done building batch slam graph (w/ initializations)!" << endl;
 
-  // create Levenberg-Marquardt optimizer for resulting factor graph, optimize
+  // STEP 2) create Levenberg-Marquardt optimizer for resulting factor graph, optimize
   LevenbergMarquardtOptimizer optimizer(graph, initial_estimate);
   Values result = optimizer.optimize();
 
@@ -208,18 +212,13 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
   cout << "initial error = " << graph.error(initial_estimate) << endl;  // iterate over all the factors_ to accumulate the log probabilities
   cout << "final error = " << graph.error(result) << endl;  // iterate over all the factors_ to accumulate the log probabilities
 
-  // Reshape<3, 4> extracted_pose_3x4 = reshape(extracted_pose_1x12);
-  // cout << "extracted_pose_3x4: " << extracted_pose_3x4 << endl;
+  // STEP 3 Loop through each ego /landmark pose and compare estimate with ground truth (both before and after slam optimization)
   Values::ConstFiltered<Pose3> poses = result.filter<Pose3>();
   int i = 0;
   vector<double> t_diff_pre, rot_diff_pre, t_diff_post, rot_diff_post;
   double ave_t_diff_pre = 0, ave_rot_diff_pre = 0, ave_t_diff_post = 0, ave_rot_diff_post = 0;
   for(const auto& key_value: poses) {
-    // cout << key_value.value.rotation().matrix() << "\n" << endl;
-    // cout << key_value.value.translation().matrix() << "\n" << endl;
-    // cout << key_value.value.matrix() << endl;
     cout << "-----------------------------------------------------" << endl;
-
     // Extract Symbol and Pose from dict & store in map
     Symbol sym = Symbol(key_value.key);
     Pose3 tf_w_est_postslam = key_value.value;
@@ -249,9 +248,6 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
     cout << "delta post-slam: t = " << t_diff_post_val << ", ang (deg) = " << (rot_diff_post_val * 180.0/M_PI) << endl;
 
     i++;
-    if (i > 6) {
-      break;
-    }
   }
   ave_t_diff_pre /= double(i);
   ave_rot_diff_pre /= double(i);
@@ -590,3 +586,13 @@ Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose) {
 //   Matrix extracted_pose_1x12 = all_poses_mat.row(pose_idx); // return a 1 x 12 matrix (does not copy)
 //   cout << "extracted_pose_1x12: " << extracted_pose_1x12 << endl;
 //   // Pose3 extr_pose3 = Pose3(Rot3(), Point3())
+// Reshape<3, 4> extracted_pose_3x4 = reshape(extracted_pose_1x12);
+// cout << "extracted_pose_3x4: " << extracted_pose_3x4 << endl;
+
+  // for(const auto& key_value: poses) {
+    //  Symbol sym = Symbol(key_value.key);
+    // Pose3 tf_w_est_postslam = key_value.value;
+    // cout << key_value.value.rotation().matrix() << "\n" << endl;
+    // cout << key_value.value.translation().matrix() << "\n" << endl;
+    // cout << key_value.value.matrix() << endl;
+    // }
