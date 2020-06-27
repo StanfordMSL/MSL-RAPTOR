@@ -105,21 +105,9 @@ int main(int argc, char** argv) {
   string path = "/mounted_folder/nocs_logs/";
   string base = "log_1_";
 
-  //  DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
-  object_est_gt_data_vec_t ado_data;
-  set<double> times;
+  object_est_gt_data_vec_t ado_data; // all ado data in 1 vector sorted by time (to be filled in by load_log_files)
+  set<double> times;  // set of all unique times (to be filled in by load_log_files)
   load_log_files(times, ado_data, path, base, object_long_to_short_name, object_id_map, dt_thresh);
-
-  std::sort(ado_data.begin(), ado_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
-      if (get<0>(lhs) == get<0>(rhs)) {
-        return get<1>(lhs) < get<1>(rhs);
-      }
-      return get<0>(lhs) < get<0>(rhs);
-   });   // this should sort the vector by time (i.e. first element in each tuple)
-
-  for(const auto & v : ado_data){
-    cout << get<0>(v) << "   " << get<1>(v) << endl;
-  }
 
   run_batch_slam(times, ado_data, object_id_map, dt_thresh);
   // run_isam(all_data, object_id_map);
@@ -129,9 +117,8 @@ int main(int argc, char** argv) {
 }
 
 void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh) {
-  // Time (s), Ado State GT, Ego State GT, 3D Corner GT (X|Y|Z), Corner 2D Projections GT (r|c), Angled BB (r|c|w|h|ang_deg), Image Segmentation Mode
+  // for each object, load its est and gt log files to extract pose and time information. combine into a set of all times, and also all the data sorted by time
   vector<object_data_vec_t> ado_data_gt, ado_data_est;
-  // map<int, object_data_vec_t> all_ado_data_gt, all_ado_data_est;
   for(const auto &key_value_pair : object_long_to_short_name) {
     object_data_vec_t ado_data_gt, ado_data_est;
     object_est_gt_data_vec_t ado_data_single;
@@ -139,16 +126,23 @@ void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, con
     int obj_id = object_id_map[key_value_pair.second];
 
     read_data_from_one_log(path + file_base + obj_long_name + "_gt.log", ado_data_gt, times);
-    cout << ado_data_gt.size() << endl;
     read_data_from_one_log(path + file_base + obj_long_name + "_est.log", ado_data_est, times);
-    cout << ado_data_est.size() << endl;
-
     sync_est_and_gt(ado_data_est, ado_data_gt, ado_data_single, obj_id, dt_thresh);
-    ado_data.insert( ado_data.end(), ado_data_single.begin(), ado_data_single.end() );
+    ado_data.insert( ado_data.end(), ado_data_single.begin(), ado_data_single.end() ); // combine into 1 vector of all ado data
   }
+
+  // sort by time & object id (the later is just for readability of debugging output, is only tie-break if time are equal)
+  std::sort(ado_data.begin(), ado_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
+    if (get<0>(lhs) == get<0>(rhs)) { // if times are equal
+      return get<1>(lhs) < get<1>(rhs); // return true if lhs has lower id
+    }
+    return get<0>(lhs) < get<0>(rhs); 
+  });   // this should sort the vector by time (i.e. first element in each tuple). Tie breaker is object id
 }
 
 void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> &times){
+  // log file header: Time (s), Ado State GT, Ego State GT, 3D Corner GT (X|Y|Z), Corner 2D Projections GT (r|c), Angled BB (r|c|w|h|ang_deg), Image Segmentation Mode
+  // note: the states are position (3), lin vel (3), quat wxyz (4), ang vel (3) (space deliminated)
   ifstream infile(fn);
   string line, s;
   double time, x, y, z, vx, vy, vz, qx, qy, qz, qw, wx, wy, wz;
@@ -156,9 +150,6 @@ void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<do
   getline(infile, line); // skip header of file
   while (getline(infile, line)) {
     istringstream iss(line);
-    // if (!getline( iss, s, ' ' )) {
-    //   break;
-    // }
     iss >> time;
     iss >> x;
     iss >> y;
@@ -178,9 +169,6 @@ void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<do
     obj_data.push_back(make_tuple(time, pose));
     continue;
   }
-  sort(obj_data.begin(), obj_data.end(), [](const tuple<double, Pose3>& lhs, const tuple<double, Pose3>& rhs) {
-      return get<0>(lhs) < get<0>(rhs);
-   });   // this should sort the vector by time
 }
 
 void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, int> &object_id_map, double dt_thresh) {
