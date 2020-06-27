@@ -7,6 +7,8 @@ set(CMAKE_VERBOSE_MAKEFILE 0)
 set(CMAKE_BUILD_TYPE Debug)
 # set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
+include_directories(/root/msl_raptor_ws/devel/include/)
+
 # Find GTSAM, either from a local build, or from a Debian/Ubuntu package.
 find_package(GTSAM REQUIRED)
 find_package(rosbag REQUIRED)
