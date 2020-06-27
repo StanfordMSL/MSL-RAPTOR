@@ -1,11 +1,11 @@
 /**
  * @file gtsam_test.cpp
- * @brief Attempt to read in rosbag and process with isam
+ * @brief Attempt to read in data and process with isam
  * @author Adam Caccavale
  */
 
 /**
- * Attempt to read in a rosbag produced by MSL-RAPTOR and further process it with gtsam
+ * Attempt to read in a data produced by MSL-RAPTOR and further process it with gtsam
  */
 
 // We will use Pose3 variables (x, y, z, Rot3) to represent the robot/landmark positions
@@ -50,16 +50,6 @@
 // utilities include functions for extracting poses from optimization results
 #include <gtsam/nonlinear/utilities.h>
 
-// Includes for Reading Rosbag - http://wiki.ros.org/rosbag/Code%20API
-#include <rosbag/bag.h>
-#include <rosbag/view.h>
-#include <std_msgs/Int32.h>
-#include <std_msgs/String.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <sensor_msgs/CameraInfo.h>
-#include <sensor_msgs/Image.h>
-#include <tf/tfMessage.h>
-
 // Misc Includes
 #include <math.h>
 #include <algorithm>
@@ -70,13 +60,14 @@
 using namespace std;
 using namespace gtsam;
 
-// Type Defs for loading rosbag data
-typedef vector<tuple<double, geometry_msgs::Pose>> object_data_vec_t;  // vector of tuples(double, ros pose message)
-typedef tuple<double, int, geometry_msgs::Pose, geometry_msgs::Pose> data_tuple; 
-typedef vector<data_tuple> object_est_gt_data_vec_t; //vector of tuples(double, int (id), ros pose message, ros pose message)
+// Type Defs for loading data
+typedef vector<tuple<double,Pose3>> object_data_vec_t;  // vector of tuples(double, pose message)
+typedef tuple<double, int, Pose3, Pose3> data_tuple; 
+typedef vector<data_tuple> object_est_gt_data_vec_t; //vector of tuples(double, int (id), pose message, pose message)
 
-// Rosbg Loading & Processing Functions
-void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& ego_data, object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh);
+// Loading & Processing Functions
+void load_log_files(object_est_gt_data_vec_t & ado_data, object_est_gt_data_vec_t & ego_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh);
+void read_data_from_one_log(const string fn, object_data_vec_t& obj_data);
 void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& ego_data, int object_id, double dt_thresh);
 
 // GTSAM-RAPTOR Function
@@ -85,12 +76,8 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 
 // Helper functions
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est);
-Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose);
 void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad, bool b_degrees);
 
-
-void load_log_files(object_est_gt_data_vec_t & ado_data, object_est_gt_data_vec_t & ego_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh);
-void read_data_from_one_log(const string fn, object_data_vec_t& obj_data);
 
 int main(int argc, char** argv) {
   // useful gtsam examples:
@@ -99,8 +86,6 @@ int main(int argc, char** argv) {
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample_large.cpp
   // Note: tf_A_B is a transform that when right multipled by a vector in frame B produces the same vector in frame A: p_A = tf_A_B * p_B
 
-  // string bag_name = "/mounted_folder/nocs/test/scene_1.bag"; // Rosbag location & name for GT data
-  string bag_name = "/mounted_folder/raptor_processed_bags/nocs_test/msl_raptor_output_from_bag_scene_1.bag"; // Rosbag location & name for EST data
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
   map<std::string, int> object_id_map = {
         {"ego", 1},
@@ -122,10 +107,7 @@ int main(int argc, char** argv) {
 
   object_est_gt_data_vec_t ado_data, ego_data;
    load_log_files(ado_data, ego_data, path, base, object_long_to_short_name, object_id_map, dt_thresh);
-  return 0;
-  
 
-  preprocess_rosbag(bag_name, ego_data, ado_data, object_id_map, dt_thresh);
   std::sort(ado_data.begin(), ado_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
       if (get<0>(lhs) == get<0>(rhs)) {
         return get<1>(lhs) < get<1>(rhs);
@@ -143,10 +125,6 @@ int main(int argc, char** argv) {
 
 void load_log_files(object_est_gt_data_vec_t & ado_data, object_est_gt_data_vec_t & ego_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh) {
   // Time (s), Ado State GT, Ego State GT, 3D Corner GT (X|Y|Z), Corner 2D Projections GT (r|c), Angled BB (r|c|w|h|ang_deg), Image Segmentation Mode
-
-// typedef vector<tuple<double, geometry_msgs::Pose>> object_data_vec_t;  // vector of tuples(double, ros pose message)
-// typedef tuple<double, int, geometry_msgs::Pose, geometry_msgs::Pose> data_tuple; 
-// typedef vector<data_tuple> object_est_gt_data_vec_t; //vector of tuples(double, int (id), ros pose message, ros pose message)
   vector<object_data_vec_t> ado_data_gt, ado_data_est;
   // map<int, object_data_vec_t> all_ado_data_gt, all_ado_data_est;
   for(const auto &key_value_pair : object_long_to_short_name) {
@@ -192,7 +170,7 @@ void read_data_from_one_log(const string fn, object_data_vec_t& obj_data){
     obj_data.push_back(make_tuple(time, pose));
     break;
   }
-  sort(obj_data.begin(), obj_data.end(), [](const tuple<double, geometry_msgs::Pose>& lhs, const tuple<double, geometry_msgs::Pose>& rhs) {
+  sort(obj_data.begin(), obj_data.end(), [](const tuple<double, Pose3>& lhs, const tuple<double, Pose3>& rhs) {
       return get<0>(lhs) < get<0>(rhs);
    });   // this should sort the vector by time
 }
@@ -228,7 +206,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
     ego_pose_index = 1 + t_ind;
     ego_sym = Symbol('x', ego_pose_index);
     double ego_time = get<0>(ego_data[t_ind]);
-    geometry_msgs::Pose ego_est = get<3>(ego_data[t_ind]);
+    Pose3 ego_est = get<3>(ego_data[t_ind]);
 
     if (obj_list_ind >= obj_data.size()) {
       cout << "encorperated all observations into graph" << endl;
@@ -244,7 +222,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       // DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
       // first condition means we have more data to process, second means this observation is cooresponding with this ego pose
       b_landmarks_observed = true; // set to true because we have at least 1 object seen
-      Pose3 tf_ego_ado_est = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind])); // estimated ado pose
+      Pose3 tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
       Symbol ado_sym = Symbol('l', get<1>(obj_data[obj_list_ind]));
       
       // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
@@ -253,8 +231,8 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
 
       if(t_ind == 0) {
         // 1B) if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
-        tf_w_gt_map[ado_sym] = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // tf_w_ado_gt
-        tf_w_est_preslam_map[ado_sym] = ros_geo_pose_to_gtsam_pose3(get<3>(obj_data[obj_list_ind])); // tf_w_ado_est
+        tf_w_gt_map[ado_sym] = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt
+        tf_w_est_preslam_map[ado_sym] = get<3>(obj_data[obj_list_ind]); // tf_w_ado_est
 
         // add initial estimate for landmark (in world frame)
         initial_estimate.insert(ado_sym, Pose3(tf_ego_ado_est)); // since by construction at t=0 the world and ego pose are both the origin, this relative measurement is also in world frame
@@ -262,7 +240,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       }
       else {
         // 1C) use gt position of landmark now & at t0 to get gt position of ego. Same for estimated position
-        tf_ego_ado_gt = ros_geo_pose_to_gtsam_pose3(get<2>(obj_data[obj_list_ind])); // current relative gt object pose
+        tf_ego_ado_gt = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
         tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
         tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // gt ego pose in world frame
       }
@@ -433,177 +411,6 @@ void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_
   // }
 }
 
-void preprocess_rosbag(string bag_name, object_est_gt_data_vec_t& ego_data, object_est_gt_data_vec_t& obj_data, map<std::string, int> &object_id_map, double dt_thresh) {
-  rosbag::Bag bag;
-  bag.open(bag_name);  // BagMode is Read by default
-  string tf = "/tf";
-  string bowl_pose_est = "bowl_white_small_norm/mavros/local_position/pose";
-  string bowl_pose_gt = "bowl_white_small_norm/mavros/vision_pose/pose";
-  string camera_pose_est = "camera_canon_len_norm/mavros/local_position/pose";
-  string camera_pose_gt = "camera_canon_len_norm/mavros/vision_pose/pose";
-  string can_pose_est = "can_arizona_tea_norm/mavros/local_position/pose";
-  string can_pose_gt = "can_arizona_tea_norm/mavros/vision_pose/pose";
-  string laptop_pose_est = "laptop_air_xin_norm/mavros/local_position/pose";
-  string laptop_pose_gt = "laptop_air_xin_norm/mavros/vision_pose/pose";
-  string mug_pose_est = "mug_daniel_norm/mavros/local_position/pose";
-  string mug_pose_gt = "mug_daniel_norm/mavros/vision_pose/pose";
-  string cam_info = "/quad7/camera/camera_info";
-  string img = "/quad7/camera/image_raw";
-  string ego_pose_est = "/quad7/mavros/local_position/pose";
-  string ego_pose_gt = "/quad7/mavros/vision_pose/pose";
-
-
-  tf::tfMessage::ConstPtr tf_msg = nullptr;
-  geometry_msgs::PoseStamped::ConstPtr geo_msg = nullptr;
-  sensor_msgs::CameraInfo::ConstPtr cam_info_msg = nullptr;
-  sensor_msgs::Image::ConstPtr img_msg = nullptr;
-  double time = 0.0, time0 = -1, ave_dt = 0, last_time = 0;
-
-  object_data_vec_t ego_data_est, ego_data_gt, bowl_data_est, bowl_data_gt, camera_data_est, camera_data_gt, can_data_est, can_data_gt, laptop_data_est, laptop_data_gt, mug_data_est, mug_data_gt;
-
-  int num_msgs = 0;
-  for(rosbag::MessageInstance const m: rosbag::View(bag))
-  {
-    num_msgs++;
-    if(time0 < 0) {
-      time0 = m.getTime().toSec();
-      time = 0.0;
-    }
-    else {
-      last_time = time;
-      time = m.getTime().toSec() - time0;
-      ave_dt += time - last_time;
-    }
-    
-    // cout << m.getDataType() << endl;
-    if( abs(time - 2.2) < 0.04 && m.getDataType() == "geometry_msgs/PoseStamped"){
-      cout << "topic: " << m.getTopic() << "msg: " << m.instantiate<geometry_msgs::PoseStamped>()->pose << endl;
-    }
-
-    if (m.getTopic() == tf || ("/" + m.getTopic() == tf)) {
-      tf_msg = m.instantiate<tf::tfMessage>();
-      if (tf_msg != nullptr) {
-        // cout << tf_msg->transforms << endl;
-      }
-    }
-    else if (m.getTopic() == bowl_pose_est || ("/" + m.getTopic() == bowl_pose_est)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        bowl_data_est.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else if (m.getTopic() == bowl_pose_gt || ("/" + m.getTopic() == bowl_pose_gt)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        bowl_data_gt.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else if (m.getTopic() == camera_pose_est || ("/" + m.getTopic() == camera_pose_est)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        camera_data_est.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else if (m.getTopic() == camera_pose_gt || ("/" + m.getTopic() == camera_pose_gt)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        camera_data_gt.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else if (m.getTopic() == can_pose_est || ("/" + m.getTopic() == can_pose_est)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        can_data_est.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else if (m.getTopic() == can_pose_gt || ("/" + m.getTopic() == can_pose_gt)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        can_data_gt.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else if (m.getTopic() == laptop_pose_est || ("/" + m.getTopic() == laptop_pose_est)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        laptop_data_est.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else if (m.getTopic() == laptop_pose_gt || ("/" + m.getTopic() == laptop_pose_gt)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        laptop_data_gt.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else if (m.getTopic() == mug_pose_est || ("/" + m.getTopic() == mug_pose_est)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        mug_data_est.push_back(make_tuple(time, geo_msg->pose));
-        // cout << get<1>(mug_data_est.back()) << endl;
-      }
-    }
-    else if (m.getTopic() == mug_pose_gt || ("/" + m.getTopic() == mug_pose_gt)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        mug_data_gt.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else if (m.getTopic() == cam_info || ("/" + m.getTopic() == cam_info)) {
-      if(cam_info_msg != nullptr) {
-        continue;
-      }
-      cam_info_msg = m.instantiate<sensor_msgs::CameraInfo>();
-    }
-    else if (m.getTopic() == img || ("/" + m.getTopic() == img)) {
-      img_msg = m.instantiate<sensor_msgs::Image>();
-      if (img_msg != nullptr) {
-        // cout << img_msg->pose << endl;
-      }
-    }
-    else if (m.getTopic() == ego_pose_est || ("/" + m.getTopic() == ego_pose_est)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        ego_data_est.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else if (m.getTopic() == ego_pose_gt || ("/" + m.getTopic() == ego_pose_gt)) {
-      geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-      if (geo_msg != nullptr) {
-        ego_data_gt.push_back(make_tuple(time, geo_msg->pose));
-      }
-    }
-    else {
-      cout << "Unexpected message type found. Topic: " << m.getTopic() << " Type: " << m.getDataType() << endl;
-    }
-  }
-  ave_dt /= num_msgs - 1;
-  cout << "Number of messages in bag = " << num_msgs << endl;
-  cout << "Average timestep = " << ave_dt << endl;
-  bag.close();
-
-  // object_est_gt_data_vec_t* ego_data = sync_est_and_gt(ego_data_est, ego_data_gt);
-  // &all_data[0] = &ego_data;
-
-
-  object_est_gt_data_vec_t bowl_data, camera_data, can_data, laptop_data, mug_data;
-
-  sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, object_id_map["ego"], dt_thresh);
-
-  sync_est_and_gt(bowl_data_est, bowl_data_gt, bowl_data, object_id_map["bowl"], dt_thresh);
-  obj_data.insert( obj_data.end(), bowl_data.begin(), bowl_data.end() );
-
-  sync_est_and_gt(camera_data_est, camera_data_gt, camera_data, object_id_map["camera"], dt_thresh);
-  obj_data.insert( obj_data.end(), camera_data.begin(), camera_data.end() );
-
-  sync_est_and_gt(can_data_est, can_data_gt, can_data, object_id_map["can"], dt_thresh);
-  obj_data.insert( obj_data.end(), can_data.begin(), can_data.end() );
-
-  sync_est_and_gt(laptop_data_est, laptop_data_gt, laptop_data, object_id_map["laptop"], dt_thresh);
-  obj_data.insert( obj_data.end(), laptop_data.begin(), laptop_data.end() );
-
-  sync_est_and_gt(mug_data_est, mug_data_gt, mug_data, object_id_map["mug"], dt_thresh);
-  obj_data.insert( obj_data.end(), mug_data.begin(), mug_data.end() );
-}
-
 void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data, int object_id, double dt_thresh) {
   // data.push_back(make_tuple(5, get<1>(data_est[0]), get<1>(data_est[0])));
   // now "sync" the gt and est for each object
@@ -618,8 +425,7 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
         data.push_back(make_tuple((t_gt + t_est)/2, object_id, get<1>(data_gt[i]), get<1>(data_est[j])));
         if (object_id != 1) { // no pose data for ego robot, all zeros
           double t_diff, rot_diff; 
-          calc_pose_delta(ros_geo_pose_to_gtsam_pose3(get<1>(data_gt[i])).inverse(), 
-                          ros_geo_pose_to_gtsam_pose3(get<1>(data_est[j])), &t_diff, &rot_diff, true);
+          calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff, &rot_diff, true);
           cout << "time = " << t_est << ". id = " << object_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
         }
         next_est_time_ind = j + 1;
@@ -642,14 +448,4 @@ Pose3 add_init_est_noise(const Pose3 &ego_pose_est) {
   
   // cout << "tf after noise: " << ego_pose_est << endl;
 
-}
-
-Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose) {
-  // Convert a ros pose structure to gtsam's Pose3 class
-  Point3 t = Point3(ros_pose.position.x, ros_pose.position.y, ros_pose.position.z);
-  Rot3 R = Rot3( Quaternion(ros_pose.orientation.w, 
-                            ros_pose.orientation.x, 
-                            ros_pose.orientation.y, 
-                            ros_pose.orientation.z) );
-  return Pose3(R, t);
 }

@@ -9,19 +9,6 @@ set(CMAKE_BUILD_TYPE Debug)
 
 # Find GTSAM, either from a local build, or from a Debian/Ubuntu package.
 find_package(GTSAM REQUIRED)
-find_package(rosbag REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(tf REQUIRED)
-
-include_directories( 
-    ${rosbag_INCLUDE_DIRS} 
-    ${std_msgs_INCLUDE_DIRS} 
-    ${geometry_msgs_INCLUDE_DIRS} 
-    ${sensor_msgs_INCLUDE_DIRS}
-    ${tf_INCLUDE_DIRS}
-)
 
 add_executable(gtsam_test src/gtsam_test.cpp)
 
@@ -30,11 +17,6 @@ add_executable(gtsam_test src/gtsam_test.cpp)
 # required build flags (e.g. C++11, etc.)
 target_link_libraries(gtsam_test PUBLIC 
     gtsam 
-    ${rosbag_LIBRARIES} 
-    ${std_msgs_LIBRARIES} 
-    ${geometry_msgs_LIBRARIES} 
-    ${sensor_msgs_LIBRARIES} 
-    ${tf_LIBRARIES}
 )
 
 # This clears the terminal when cmake is called
