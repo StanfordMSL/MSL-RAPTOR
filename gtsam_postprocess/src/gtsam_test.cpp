@@ -276,6 +276,10 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   for(const auto& key_value: poses) {
     // Extract Symbol and Pose from dict & store in map
     Symbol sym = Symbol(key_value.key);
+    if(sym == Symbol('x',44))
+    {
+      cout << "dsfs" << endl;
+    }
     Pose3 tf_w_est_postslam = key_value.value;
     tf_w_est_postslam_map[sym] = tf_w_est_postslam;
 
@@ -460,6 +464,9 @@ Pose3 remove_yaw(Pose3 P) {
 }
 
 Rot3 remove_yaw(Rot3 R) {
+  /// https://stackoverflow.com/questions/31589901/euler-to-quaternion-quaternion-to-euler-using-eigen
+  // https://eigen.tuxfamily.org/dox/group__Geometry__Module.html
+  // https://eigen.tuxfamily.org/dox/classEigen_1_1AngleAxis.html
   // roll (X) pitch (Y) yaw (Z) (set Z to 0)
   Matrix3 M = R.matrix();
   double x,y,z,cx,cy,cz,sx,sy,sz;
@@ -467,16 +474,14 @@ Rot3 remove_yaw(Rot3 R) {
   y = asin(sy);
   cy = cos(y);
   if (abs(cy) < 0.0001) {
-    cz = M(0, 0) / cy;
-    cx =  M(2, 2) / cy;
-    z = acos(cz);
-    x = acos(cx);
-    sx = sin(x);
-
-    // set z = 0...
-    sz = 0;
-    cz = 1;
-    return Rot3();
+    // https://www.mecademic.com/resources/Euler-angles/Euler-angles
+    // x = 0; cx = 1; sx = 0;
+    // y = M_PI / 2.0;
+    // z = 0;
+    // return Rot3(     cy*cz,            -cy*sz,         sy,
+    //             cx*sz + cz*sx*sy, cx*cz - sx*sy*sz, -cy*sx,
+    //             sx*sz - cx*cz*sy, cz*sx + cx*sy*sz,  cx*cy );
+    return Rot3::Ry(M_PI / 2.0);
   }
   else{
     cz = M(0, 0) / cy;
@@ -510,4 +515,5 @@ Rot3 remove_yaw(Rot3 R) {
   //       %         [ sx*sz - cx*cz*sy, cz*sx + cx*sy*sz,  cx*cy]
   //       %       = Rx(tx) * Ry(ty) * Rz(tz)
 
+  //https://www.mecademic.com/resources/Euler-angles/Euler-angles
 }
