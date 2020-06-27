@@ -64,6 +64,9 @@
 #include <math.h>
 #include <algorithm>
 #include <random>
+#include <fstream>
+#include <iostream>
+#include "json/json.h"
 
 using namespace std;
 using namespace gtsam;
