@@ -16,6 +16,7 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf REQUIRED)
+find_package(jsoncpp CONFIG REQUIRED)
 
 # message("Includes:" ${rosbag_INCLUDE_DIRS} )
 # message("Libraries:" ${rosbag_LIBRARIES} )
@@ -43,9 +44,10 @@ target_link_libraries(gtsam_test PUBLIC
     ${std_msgs_LIBRARIES} 
     ${geometry_msgs_LIBRARIES} 
     ${sensor_msgs_LIBRARIES} 
-    ${tf_LIBRARIES} 
+    ${tf_LIBRARIES}
+    jsoncpp_lib
 )
-
+# target_link_libraries(main PRIVATE jsoncpp_lib)
 # # This clears the terminal when cmake is called
 # execute_process (COMMAND bash -c "clear")
 
