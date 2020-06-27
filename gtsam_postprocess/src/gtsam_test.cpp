@@ -66,7 +66,6 @@
 #include <random>
 #include <fstream>
 #include <iostream>
-#include "json/json.h"
 
 using namespace std;
 using namespace gtsam;
@@ -90,6 +89,9 @@ Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose);
 void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad, bool b_degrees);
 
 
+void load_log_files(object_est_gt_data_vec_t & ado_data, object_est_gt_data_vec_t & ego_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh);
+void read_data_from_one_log(const string fn, object_data_vec_t& obj_data);
+
 int main(int argc, char** argv) {
   // useful gtsam examples:
   // https://github.com/borglab/gtsam/blob/develop/examples/VisualISAM2Example.cpp
@@ -97,8 +99,8 @@ int main(int argc, char** argv) {
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample_large.cpp
   // Note: tf_A_B is a transform that when right multipled by a vector in frame B produces the same vector in frame A: p_A = tf_A_B * p_B
 
-  string bag_name = "/mounted_folder/nocs/test/scene_1.bag"; // Rosbag location & name for GT data
-  // string bag_name = "/mounted_folder/raptor_processed_bags/nocs_test/msl_raptor_output_from_bag_scene_1.bag"; // Rosbag location & name for EST data
+  // string bag_name = "/mounted_folder/nocs/test/scene_1.bag"; // Rosbag location & name for GT data
+  string bag_name = "/mounted_folder/raptor_processed_bags/nocs_test/msl_raptor_output_from_bag_scene_1.bag"; // Rosbag location & name for EST data
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
   map<std::string, int> object_id_map = {
         {"ego", 1},
@@ -108,10 +110,23 @@ int main(int argc, char** argv) {
         {"laptop", 5},
         {"mug", 6}
   };
+  map<string, string> object_long_to_short_name = {
+    {"bowl_white_small_norm", "bowl"},
+    { "camera_canon_len_norm", "camera"},
+    {"can_arizona_tea_norm", "can"},
+    {"laptop_air_xin_norm", "laptop"},
+    {"mug_daniel_norm", "mug"}
+  };
+  string path = "/mounted_folder/nocs_logs/";
+  string base = "log_1_";
+
+  object_est_gt_data_vec_t ado_data, ego_data;
+   load_log_files(ado_data, ego_data, path, base, object_long_to_short_name, object_id_map, dt_thresh);
+  return 0;
   
-  object_est_gt_data_vec_t obj_data, ego_data;
-  preprocess_rosbag(bag_name, ego_data, obj_data, object_id_map, dt_thresh);
-  std::sort(obj_data.begin(), obj_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
+
+  preprocess_rosbag(bag_name, ego_data, ado_data, object_id_map, dt_thresh);
+  std::sort(ado_data.begin(), ado_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
       if (get<0>(lhs) == get<0>(rhs)) {
         return get<1>(lhs) < get<1>(rhs);
       }
@@ -119,11 +134,67 @@ int main(int argc, char** argv) {
    });   // this should sort the vector by time (i.e. first element in each tuple)
   //  DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
   return 5;
-  run_batch_slam(ego_data, obj_data, object_id_map, dt_thresh);
+  run_batch_slam(ego_data, ado_data, object_id_map, dt_thresh);
   // run_isam(all_data, object_id_map);
 
   cout << "done with main!" << endl;
   return 0;
+}
+
+void load_log_files(object_est_gt_data_vec_t & ado_data, object_est_gt_data_vec_t & ego_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh) {
+  // Time (s), Ado State GT, Ego State GT, 3D Corner GT (X|Y|Z), Corner 2D Projections GT (r|c), Angled BB (r|c|w|h|ang_deg), Image Segmentation Mode
+
+// typedef vector<tuple<double, geometry_msgs::Pose>> object_data_vec_t;  // vector of tuples(double, ros pose message)
+// typedef tuple<double, int, geometry_msgs::Pose, geometry_msgs::Pose> data_tuple; 
+// typedef vector<data_tuple> object_est_gt_data_vec_t; //vector of tuples(double, int (id), ros pose message, ros pose message)
+  vector<object_data_vec_t> ado_data_gt, ado_data_est;
+  // map<int, object_data_vec_t> all_ado_data_gt, all_ado_data_est;
+  for(const auto &key_value_pair : object_long_to_short_name) {
+    object_data_vec_t ado_data_gt, ado_data_est;
+    object_est_gt_data_vec_t ado_data_single;
+    string obj_long_name = key_value_pair.first;
+    int obj_id = object_id_map[key_value_pair.second];
+
+    read_data_from_one_log(path + file_base + obj_long_name + "_gt.log", ado_data_gt);
+    read_data_from_one_log(path + file_base + obj_long_name + "_est.log", ado_data_est);
+
+    sync_est_and_gt(ado_data_est, ado_data_gt, ado_data_single, obj_id, dt_thresh);
+    ado_data.insert( ado_data.end(), ado_data_single.begin(), ado_data_single.end() );
+  }
+  // sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, object_id_map["ego"], dt_thresh);
+}
+
+void read_data_from_one_log(const string fn, object_data_vec_t& obj_data){
+  ifstream infile(fn);
+  string line, s;
+  double time, x, y, z, vx, vy, vz, qx, qy, qz, qw, wx, wy, wz;
+  Pose3 pose;
+  while (getline(infile, line)) {
+    istringstream iss(line);
+    if (!getline( iss, s, ' ' )) {
+      break;
+    }
+    iss >> time;
+    iss >> x;
+    iss >> y;
+    iss >> z;
+    iss >> vx;
+    iss >> vy;
+    iss >> vz;
+    iss >> qw;
+    iss >> qx;
+    iss >> qy;
+    iss >> qz;
+    iss >> wx;
+    iss >> wy;
+    iss >> wz;
+    pose = Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z));
+    obj_data.push_back(make_tuple(time, pose));
+    break;
+  }
+  sort(obj_data.begin(), obj_data.end(), [](const tuple<double, geometry_msgs::Pose>& lhs, const tuple<double, geometry_msgs::Pose>& rhs) {
+      return get<0>(lhs) < get<0>(rhs);
+   });   // this should sort the vector by time
 }
 
 void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, const map<std::string, int> &object_id_map, double dt_thresh) {

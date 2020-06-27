@@ -7,8 +7,6 @@ set(CMAKE_VERBOSE_MAKEFILE 0)
 set(CMAKE_BUILD_TYPE Debug)
 # set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
-include_directories(/root/msl_raptor_ws/devel/include/)
-
 # Find GTSAM, either from a local build, or from a Debian/Ubuntu package.
 find_package(GTSAM REQUIRED)
 find_package(rosbag REQUIRED)
@@ -16,10 +14,6 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf REQUIRED)
-find_package(jsoncpp CONFIG REQUIRED)
-
-# message("Includes:" ${rosbag_INCLUDE_DIRS} )
-# message("Libraries:" ${rosbag_LIBRARIES} )
 
 include_directories( 
     ${rosbag_INCLUDE_DIRS} 
@@ -28,10 +22,6 @@ include_directories(
     ${sensor_msgs_INCLUDE_DIRS}
     ${tf_INCLUDE_DIRS}
 )
-
-
-# custom command to clear terminal when "make" is called
-# add_custom_target(tmp clear)
 
 add_executable(gtsam_test src/gtsam_test.cpp)
 
@@ -45,11 +35,7 @@ target_link_libraries(gtsam_test PUBLIC
     ${geometry_msgs_LIBRARIES} 
     ${sensor_msgs_LIBRARIES} 
     ${tf_LIBRARIES}
-    jsoncpp_lib
 )
-# target_link_libraries(main PRIVATE jsoncpp_lib)
-# # This clears the terminal when cmake is called
-# execute_process (COMMAND bash -c "clear")
 
 # This clears the terminal when cmake is called
 add_custom_target(clearing_terminal ALL
