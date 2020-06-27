@@ -90,36 +90,6 @@ RUN cd gtsam/gtsam/3rdparty/Eigen && \
     cmake .. &&\
     make install
 
-# Install JsonCpp
-RUN git clone https://github.com/Microsoft/vcpkg.git && \
-    cd vcpkg && \
-    ./bootstrap-vcpkg.sh -disableMetrics && \
-    ./vcpkg integrate install && \
-    ./vcpkg install jsoncpp
-
-# # Install GTSAM (requirements)
-# RUN apt-get update && apt-get install -y \
-#     libboost-all-dev \
-#     cmake \
-#     libtbb-dev \
-#     && rm -rf /var/lib/apt/lists/*
-
-# # Install GTSAM
-# RUN git clone https://github.com/borglab/gtsam.git && \
-#     cd gtsam && \
-#     mkdir build && \
-#     cd build && \
-#     cmake .. && \
-#     make -j2 && \
-#     make install
-
-# # Install Eigen3 (packaged in GTSAM)
-# RUN cd gtsam/gtsam/3rdparty/Eigen && \
-#     mkdir build && \
-#     cd build && \
-#     cmake .. &&\
-#     make install
-
 # Install dependencies for rosbag (needed for reading data from a rosbag)
 RUN pip3 install pycrypto python-gnupg
 
