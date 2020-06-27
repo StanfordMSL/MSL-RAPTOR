@@ -77,7 +77,8 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
 // Helper functions
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est);
 void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad, bool b_degrees);
-
+Rot3 remove_yaw(Rot3 R);
+Pose3 remove_yaw(Pose3 P);
 
 int main(int argc, char** argv) {
   // useful gtsam examples:
@@ -166,7 +167,7 @@ void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<do
     iss >> wz;
     pose = Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z));
     times.insert(time);
-    obj_data.push_back(make_tuple(time, pose));
+    obj_data.push_back(make_tuple(time, remove_yaw(pose)));
     continue;
   }
 }
@@ -200,19 +201,20 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   //  - 1D) Use estimate of current camera pose for value initalization
   int t_ind = 0;
   for(const auto & ego_time : times) {
+    Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
     ego_pose_index = 1 + t_ind;
     ego_sym = Symbol('x', ego_pose_index);
+    if(ego_pose_index == 44){
+      cout << "trouble case" << endl;
+    }
 
     if (obj_list_ind >= obj_data.size()) {
       cout << "encorperated all observations into graph" << endl;
       break;
     }
-
-    Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
     
-    cout << "\n-----------------------------------------" << endl;
-    cout << "t_ind = " << t_ind << endl;
-
+    // cout << "\n-----------------------------------------" << endl;
+    // cout << "t_ind = " << t_ind << endl;
     while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
       // DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
       // first condition means we have more data to process, second means this observation is cooresponding with this ego pose
@@ -222,7 +224,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       
       // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
       graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
-      cout << "creating factor " << ego_sym << " <--> " << ado_sym << endl;
+      // cout << "creating factor " << ego_sym << " <--> " << ado_sym << endl;
 
       if(t_ind == 0) {
         // 1B) if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
@@ -237,6 +239,16 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         // 1C) use gt position of landmark now & at t0 to get gt position of ego. Same for estimated position
         tf_ego_ado_gt = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
         tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
+        if(obj_list_ind >= 199 && obj_list_ind< 204){
+          cout << "at debug" << endl;
+          Rot3 R = tf_ego_ado_gt.rotation();
+          cout << R << endl;
+          cout << R.xyz() << "\n"<< endl;
+          Rot3 R2 = remove_yaw(R);
+          cout << R2 << endl;
+          cout << R2.xyz() << R2.yaw() << endl;
+          cout << "end debug" << endl;
+        }
         tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // gt ego pose in world frame
       }
       obj_list_ind++;
@@ -255,10 +267,6 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   LevenbergMarquardtOptimizer optimizer(graph, initial_estimate);
   Values result = optimizer.optimize();
 
-  result.print("Final result:\n");
-  cout << "initial error = " << graph.error(initial_estimate) << endl;  // iterate over all the factors_ to accumulate the log probabilities
-  cout << "final error = " << graph.error(result) << endl;  // iterate over all the factors_ to accumulate the log probabilities
-
   // STEP 3 Loop through each ego /landmark pose and compare estimate with ground truth (both before and after slam optimization)
   Values::ConstFiltered<Pose3> poses = result.filter<Pose3>();
   int i = 0;
@@ -266,19 +274,14 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   double ave_t_diff_pre = 0, ave_rot_diff_pre = 0, ave_t_diff_post = 0, ave_rot_diff_post = 0;
   bool b_degrees = true;
   for(const auto& key_value: poses) {
-    cout << "-----------------------------------------------------" << endl;
     // Extract Symbol and Pose from dict & store in map
     Symbol sym = Symbol(key_value.key);
     Pose3 tf_w_est_postslam = key_value.value;
-    cout << "evaluating " << sym << ":" << endl;
     tf_w_est_postslam_map[sym] = tf_w_est_postslam;
 
     // Find corresponding gt pose and preslam pose
     Pose3 tf_w_gt = tf_w_gt_map[sym], tf_w_gt_inv = tf_w_gt.inverse();
     Pose3 tf_w_est_preslam = tf_w_est_preslam_map[sym];
-    cout << "gt pose:" << tf_w_gt << endl;
-    cout << "pre-process est pose:" << tf_w_est_preslam << endl;
-    cout << "post-process est pose:" << tf_w_est_postslam << endl;
     
     double t_diff_pre_val, rot_diff_pre_val, t_diff_post_val, rot_diff_post_val; 
     calc_pose_delta(tf_w_est_preslam, tf_w_gt_inv, &t_diff_pre_val, &rot_diff_pre_val, b_degrees);
@@ -292,6 +295,11 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     ave_t_diff_post += t_diff_post_val;
     ave_rot_diff_post += rot_diff_post_val;
 
+    cout << "-----------------------------------------------------" << endl;
+    cout << "evaluating " << sym << ":" << endl;
+    // cout << "gt pose:" << tf_w_gt << endl;
+    // cout << "pre-process est pose:" << tf_w_est_preslam << endl;
+    // cout << "post-process est pose:" << tf_w_est_postslam << endl;
     cout << "delta pre-slam: t = " << t_diff_pre_val << ", ang = " << rot_diff_pre_val << " deg" << endl;
     cout << "delta post-slam: t = " << t_diff_post_val << ", ang = " << rot_diff_post_val << " deg" << endl;
 
@@ -301,8 +309,9 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   ave_rot_diff_pre /= double(i);
   ave_t_diff_post /= double(i);
   ave_rot_diff_post /= double(i);
-  cout << "-----------------------------------------------------" << endl;
-  cout << "-----------------------------------------------------" << endl;
+  cout << "\n-----------------------------------------------------\n-----------------------------------------------------\n" << endl;
+  cout << "initial error = " << graph.error(initial_estimate) << endl;  // iterate over all the factors_ to accumulate the log probabilities
+  cout << "final error = " << graph.error(result) << "\n" << endl;  // iterate over all the factors_ to accumulate the log probabilities
   cout << "Averages t_pre = " << ave_t_diff_pre << ", t_post = " << ave_t_diff_post << endl;
   cout << "Averages rot_pre = " << ave_rot_diff_pre << " deg, rot_post = " << ave_rot_diff_post << " deg" << endl;
 }
@@ -422,7 +431,7 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
         if (object_id != 1) { // no pose data for ego robot, all zeros
           double t_diff, rot_diff; 
           calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff, &rot_diff, true);
-          // cout << "time = " << t_est << ". id = " << object_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
+          cout << "time = " << t_est << ". id = " << object_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
         }
         next_est_time_ind = j + 1;
         break;
@@ -443,5 +452,62 @@ Pose3 add_init_est_noise(const Pose3 &ego_pose_est) {
   // ego_pose_est = ego_pose_est.compose(delta);
   
   // cout << "tf after noise: " << ego_pose_est << endl;
+
+}
+
+Pose3 remove_yaw(Pose3 P) {
+  return Pose3(remove_yaw(P.rotation()), P.translation());
+}
+
+Rot3 remove_yaw(Rot3 R) {
+  // roll (X) pitch (Y) yaw (Z) (set Z to 0)
+  Matrix3 M = R.matrix();
+  double x,y,z,cx,cy,cz,sx,sy,sz;
+  sy = M(0,2);
+  y = asin(sy);
+  cy = cos(y);
+  if (abs(cy) < 0.0001) {
+    cz = M(0, 0) / cy;
+    cx =  M(2, 2) / cy;
+    z = acos(cz);
+    x = acos(cx);
+    sx = sin(x);
+
+    // set z = 0...
+    sz = 0;
+    cz = 1;
+    return Rot3();
+  }
+  else{
+    cz = M(0, 0) / cy;
+    cx =  M(2, 2) / cy;
+    z = acos(cz);
+    x = acos(cx);
+    sx = sin(x);
+
+    // set z = 0...
+    sz = 0;
+    cz = 1;
+
+    // Rot3 (double R11, double R12, double R13, double R21, double R22, double R23, double R31, double R32, double R33)
+    return Rot3(     cy*cz,            -cy*sz,         sy,
+                cx*sz + cz*sx*sy, cx*cz - sx*sy*sz, -cy*sx,
+                sx*sz - cx*cz*sy, cz*sx + cx*sy*sz,  cx*cy );
+  }
+  runtime_error("SHOULD NEVER BE HERE (remove_yaw)");
+  return Rot3(); 
+
+  // This has been "tested" by taking copying a matrix to matlab, checking its rotm2eul, 
+  //  then comparing that to the rotm2eul of the same matrix after its gone through this function
+
+// Per Matlab (eul2rotm function)...
+  //  case 'XYZ'
+  //       %     The rotation matrix R can be constructed as follows by
+  //       %     ct = [cx cy cz] and st = [sx sy sz]
+  //       %
+  //       %     R = [            cy*cz,           -cy*sz,     sy]
+  //       %         [ cx*sz + cz*sx*sy, cx*cz - sx*sy*sz, -cy*sx]
+  //       %         [ sx*sz - cx*cz*sy, cz*sx + cx*sy*sz,  cx*cy]
+  //       %       = Rx(tx) * Ry(ty) * Rz(tz)
 
 }
