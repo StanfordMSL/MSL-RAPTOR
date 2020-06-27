@@ -19,8 +19,8 @@ target_link_libraries(gtsam_test PUBLIC
     gtsam 
 )
 
-# This clears the terminal when cmake is called
-add_custom_target(clearing_terminal ALL
-    COMMAND clear
-    DEPENDS ${gtsam_test}
-)
+# # This clears the terminal when make is called
+# add_custom_target(clearing_terminal ALL
+#     COMMAND clear
+#     DEPENDS ${gtsam_test}
+# )

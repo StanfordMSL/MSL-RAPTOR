@@ -61,18 +61,18 @@ using namespace std;
 using namespace gtsam;
 
 // Type Defs for loading data
-typedef vector<tuple<double,Pose3>> object_data_vec_t;  // vector of tuples(double, pose message)
+typedef vector<tuple<double, Pose3>> object_data_vec_t;  // vector of tuples(double, pose message)
 typedef tuple<double, int, Pose3, Pose3> data_tuple; 
 typedef vector<data_tuple> object_est_gt_data_vec_t; //vector of tuples(double, int (id), pose message, pose message)
 
 // Loading & Processing Functions
-void load_log_files(object_est_gt_data_vec_t & ado_data, object_est_gt_data_vec_t & ego_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh);
-void read_data_from_one_log(const string fn, object_data_vec_t& obj_data);
+void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh);
+void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> & times);
 void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& ego_data, int object_id, double dt_thresh);
 
 // GTSAM-RAPTOR Function
 void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map);
-void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, const map<std::string, int> &object_id_map, double dt_thresh);
+void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, int> &object_id_map, double dt_thresh);
 
 // Helper functions
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est);
@@ -105,8 +105,10 @@ int main(int argc, char** argv) {
   string path = "/mounted_folder/nocs_logs/";
   string base = "log_1_";
 
-  object_est_gt_data_vec_t ado_data, ego_data;
-   load_log_files(ado_data, ego_data, path, base, object_long_to_short_name, object_id_map, dt_thresh);
+  //  DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
+  object_est_gt_data_vec_t ado_data;
+  set<double> times;
+  load_log_files(times, ado_data, path, base, object_long_to_short_name, object_id_map, dt_thresh);
 
   std::sort(ado_data.begin(), ado_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
       if (get<0>(lhs) == get<0>(rhs)) {
@@ -114,16 +116,19 @@ int main(int argc, char** argv) {
       }
       return get<0>(lhs) < get<0>(rhs);
    });   // this should sort the vector by time (i.e. first element in each tuple)
-  //  DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
-  return 5;
-  run_batch_slam(ego_data, ado_data, object_id_map, dt_thresh);
+
+  for(const auto & v : ado_data){
+    cout << get<0>(v) << "   " << get<1>(v) << endl;
+  }
+
+  run_batch_slam(times, ado_data, object_id_map, dt_thresh);
   // run_isam(all_data, object_id_map);
 
   cout << "done with main!" << endl;
   return 0;
 }
 
-void load_log_files(object_est_gt_data_vec_t & ado_data, object_est_gt_data_vec_t & ego_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh) {
+void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh) {
   // Time (s), Ado State GT, Ego State GT, 3D Corner GT (X|Y|Z), Corner 2D Projections GT (r|c), Angled BB (r|c|w|h|ang_deg), Image Segmentation Mode
   vector<object_data_vec_t> ado_data_gt, ado_data_est;
   // map<int, object_data_vec_t> all_ado_data_gt, all_ado_data_est;
@@ -133,25 +138,27 @@ void load_log_files(object_est_gt_data_vec_t & ado_data, object_est_gt_data_vec_
     string obj_long_name = key_value_pair.first;
     int obj_id = object_id_map[key_value_pair.second];
 
-    read_data_from_one_log(path + file_base + obj_long_name + "_gt.log", ado_data_gt);
-    read_data_from_one_log(path + file_base + obj_long_name + "_est.log", ado_data_est);
+    read_data_from_one_log(path + file_base + obj_long_name + "_gt.log", ado_data_gt, times);
+    cout << ado_data_gt.size() << endl;
+    read_data_from_one_log(path + file_base + obj_long_name + "_est.log", ado_data_est, times);
+    cout << ado_data_est.size() << endl;
 
     sync_est_and_gt(ado_data_est, ado_data_gt, ado_data_single, obj_id, dt_thresh);
     ado_data.insert( ado_data.end(), ado_data_single.begin(), ado_data_single.end() );
   }
-  // sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, object_id_map["ego"], dt_thresh);
 }
 
-void read_data_from_one_log(const string fn, object_data_vec_t& obj_data){
+void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> &times){
   ifstream infile(fn);
   string line, s;
   double time, x, y, z, vx, vy, vz, qx, qy, qz, qw, wx, wy, wz;
   Pose3 pose;
+  getline(infile, line); // skip header of file
   while (getline(infile, line)) {
     istringstream iss(line);
-    if (!getline( iss, s, ' ' )) {
-      break;
-    }
+    // if (!getline( iss, s, ' ' )) {
+    //   break;
+    // }
     iss >> time;
     iss >> x;
     iss >> y;
@@ -167,15 +174,16 @@ void read_data_from_one_log(const string fn, object_data_vec_t& obj_data){
     iss >> wy;
     iss >> wz;
     pose = Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z));
+    times.insert(time);
     obj_data.push_back(make_tuple(time, pose));
-    break;
+    continue;
   }
   sort(obj_data.begin(), obj_data.end(), [](const tuple<double, Pose3>& lhs, const tuple<double, Pose3>& rhs) {
       return get<0>(lhs) < get<0>(rhs);
    });   // this should sort the vector by time
 }
 
-void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_gt_data_vec_t& obj_data, const map<std::string, int> &object_id_map, double dt_thresh) {
+void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, int> &object_id_map, double dt_thresh) {
   // note: object id serves as landmark id, landmark is same as saying "ado"
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
 
@@ -202,11 +210,10 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
   //  - 1B) If first timestep, use the fact that x1 is defined to be origin to set ground truth pose of landmarks. Also use first estimate as initial estimate for landmark pose
   //  - 1C) Otherwise, use gt / estimate of landmark poses from t0 and current time to gt / estimate of current camera pose (SUBSTITUE FOR ODOMETRY!!)
   //  - 1D) Use estimate of current camera pose for value initalization
-  for(int t_ind = 0; t_ind < ego_data.size(); t_ind++) {
+  int t_ind = 0;
+  for(const auto & ego_time : times) {
     ego_pose_index = 1 + t_ind;
     ego_sym = Symbol('x', ego_pose_index);
-    double ego_time = get<0>(ego_data[t_ind]);
-    Pose3 ego_est = get<3>(ego_data[t_ind]);
 
     if (obj_list_ind >= obj_data.size()) {
       cout << "encorperated all observations into graph" << endl;
@@ -252,6 +259,7 @@ void run_batch_slam(const object_est_gt_data_vec_t& ego_data, const object_est_g
       tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_est);
       tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
     b_landmarks_observed = false;
+    t_ind++;
   }
   cout << "done building batch slam graph (w/ initializations)!" << endl;
 
@@ -426,7 +434,7 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
         if (object_id != 1) { // no pose data for ego robot, all zeros
           double t_diff, rot_diff; 
           calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff, &rot_diff, true);
-          cout << "time = " << t_est << ". id = " << object_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
+          // cout << "time = " << t_est << ". id = " << object_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
         }
         next_est_time_ind = j + 1;
         break;
