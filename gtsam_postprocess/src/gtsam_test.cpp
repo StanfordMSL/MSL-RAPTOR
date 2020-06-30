@@ -56,6 +56,8 @@
 #include <random>
 #include <fstream>
 #include <iostream>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 using namespace std;
 using namespace gtsam;
@@ -79,6 +81,7 @@ Pose3 add_init_est_noise(const Pose3 &ego_pose_est);
 void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad, bool b_degrees);
 Rot3 remove_yaw(Rot3 R);
 Pose3 remove_yaw(Pose3 P);
+Eigen::Matrix3f rot3_to_matrix3f(Rot3 R);
 
 int main(int argc, char** argv) {
   // useful gtsam examples:
@@ -463,57 +466,98 @@ Pose3 remove_yaw(Pose3 P) {
   return Pose3(remove_yaw(P.rotation()), P.translation());
 }
 
+Eigen::Matrix3f rot3_to_matrix3f(Rot3 R) {
+  Eigen::Matrix3f m;
+  m(0,0) = R.matrix()(0,0); m(0,1) = R.matrix()(0,1); m(0,2) = R.matrix()(0,2);
+  m(1,0) = R.matrix()(1,0); m(1,1) = R.matrix()(1,1); m(1,2) = R.matrix()(1,2);
+  m(2,0) = R.matrix()(2,0); m(2,1) = R.matrix()(2,1); m(2,2) = R.matrix()(2,2);
+  return m;
+}
+
 Rot3 remove_yaw(Rot3 R) {
+  // https://eigen.tuxfamily.org/dox/group__Geometry__Module.html#ga17994d2e81b723295f5bc3b1f862ed3b  || https://stackoverflow.com/questions/31589901/euler-to-quaternion-quaternion-to-euler-using-eigen
   /// https://stackoverflow.com/questions/31589901/euler-to-quaternion-quaternion-to-euler-using-eigen
   // https://eigen.tuxfamily.org/dox/group__Geometry__Module.html
   // https://eigen.tuxfamily.org/dox/classEigen_1_1AngleAxis.html
   // roll (X) pitch (Y) yaw (Z) (set Z to 0)
-  Matrix3 M = R.matrix();
-  double x,y,z,cx,cy,cz,sx,sy,sz;
-  sy = M(0,2);
-  y = asin(sy);
-  cy = cos(y);
-  if (abs(cy) < 0.0001) {
-    // https://www.mecademic.com/resources/Euler-angles/Euler-angles
-    // x = 0; cx = 1; sx = 0;
-    // y = M_PI / 2.0;
-    // z = 0;
-    // return Rot3(     cy*cz,            -cy*sz,         sy,
-    //             cx*sz + cz*sx*sy, cx*cz - sx*sy*sz, -cy*sx,
-    //             sx*sz - cx*cz*sy, cz*sx + cx*sy*sz,  cx*cy );
-    return Rot3::Ry(M_PI / 2.0);
-  }
-  else{
-    cz = M(0, 0) / cy;
-    cx =  M(2, 2) / cy;
-    z = acos(cz);
-    x = acos(cx);
-    sx = sin(x);
 
-    // set z = 0...
-    sz = 0;
-    cz = 1;
+  // Eigen::Matrix3d m;
+  // Eigen::Matrix3f m;
+  // m(0,0) = 1; m(0,1) = 0; m(0,2) = 0;
+  // m(1,0) = 0; m(1,1) = 1; m(1,2) = 0;
+  // m(2,0) = 0; m(2,1) = 0; m(2,2) = 1;
+  // Matrix M = R.matrix();
+  // Eigen::Vector3f ea0 = m.eulerAngles(0,1,2);
+  Eigen::Vector3f ea = rot3_to_matrix3f(R).eulerAngles(0, 1, 2); 
+  Eigen::Quaternion<float, 0> Q1 = Eigen::AngleAxisf(ea[0], Eigen::Vector3f::UnitZ()) * 
+                                   Eigen::AngleAxisf(ea[1], Eigen::Vector3f::UnitX()) * 
+                                   Eigen::AngleAxisf(ea[2], Eigen::Vector3f::UnitZ());
+  Eigen::Quaternion<float, 0> Q2 = Eigen::AngleAxisf(ea[0], Eigen::Vector3f::UnitZ()) * 
+                                   Eigen::AngleAxisf(ea[1], Eigen::Vector3f::UnitX()) * 
+                                   Eigen::AngleAxisf(0, Eigen::Vector3f::UnitZ());
+  Rot3 R1 = Rot3(Quaternion(Q1.w(), Q1.x(), Q1.y(), Q1.z()));
+  Rot3 R2 = Rot3(Quaternion(Q2.w(), Q2.x(), Q2.y(), Q2.z()));
 
-    // Rot3 (double R11, double R12, double R13, double R21, double R22, double R23, double R31, double R32, double R33)
-    return Rot3(     cy*cz,            -cy*sz,         sy,
-                cx*sz + cz*sx*sy, cx*cz - sx*sy*sz, -cy*sx,
-                sx*sz - cx*cz*sy, cz*sx + cx*sy*sz,  cx*cy );
-  }
-  runtime_error("SHOULD NEVER BE HERE (remove_yaw)");
-  return Rot3(); 
+  // v.insert(0,(Vector(4) << Q.x(), Q.y(), Q.z(), Q.w());
+  // Rot3 R1 = Rot3(v);
+  // v(4) << Q2.x(), Q2.y(), Q2.z(), Q2.w();
+  // Rot3 R2 = Rot3(v);
+  // Rot3 R1 = Rot3(Eigen::AngleAxisf(ea[0], Eigen::Vector3f::UnitZ()) * Eigen::AngleAxisf(ea[1], Eigen::Vector3f::UnitX()) * Eigen::AngleAxisf(ea[2], Eigen::Vector3f::UnitZ()));
+  return Rot3();
+  // Matrix3 M1 = AngleAxis(ea[0], Vector3::UnitZ()) * AngleAxisf(ea[1], Vector3::UnitX()) * AngleAxisf(ea[2], Vector3::UnitZ());
+  // Matrix3 M2 = Eigen::AngleAxisf(ea[0], Eigen::Vector3f::UnitZ()) * Eigen::AngleAxisf(ea[1], Eigen::Vector3f::UnitX()) * Eigen::AngleAxisf(0, Eigen::Vector3f::UnitZ());
+  // return Rot3(Eigen::AngleAxisf(ea[0], Eigen::Vector3f::UnitZ()) * Eigen::AngleAxisf(ea[1], Eigen::Vector3f::UnitX()) * Eigen::AngleAxisf(0, Eigen::Vector3f::UnitZ()));
 
-  // This has been "tested" by taking copying a matrix to matlab, checking its rotm2eul, 
-  //  then comparing that to the rotm2eul of the same matrix after its gone through this function
 
-// Per Matlab (eul2rotm function)...
-  //  case 'XYZ'
-  //       %     The rotation matrix R can be constructed as follows by
-  //       %     ct = [cx cy cz] and st = [sx sy sz]
-  //       %
-  //       %     R = [            cy*cz,           -cy*sz,     sy]
-  //       %         [ cx*sz + cz*sx*sy, cx*cz - sx*sy*sz, -cy*sx]
-  //       %         [ sx*sz - cx*cz*sy, cz*sx + cx*sy*sz,  cx*cy]
-  //       %       = Rx(tx) * Ry(ty) * Rz(tz)
+//   Matrix3 M = R.matrix();
+//   Vector3 ea = M.eulerAngles(0, 1, 2);
+//   double x,y,z,cx,cy,cz,sx,sy,sz;
+//   sy = M(0,2);
+//   y = asin(sy);
+//   cy = cos(y);
+//   if (abs(cy) < 0.0001) {
+//     // https://www.mecademic.com/resources/Euler-angles/Euler-angles
+//     // x = 0; cx = 1; sx = 0;
+//     // y = M_PI / 2.0;
+//     // z = 0;
+//     // return Rot3(     cy*cz,            -cy*sz,         sy,
+//     //             cx*sz + cz*sx*sy, cx*cz - sx*sy*sz, -cy*sx,
+//     //             sx*sz - cx*cz*sy, cz*sx + cx*sy*sz,  cx*cy );
+//     return Rot3::Ry(M_PI / 2.0);
+//   }
+//   else{
+//     cz = M(0, 0) / cy;
+//     cx =  M(2, 2) / cy;
+//     z = acos(cz);
+//     x = acos(cx);
+//     sx = sin(x);
 
-  //https://www.mecademic.com/resources/Euler-angles/Euler-angles
+//     // set z = 0...
+//     sz = 0;
+//     cz = 1;
+
+//     // Rot3 (double R11, double R12, double R13, double R21, double R22, double R23, double R31, double R32, double R33)
+//     Rot3 tmp =  Rot3(     cy*cz,            -cy*sz,         sy,
+//                 cx*sz + cz*sx*sy, cx*cz - sx*sy*sz, -cy*sx,
+//                 sx*sz - cx*cz*sy, cz*sx + cx*sy*sz,  cx*cy );
+//     Vector3 ea2 = tmp.matrix().eulerAngles(0, 1, 2);
+//     return tmp;
+//   }
+//   runtime_error("SHOULD NEVER BE HERE (remove_yaw)");
+//   return Rot3(); 
+
+//   // This has been "tested" by taking copying a matrix to matlab, checking its rotm2eul, 
+//   //  then comparing that to the rotm2eul of the same matrix after its gone through this function
+
+// // Per Matlab (eul2rotm function)...
+//   //  case 'XYZ'
+//   //       %     The rotation matrix R can be constructed as follows by
+//   //       %     ct = [cx cy cz] and st = [sx sy sz]
+//   //       %
+//   //       %     R = [            cy*cz,           -cy*sz,     sy]
+//   //       %         [ cx*sz + cz*sx*sy, cx*cz - sx*sy*sz, -cy*sx]
+//   //       %         [ sx*sz - cx*cz*sy, cz*sx + cx*sy*sz,  cx*cy]
+//   //       %       = Rx(tx) * Ry(ty) * Rz(tz)
+
+//   //https://www.mecademic.com/resources/Euler-angles/Euler-angles
 }
