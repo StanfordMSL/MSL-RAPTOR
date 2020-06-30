@@ -62,19 +62,42 @@
 using namespace std;
 using namespace gtsam;
 
-// Type Defs for loading data
+// Type Defs
 typedef vector<tuple<double, Pose3>> object_data_vec_t;  // vector of tuples(double, pose message)
 typedef tuple<double, int, Pose3, Pose3> data_tuple; 
 typedef vector<data_tuple> object_est_gt_data_vec_t; //vector of tuples(double, int (id), pose message, pose message)
 
-// Loading & Processing Functions
-void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh);
-void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> & times);
-void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& ego_data, int object_id, double dt_thresh);
+// Structs
+struct obj_param_t {
+  string long_name;
+  string short_name;
+  int obj_id;
+  bool b_rm_roll;
+  bool b_rm_pitch;
+  bool b_rm_yaw;
+  obj_param_t() { // default values
+    long_name = ""; short_name = ""; obj_id = -1;
+    b_rm_roll = false; b_rm_pitch = false; b_rm_yaw = false;
+  }
+  obj_param_t(string long_name_, string short_name_, int obj_id_) {
+    obj_param_t();
+    long_name = long_name_; short_name = short_name_; obj_id = obj_id_;
+  }
+  obj_param_t(string long_name_, string short_name_, int obj_id_, bool rm_r_, bool rm_p_, bool rm_y_) {
+    obj_param_t();
+    long_name = long_name_; short_name = short_name_; obj_id = obj_id_;
+    b_rm_roll = rm_r_; b_rm_pitch = rm_p_; b_rm_yaw = rm_y_;
+  }
+} obj_params;
 
 // GTSAM-RAPTOR Function
-void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map);
-void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, int> &object_id_map, double dt_thresh);
+void run_isam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, obj_param_t> &obj_params_map, double dt_thresh);
+void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, obj_param_t> &obj_params_map, double dt_thresh);
+
+// Loading & Processing Functions
+void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, obj_param_t>, double dt_thresh);
+void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> & times);
+void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& ego_data, obj_param_t params, double dt_thresh);
 
 // Helper functions
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est);
@@ -82,8 +105,41 @@ void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, doub
 Rot3 remove_yaw(Rot3 R);
 Pose3 remove_yaw(Pose3 P);
 Eigen::Matrix3f rot3_to_matrix3f(Rot3 R);
+Eigen::Matrix3f create_rotation_matrix(float ax, float ay, float az);
+void debug_func();
+float fix_it(float f);
+
+float fix_it(float f){
+  if (f > 0){
+    return M_PI - f;
+  }
+  else if (f < 0) {
+    return -M_PI - f;
+  }
+  return f;
+}
+
+void debug_func() {
+  Eigen::Vector3f ea;
+  // float ax = -0.18336085, ay = -0.73772085, az = -0.00000104;// failure values: -0.18336085, -0.73772085, -0.00000104
+  float ax = -0.05, ay = -0.05, az = -0.05;
+  // float ax = -M_PI_4, ay = -M_PI_4, az = -M_PI_4;// failure values: -0.18336085, -0.73772085, -0.00000104
+  Eigen::Matrix3f rot_matrix = create_rotation_matrix(ax, ay, az);
+  cout << "ax: " << ax << "(" << ax * 180.0/M_PI << "), ay: " << ay << "(" << ay*180.0/M_PI << "), az: " << az << "(" << az*180.0/M_PI << " rad (in degrees)" << endl;
+  cout << "rot_matrix: " << rot_matrix << endl;
+  int i = 0, j = 1, k = 2;
+  ea = rot_matrix.eulerAngles(i, j, k); 
+  cout << "order: " << i << j << k << " --> ea: " << ea[0] << ", " << ea[1] << ", " << ea[2] << "\n" << endl;
+  cout << "    fixed --> ea: " << fix_it(ea[0]) << ", " << fix_it(ea[1]) << ", " << fix_it(ea[2]) << "\n" << endl;
+  i = 2; j = 1; k = 0;
+  ea = rot_matrix.eulerAngles(i, j, k); 
+  cout << "order: " << i << j << k << " --> ea: " << ea[0] << ", " << ea[1] << ", " << ea[2] << "\n" << endl;
+  cout<<endl;
+}
 
 int main(int argc, char** argv) {
+  // debug_func();
+  // return 0;
   // useful gtsam examples:
   // https://github.com/borglab/gtsam/blob/develop/examples/VisualISAM2Example.cpp
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp
@@ -91,91 +147,32 @@ int main(int argc, char** argv) {
   // Note: tf_A_B is a transform that when right multipled by a vector in frame B produces the same vector in frame A: p_A = tf_A_B * p_B
 
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
-  map<std::string, int> object_id_map = {
-        {"ego", 1},
-        {"bowl", 2},
-        {"camera", 3},
-        {"can", 4},
-        {"laptop", 5},
-        {"mug", 6}
-  };
-  map<string, string> object_long_to_short_name = {
-    {"bowl_white_small_norm", "bowl"},
-    { "camera_canon_len_norm", "camera"},
-    {"can_arizona_tea_norm", "can"},
-    {"laptop_air_xin_norm", "laptop"},
-    {"mug_daniel_norm", "mug"}
+  map<string, obj_param_t> obj_param_map = {
+    {"bowl_white_small_norm", obj_param_t("bowl_white_small_norm", "bowl",   2, false, false, true)},
+    {"camera_canon_len_norm", obj_param_t("camera_canon_len_norm", "camera", 3, false, false, false)},
+    {"can_arizona_tea_norm",  obj_param_t("can_arizona_tea_norm",  "can",    4, false, false, true)},
+    {"laptop_air_xin_norm",   obj_param_t("laptop_air_xin_norm",   "laptop", 5, false, false, false)},
+    {"mug_daniel_norm",       obj_param_t("mug_daniel_norm",       "mug",    6, false, false, false)}
   };
   string path = "/mounted_folder/nocs_logs/";
   string base = "log_1_";
 
   object_est_gt_data_vec_t ado_data; // all ado data in 1 vector sorted by time (to be filled in by load_log_files)
   set<double> times;  // set of all unique times (to be filled in by load_log_files)
-  load_log_files(times, ado_data, path, base, object_long_to_short_name, object_id_map, dt_thresh);
+  load_log_files(times, ado_data, path, base, obj_param_map, dt_thresh);
 
-  run_batch_slam(times, ado_data, object_id_map, dt_thresh);
-  // run_isam(all_data, object_id_map);
+  run_batch_slam(times, ado_data, obj_param_map, dt_thresh);
+  // run_isam(times, ado_data, obj_param_map, dt_thresh);
 
   cout << "done with main!" << endl;
   return 0;
 }
 
-void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, string> & object_long_to_short_name, map<string, int> & object_id_map, double dt_thresh) {
-  // for each object, load its est and gt log files to extract pose and time information. combine into a set of all times, and also all the data sorted by time
-  vector<object_data_vec_t> ado_data_gt, ado_data_est;
-  for(const auto &key_value_pair : object_long_to_short_name) {
-    object_data_vec_t ado_data_gt, ado_data_est;
-    object_est_gt_data_vec_t ado_data_single;
-    string obj_long_name = key_value_pair.first;
-    int obj_id = object_id_map[key_value_pair.second];
+//////////////////////////////////////////////////////////
+// Primary Slam Functions
+//////////////////////////////////////////////////////////
 
-    read_data_from_one_log(path + file_base + obj_long_name + "_gt.log", ado_data_gt, times);
-    read_data_from_one_log(path + file_base + obj_long_name + "_est.log", ado_data_est, times);
-    sync_est_and_gt(ado_data_est, ado_data_gt, ado_data_single, obj_id, dt_thresh);
-    ado_data.insert( ado_data.end(), ado_data_single.begin(), ado_data_single.end() ); // combine into 1 vector of all ado data
-  }
-
-  // sort by time & object id (the later is just for readability of debugging output, is only tie-break if time are equal)
-  std::sort(ado_data.begin(), ado_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
-    if (get<0>(lhs) == get<0>(rhs)) { // if times are equal
-      return get<1>(lhs) < get<1>(rhs); // return true if lhs has lower id
-    }
-    return get<0>(lhs) < get<0>(rhs); 
-  });   // this should sort the vector by time (i.e. first element in each tuple). Tie breaker is object id
-}
-
-void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> &times){
-  // log file header: Time (s), Ado State GT, Ego State GT, 3D Corner GT (X|Y|Z), Corner 2D Projections GT (r|c), Angled BB (r|c|w|h|ang_deg), Image Segmentation Mode
-  // note: the states are position (3), lin vel (3), quat wxyz (4), ang vel (3) (space deliminated)
-  ifstream infile(fn);
-  string line, s;
-  double time, x, y, z, vx, vy, vz, qx, qy, qz, qw, wx, wy, wz;
-  Pose3 pose;
-  getline(infile, line); // skip header of file
-  while (getline(infile, line)) {
-    istringstream iss(line);
-    iss >> time;
-    iss >> x;
-    iss >> y;
-    iss >> z;
-    iss >> vx;
-    iss >> vy;
-    iss >> vz;
-    iss >> qw;
-    iss >> qx;
-    iss >> qy;
-    iss >> qz;
-    iss >> wx;
-    iss >> wy;
-    iss >> wz;
-    pose = Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z));
-    times.insert(time);
-    obj_data.push_back(make_tuple(time, remove_yaw(pose)));
-    continue;
-  }
-}
-
-void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, int> &object_id_map, double dt_thresh) {
+void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, obj_param_t> &obj_params_map, double dt_thresh) {
   // note: object id serves as landmark id, landmark is same as saying "ado"
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
 
@@ -297,10 +294,10 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     rot_diff_pre.push_back(rot_diff_pre_val);
     t_diff_post.push_back(t_diff_post_val);
     rot_diff_post.push_back(rot_diff_post_val);
-    ave_t_diff_pre += t_diff_pre_val;
-    ave_rot_diff_pre += rot_diff_pre_val;
-    ave_t_diff_post += t_diff_post_val;
-    ave_rot_diff_post += rot_diff_post_val;
+    ave_t_diff_pre += abs(t_diff_pre_val);
+    ave_rot_diff_pre += abs(rot_diff_pre_val);
+    ave_t_diff_post += abs(t_diff_post_val);
+    ave_rot_diff_post += abs(rot_diff_post_val);
 
     cout << "-----------------------------------------------------" << endl;
     cout << "evaluating " << sym << ":" << endl;
@@ -323,107 +320,168 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   cout << "Averages rot_pre = " << ave_rot_diff_pre << " deg, rot_post = " << ave_rot_diff_post << " deg" << endl;
 }
 
-void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad, bool b_degrees){
-  // b_degrees is true if we want degrees, false for radians 
-  Pose3 delta = p1.compose(p2);
-  *trans_diff = delta.translation().squaredNorm();
-  double tmp = (delta.rotation().matrix().trace() - 1) / 2.0;
-  double thresh = 0.001;
-  double unit_multiplier = 1;
-  if (b_degrees){
-    unit_multiplier = 180.0 / M_PI;
-  }
-  if (tmp > 1 && (tmp - 1) < thresh) {
-    *rot_diff_rad = 0;
-  }
-  else if (tmp > 1) {
-    runtime_error("ERROR: cant have acos input > 1!!");
-  }
-  else if (tmp < -1 && (abs(tmp) - 1) < thresh){
-    *rot_diff_rad = M_PI * unit_multiplier;
-  }
-  else if (tmp < -1 && (abs(tmp) - 1) < thresh){
-    runtime_error("ERROR: cant have acos input < -1!!");
-  }
-  else {
-    *rot_diff_rad = acos( tmp ) * unit_multiplier;
-  }
-}
+void run_isam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, obj_param_t> &obj_params_map, double dt_thresh) {
+  // // parameters
+  // size_t minK = 150; // minimum number of range measurements to process initially
+  // size_t incK = 25; // minimum number of range measurements to process after
+  // bool groundTruth = false;
+  // bool robust = true;
 
-void run_isam(object_est_gt_data_vec_t& all_data, map<std::string, int> &object_id_map) {
-  // // Create an iSAM2 object. Unlike iSAM1, which performs periodic batch steps
-  // // to maintain proper linearization and efficient variable ordering, iSAM2
-  // // performs partial relinearization/reordering at each step. A parameter
-  // // structure is available that allows the user to set various properties, such
-  // // as the relinearization threshold and type of linear solver. For this
-  // // example, we we set the relinearization threshold small so the iSAM2 result
-  // // will approach the batch result.
-  // ISAM2Params parameters;
-  // parameters.relinearizeThreshold = 0.01;
-  // parameters.relinearizeSkip = 1;
-  // ISAM2 isam(parameters);
+  // // Set Noise parameters
+  // Vector priorSigmas = Vector3(1,1,M_PI);
+  // Vector odoSigmas = Vector3(0.05, 0.01, 0.1);
+  // double sigmaR = 100; // range standard deviation
+  // const NM::Base::shared_ptr // all same type
+  // priorNoise = NM::Diagonal::Sigmas(priorSigmas), //prior
+  // odoNoise = NM::Diagonal::Sigmas(odoSigmas), // odometry
+  // gaussian = NM::Isotropic::Sigma(1, sigmaR), // non-robust
+  // tukey = NM::Robust::Create(NM::mEstimator::Tukey::Create(15), gaussian), //robust
+  // rangeNoise = robust ? tukey : gaussian;
 
-  // // Create a Factor Graph and Values to hold the new data
-  // NonlinearFactorGraph graph;
-  // Values initialEstimate;
+  // // Initialize iSAM
+  // ISAM2 isam;
 
-  // // Loop over the poses, adding the observations to iSAM incrementally
-  // for (size_t i = 0; i < poses.size(); ++i) {
-  //   // Add factors for each landmark observation
-  //   for (size_t j = 0; j < points.size(); ++j) {
-  //     PinholeCamera<Cal3_S2> camera(poses[i], *K);
-  //     Point2 measurement = camera.project(points[j]);
-  //     graph.emplace_shared<GenericProjectionFactor<Pose3, Point3, Cal3_S2> >(measurement, measurementNoise, Symbol('x', i), Symbol('l', j), K);
-  //   }
+  // // Add prior on first pose
+  // Pose2 pose0 = Pose2(-34.2086489999201, 45.3007639991120,
+  //     M_PI - 2.02108900000000);
+  // NonlinearFactorGraph newFactors;
+  // newFactors.addPrior(0, pose0, priorNoise);
+  // Values initial;
+  // initial.insert(0, pose0);
 
-  //   // Add an initial guess for the current pose
-  //   // Intentionally initialize the variables off from the ground truth
-  //   static Pose3 kDeltaPose(Rot3::Rodrigues(-0.1, 0.2, 0.25),
-  //                           Point3(0.05, -0.10, 0.20));
-  //   initialEstimate.insert(Symbol('x', i), poses[i] * kDeltaPose);
-
-  //   // If this is the first iteration, add a prior on the first pose to set the
-  //   // coordinate frame and a prior on the first landmark to set the scale Also,
-  //   // as iSAM solves incrementally, we must wait until each is observed at
-  //   // least twice before adding it to iSAM.
-  //   if (i == 0) {
-  //     // Add a prior on pose x0, 30cm std on x,y,z and 0.1 rad on roll,pitch,yaw
-  //     static auto kPosePrior = noiseModel::Diagonal::Sigmas(
-  //         (Vector(6) << Vector3::Constant(0.1), Vector3::Constant(0.3))
-  //             .finished());
-  //     graph.addPrior(Symbol('x', 0), poses[0], kPosePrior);
-
-  //     // Add a prior on landmark l0
-  //     static auto kPointPrior = noiseModel::Isotropic::Sigma(3, 0.1);
-  //     graph.addPrior(Symbol('l', 0), points[0], kPointPrior);
-
-  //     // Add initial guesses to all observed landmarks
-  //     // Intentionally initialize the variables off from the ground truth
-  //     static Point3 kDeltaPoint(-0.25, 0.20, 0.15);
-  //     for (size_t j = 0; j < points.size(); ++j)
-  //       initialEstimate.insert<Point3>(Symbol('l', j), points[j] + kDeltaPoint);
-
-  //   } else {
-  //     // Update iSAM with the new factors
-  //     isam.update(graph, initialEstimate);
-  //     // Each call to iSAM2 update(*) performs one iteration of the iterative
-  //     // nonlinear solver. If accuracy is desired at the expense of time,
-  //     // update(*) can be called additional times to perform multiple optimizer
-  //     // iterations every step.
-  //     isam.update();
-  //     Values currentEstimate = isam.calculateEstimate();
-  //     cout << "****************************************************" << endl;
-  //     cout << "Frame " << i << ": " << endl;
-  //     currentEstimate.print("Current estimate: ");
-
-  //     // Clear the factor graph and values for the next iteration
-  //     graph.resize(0);
-  //     initialEstimate.clear();
-  //   }
+  // //  initialize points
+  // if (groundTruth) { // from TL file
+  //   initial.insert(symbol('L', 1), Point2(-68.9265, 18.3778));
+  //   initial.insert(symbol('L', 6), Point2(-37.5805, 69.2278));
+  //   initial.insert(symbol('L', 0), Point2(-33.6205, 26.9678));
+  //   initial.insert(symbol('L', 5), Point2(1.7095, -5.8122));
+  // } else { // drawn from sigma=1 Gaussian in matlab version
+  //   initial.insert(symbol('L', 1), Point2(3.5784, 2.76944));
+  //   initial.insert(symbol('L', 6), Point2(-1.34989, 3.03492));
+  //   initial.insert(symbol('L', 0), Point2(0.725404, -0.0630549));
+  //   initial.insert(symbol('L', 5), Point2(0.714743, -0.204966));
   // }
+
+  // // set some loop variables
+  // size_t i = 1; // step counter
+  // size_t k = 0; // range measurement counter
+  // bool initialized = false;
+  // Pose2 lastPose = pose0;
+  // size_t countK = 0;
+
+  // // Loop over odometry
+  // gttic_(iSAM);
+  // for(const TimedOdometry& timedOdometry: odometry) {
+  //   //--------------------------------- odometry loop -----------------------------------------
+  //   double t;
+  //   Pose2 odometry;
+  //   boost::tie(t, odometry) = timedOdometry;
+
+  //   // add odometry factor
+  //   newFactors.push_back(BetweenFactor<Pose2>(i-1, i, odometry, odoNoise));
+
+  //   // predict pose and add as initial estimate
+  //   Pose2 predictedPose = lastPose.compose(odometry);
+  //   lastPose = predictedPose;
+  //   initial.insert(i, predictedPose);
+
+  //   // Check if there are range factors to be added
+  //   while (k < K && t >= boost::get<0>(triples[k])) {
+  //     size_t j = boost::get<1>(triples[k]);
+  //     double range = boost::get<2>(triples[k]);
+  //     newFactors.push_back(RangeFactor<Pose2, Point2>(i, symbol('L', j), range,rangeNoise));
+  //     k = k + 1;
+  //     countK = countK + 1;
+  //   }
+
+  //   // Check whether to update iSAM 2
+  //   if ((k > minK) && (countK > incK)) {
+  //     if (!initialized) { // Do a full optimize for first minK ranges
+  //       gttic_(batchInitialization);
+  //       LevenbergMarquardtOptimizer batchOptimizer(newFactors, initial);
+  //       initial = batchOptimizer.optimize();
+  //       gttoc_(batchInitialization);
+  //       initialized = true;
+  //     }
+  //     gttic_(update);
+  //     isam.update(newFactors, initial);
+  //     gttoc_(update);
+  //     gttic_(calculateEstimate);
+  //     Values result = isam.calculateEstimate();
+  //     gttoc_(calculateEstimate);
+  //     lastPose = result.at<Pose2>(i);
+  //     newFactors = NonlinearFactorGraph();
+  //     initial = Values();
+  //     countK = 0;
+  //   }
+  //   i += 1;
+  //   //--------------------------------- odometry loop -----------------------------------------
+  // } // end for
 }
 
-void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data, int object_id, double dt_thresh) {
+//////////////////////////////////////////////////////////
+// Data Loading Helper Functions
+//////////////////////////////////////////////////////////
+
+void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, obj_param_t> obj_params, double dt_thresh) {
+  // for each object, load its est and gt log files to extract pose and time information. combine into a set of all times, and also all the data sorted by time
+  vector<object_data_vec_t> ado_data_gt, ado_data_est;
+  for(const auto &key_value_pair : obj_params) {
+    object_data_vec_t ado_data_gt, ado_data_est;
+    object_est_gt_data_vec_t ado_data_single;
+    obj_param_t params = key_value_pair.second;
+    // string obj_long_name = params.long_name; //key_value_pair.first;
+    // int obj_id = params.obj_id; //object_id_map[key_value_pair.second];
+    cout << "Processing " << params.long_name << " (id = " << params.obj_id << ")" << endl;
+
+    read_data_from_one_log(path + file_base + params.long_name + "_gt.log", ado_data_gt, times);
+    read_data_from_one_log(path + file_base + params.long_name + "_est.log", ado_data_est, times);
+    sync_est_and_gt(ado_data_est, ado_data_gt, ado_data_single, params, dt_thresh);
+    ado_data.insert( ado_data.end(), ado_data_single.begin(), ado_data_single.end() ); // combine into 1 vector of all ado data
+  }
+
+  // sort by time & object id (the later is just for readability of debugging output, is only tie-break if time are equal)
+  std::sort(ado_data.begin(), ado_data.end(), [](const data_tuple& lhs, const data_tuple& rhs) {
+    if (get<0>(lhs) == get<0>(rhs)) { // if times are equal
+      return get<1>(lhs) < get<1>(rhs); // return true if lhs has lower id
+    }
+    return get<0>(lhs) < get<0>(rhs); 
+  });   // this should sort the vector by time (i.e. first element in each tuple). Tie breaker is object id
+}
+
+void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> &times){
+  // log file header: Time (s), Ado State GT, Ego State GT, 3D Corner GT (X|Y|Z), Corner 2D Projections GT (r|c), Angled BB (r|c|w|h|ang_deg), Image Segmentation Mode
+  // note: the states are position (3), lin vel (3), quat wxyz (4), ang vel (3) (space deliminated)
+  ifstream infile(fn);
+  string line, s;
+  double time, x, y, z, vx, vy, vz, qx, qy, qz, qw, wx, wy, wz;
+  Pose3 pose;
+  getline(infile, line); // skip header of file
+  while (getline(infile, line)) {
+    istringstream iss(line);
+    iss >> time;
+    iss >> x;
+    iss >> y;
+    iss >> z;
+    iss >> vx;
+    iss >> vy;
+    iss >> vz;
+    iss >> qw;
+    iss >> qx;
+    iss >> qy;
+    iss >> qz;
+    iss >> wx;
+    iss >> wy;
+    iss >> wz;
+    pose = Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z));
+    times.insert(time);
+    obj_data.push_back(make_tuple(time, pose));
+    // obj_data.push_back(make_tuple(time, remove_yaw(pose)));
+    continue;
+  }
+}
+
+void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data, obj_param_t params, double dt_thresh) {
   // data.push_back(make_tuple(5, get<1>(data_est[0]), get<1>(data_est[0])));
   // now "sync" the gt and est for each object
   
@@ -434,18 +492,57 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
     for (uint j = next_est_time_ind; j < data_est.size(); j++) {
       t_est = get<0>(data_est[j]);
       if(dt_thresh > abs(t_gt - t_est)) {
-        data.push_back(make_tuple((t_gt + t_est)/2, object_id, get<1>(data_gt[i]), get<1>(data_est[j])));
-        if (object_id != 1) { // no pose data for ego robot, all zeros
+        data.push_back(make_tuple((t_gt + t_est)/2, params.obj_id, get<1>(data_gt[i]), get<1>(data_est[j])));
+        if (params.obj_id != 1) { // no pose data for ego robot, all zeros
           double t_diff, rot_diff; 
           calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff, &rot_diff, true);
-          cout << "time = " << t_est << ". id = " << object_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
+
+          cout << "\n-------------------------------------------------------------" << endl;
+          cout << "a) time = " << t_est << ". id = " << params.obj_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
+          
+          double t_diff2, rot_diff2;
+          if (!params.b_rm_roll && !params.b_rm_pitch && !params.b_rm_yaw) {
+            calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
+            cout << "b) \t\t\t   not symetric" << endl;
+          }
+          else {
+            if (params.b_rm_roll) {
+              runtime_error("Need to implement remove_roll()!");
+            }
+            if (params.b_rm_pitch) {
+              runtime_error("Need to implement remove_pitch()!");
+            }
+            if (params.b_rm_yaw) {
+              Pose3 data_gt_no_yaw = remove_yaw(get<1>(data_gt[i]));
+              Pose3 data_est_no_yaw = remove_yaw(get<1>(data_est[i]));
+              calc_pose_delta(data_gt_no_yaw.inverse(), data_est_no_yaw, &t_diff2, &rot_diff2, true);
+              cout << "c) \t\t\t   w/o yaw:  t_delta2 = " << t_diff2 << ", r_delta2 = " << rot_diff2 << " deg" << endl;
+              calc_pose_delta(data_gt_no_yaw.inverse(), get<1>(data_gt[j]), &t_diff2, &rot_diff2, true);
+              cout << "d) \t\t\t   w/ vs. w/o yaw [gt]:   t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;
+              calc_pose_delta(data_est_no_yaw.inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
+              cout << "e) \t\t\t   w/ vs. w/o yaw [est]:  t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;
+
+              if (t_est > 31.7 && params.obj_id == 2 && t_est < 31.9) {
+                cout << "f) gt yaw: "<< get<1>(data_gt[i]) << endl;              
+                cout << "g) gt no yaw: " << data_gt_no_yaw << endl;
+                cout << endl;  
+              }
+            }
+          }
+          
         }
         next_est_time_ind = j + 1;
         break;
       }
     }
   }
+  cout << endl;
 }
+
+
+//////////////////////////////////////////////////////////
+// Math Helper Functions
+//////////////////////////////////////////////////////////
 
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est) {
   // noise = np.array([random.uniform(-0.02, 0.02) for i in range(3)]) 
@@ -466,6 +563,54 @@ Pose3 remove_yaw(Pose3 P) {
   return Pose3(remove_yaw(P.rotation()), P.translation());
 }
 
+Rot3 remove_yaw(Rot3 R) {
+  // Goal - recover the XYZ euler angles and set the yaw (rotation about Z) to 0
+  // https://eigen.tuxfamily.org/dox/group__Geometry__Module.html#ga17994d2e81b723295f5bc3b1f862ed3b  || https://stackoverflow.com/questions/31589901/euler-to-quaternion-quaternion-to-euler-using-eigen
+  /// https://stackoverflow.com/questions/31589901/euler-to-quaternion-quaternion-to-euler-using-eigen
+  // https://eigen.tuxfamily.org/dox/group__Geometry__Module.html
+  // https://eigen.tuxfamily.org/dox/classEigen_1_1AngleAxis.html
+  // roll (X) pitch (Y) yaw (Z) (set Z to 0)
+
+
+  Eigen::Vector3f ea = rot3_to_matrix3f(R).eulerAngles(1, 1, 2); 
+  cout << "1) R as ea: " << ea[0] << ", " << ea[1] << ", " << ea[2] << "\n" << endl;
+  Eigen::Quaternionf Q_no_yaw = Eigen::AngleAxisf(ea[0], Eigen::Vector3f::UnitX()) * 
+                                Eigen::AngleAxisf(ea[1], Eigen::Vector3f::UnitY()) * 
+                                Eigen::AngleAxisf(0.0,   Eigen::Vector3f::UnitZ());
+  Rot3 R_out = Rot3(Quaternion(Q_no_yaw.w(), Q_no_yaw.x(), Q_no_yaw.y(), Q_no_yaw.z()));
+  Eigen::Vector3f ea_out = rot3_to_matrix3f(R_out).eulerAngles(1, 1, 2); 
+  cout << "2) R_out as ea: " << ea_out[0] << ", " << ea_out[1] << ", " << ea_out[2] << "\n" << endl;
+  return R_out;
+
+}
+
+void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad, bool b_degrees){
+  // b_degrees is true if we want degrees, false for radians 
+  Pose3 delta = p1.compose(p2);
+  *trans_diff = delta.translation().squaredNorm();
+  double thresh = 0.001;
+  double unit_multiplier = 1;
+  double acos_input = (delta.rotation().matrix().trace() - 1) / 2.0;
+  if (b_degrees){
+    unit_multiplier = 180.0 / M_PI;
+  }
+  if (acos_input > 1 && (acos_input - 1) < thresh) {
+    *rot_diff_rad = 0;
+  }
+  else if (acos_input > 1) {
+    runtime_error("ERROR: cant have acos input > 1!!");
+  }
+  else if (acos_input < -1 && (abs(acos_input) - 1) < thresh){
+    *rot_diff_rad = M_PI * unit_multiplier;
+  }
+  else if (acos_input < -1 && (abs(acos_input) - 1) < thresh){
+    runtime_error("ERROR: cant have acos input < -1!!");
+  }
+  else {
+    *rot_diff_rad = acos( acos_input ) * unit_multiplier;
+  }
+}
+
 Eigen::Matrix3f rot3_to_matrix3f(Rot3 R) {
   Eigen::Matrix3f m;
   m(0,0) = R.matrix()(0,0); m(0,1) = R.matrix()(0,1); m(0,2) = R.matrix()(0,2);
@@ -474,37 +619,21 @@ Eigen::Matrix3f rot3_to_matrix3f(Rot3 R) {
   return m;
 }
 
-Rot3 remove_yaw(Rot3 R) {
-  // https://eigen.tuxfamily.org/dox/group__Geometry__Module.html#ga17994d2e81b723295f5bc3b1f862ed3b  || https://stackoverflow.com/questions/31589901/euler-to-quaternion-quaternion-to-euler-using-eigen
-  /// https://stackoverflow.com/questions/31589901/euler-to-quaternion-quaternion-to-euler-using-eigen
-  // https://eigen.tuxfamily.org/dox/group__Geometry__Module.html
-  // https://eigen.tuxfamily.org/dox/classEigen_1_1AngleAxis.html
-  // roll (X) pitch (Y) yaw (Z) (set Z to 0)
+Eigen::Matrix3f create_rotation_matrix(float ax, float ay, float az) {
 
-  cout << "\n-------------------------------------------------------------" << endl;
-  cout << "R: " << R << endl;
-  Eigen::Vector3f ea = rot3_to_matrix3f(R).eulerAngles(0, 1, 2); 
-  cout << "R as ea: " << ea[0] << ", " << ea[1] << ", " << ea[2] << "\n" << endl;
+  // Eigen::Matrix3f R_deltax = np.array([[ 1.             , 0.             , 0.              ],
+  //                         [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
+  //                         [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]]);
+  // Eigen::Matrix3f R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
+  //                         [ 0.             , 1.             , 0               ],
+  //                         [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]]);
+  // Eigen::Matrix3f R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
+  //                         [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
+  //                         [ 0.             , 0.             , 1.              ]]);
 
-  Eigen::Quaternion<float, 0> Q1 = Eigen::AngleAxisf(ea[0], Eigen::Vector3f::UnitX()) * 
-                                   Eigen::AngleAxisf(ea[1], Eigen::Vector3f::UnitY()) * 
-                                   Eigen::AngleAxisf(ea[2], Eigen::Vector3f::UnitZ());
-  Rot3 R1 = Rot3(Quaternion(Q1.w(), Q1.x(), Q1.y(), Q1.z()));
-  cout << "R1 (should = R): " << R1 << "\n" << endl;
-  Eigen::Quaternion<float, 0> Q2 = Eigen::AngleAxisf(ea[0], Eigen::Vector3f::UnitX()) * 
-                                   Eigen::AngleAxisf(ea[1], Eigen::Vector3f::UnitY()) * 
-                                   Eigen::AngleAxisf(0.0,   Eigen::Vector3f::UnitZ());
-  Rot3 R2 = Rot3(Quaternion(Q2.w(), Q2.x(), Q2.y(), Q2.z()));
-  cout << "R2 (should = R - yaw): " << R2 << "\n" << endl;
-
-  Eigen::Vector3f ea1 = rot3_to_matrix3f(R1).eulerAngles(0, 1, 2); 
-  Eigen::Vector3f ea2 = rot3_to_matrix3f(R2).eulerAngles(0, 1, 2); 
-
-  cout << "R1 as ea1: " << ea1[0] << ", " << ea1[1] << ", " << ea1[2] <<endl;
-  cout << "R2 as ea2: " << ea2[0] << ", " << ea2[1] << ", " << ea2[2] << "\n" <<endl;
-
-  if (ea[2] > 0.1) {
-    cout << "yaw was removed (hopefully)" << endl;
-  }
-  return R2;
+  Eigen::Matrix3f R_deltax, R_deltay, R_deltaz;
+  R_deltax << 1, 0, 0, 0, cos(ax), -sin(ax), 0, sin(ax), cos(ax);
+  R_deltay << cos(ay), 0, sin(ay), 0, 1, 0, -sin(ay), 0, cos(ay);
+  R_deltaz << cos(az), -sin(az), 0, sin(az), cos(az), 0, 0, 0, 1;
+  return R_deltax * R_deltay * R_deltaz;
 }
