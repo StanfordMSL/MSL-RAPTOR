@@ -235,12 +235,15 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     
     // cout << "\n-----------------------------------------" << endl;
     // cout << "t_ind = " << t_ind << endl;
+    vector<Rot3> r_vec;
+    vector<Point3> t_vec;
     while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
       // DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
       // first condition means we have more data to process, second means this observation is cooresponding with this ego pose
       b_landmarks_observed = true; // set to true because we have at least 1 object seen
       Pose3 tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
-      Symbol ado_sym = Symbol('l', get<1>(obj_data[obj_list_ind]));
+      int obj_id = get<1>(obj_data[obj_list_ind]);
+      Symbol ado_sym = Symbol('l', obj_id);
       
       // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
       graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
@@ -259,17 +262,21 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         // 1C) use gt position of landmark now & at t0 to get gt position of ego. Same for estimated position
         tf_ego_ado_gt = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
         tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
-        if(obj_list_ind >= 199 && obj_list_ind< 204){
-          cout << "at debug" << endl;
-          Rot3 R = tf_ego_ado_gt.rotation();
-          cout << R << endl;
-          cout << R.xyz() << "\n"<< endl;
-          Rot3 R2 = remove_yaw(R);
-          cout << R2 << endl;
-          cout << R2.xyz() << R2.yaw() << endl;
-          cout << "end debug" << endl;
-        }
+        // if(false && obj_list_ind >= 199 && obj_list_ind< 204){
+        //   cout << "at debug" << endl;
+        //   Rot3 R = tf_ego_ado_gt.rotation();
+        //   cout << R << endl;
+        //   cout << R.xyz() << "\n"<< endl;
+        //   Rot3 R2 = remove_yaw(R);
+        //   cout << R2 << endl;
+        //   cout << R2.xyz() << R2.yaw() << endl;
+        //   cout << "end debug" << endl;
+        // }
         tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // gt ego pose in world frame
+        if (obj_id != 2 && obj_id!=4){ // assume we see at least 1 object w/o symmetry 
+          r_vec.push_back(Rot3(tf_w_ego_est.rotation()));
+        }
+        t_vec.push_back(Point3(tf_w_ego_est.translation()));
       }
       obj_list_ind++;
     }
@@ -342,81 +349,81 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
 }
 
 void run_isam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, obj_param_t> &obj_params_map, double dt_thresh) {
-  // parameters
-  size_t minK = floor(times.size()*0.1); // minimum number of range measurements to process initially
-  size_t incK = 1; // how often do we update the slam map? 1 - every time, 2 - every other etc etc
+  // // parameters
+  // size_t minK = floor(times.size()*0.1); // minimum number of range measurements to process initially
+  // size_t incK = 1; // how often do we update the slam map? 1 - every time, 2 - every other etc etc
 
-  NonlinearFactorGraph newFactors;
-  Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
+  // NonlinearFactorGraph newFactors;
+  // Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
 
-  // Set Noise parameters
-  Vector priorSigmas = Vector3(1,1,M_PI);
-  Vector odoSigmas = Vector3(0.05, 0.01, 0.1);
-  double sigmaR = 100; // range standard deviation
-  // const NM::Base::shared_ptr // all same type
-  // priorNoise = NM::Diagonal::Sigmas(priorSigmas), //prior
-  // odoNoise = NM::Diagonal::Sigmas(odoSigmas), // odometry
+  // // Set Noise parameters
+  // Vector priorSigmas = Vector3(1,1,M_PI);
+  // Vector odoSigmas = Vector3(0.05, 0.01, 0.1);
+  // double sigmaR = 100; // range standard deviation
+  // // const NM::Base::shared_ptr // all same type
+  // // priorNoise = NM::Diagonal::Sigmas(priorSigmas), //prior
+  // // odoNoise = NM::Diagonal::Sigmas(odoSigmas), // odometry
   
-  // Eventually I will use the ukf's covarience here, but for now use a constant one
-  auto raptorNoise = noiseModel::Diagonal::Sigmas(
-          (Vector(6) << Vector3::Constant(0.01), Vector3::Constant(0.03)).finished());
+  // // Eventually I will use the ukf's covarience here, but for now use a constant one
+  // auto raptorNoise = noiseModel::Diagonal::Sigmas(
+  //         (Vector(6) << Vector3::Constant(0.01), Vector3::Constant(0.03)).finished());
 
-  // Initialize iSAM
-  ISAM2 isam;
+  // // Initialize iSAM
+  // ISAM2 isam;
 
-  // Create first pose exactly at origin // NOTE: might want to do this in the future: Add prior on first pose // newFactors.addPrior(0, pose0, priorNoise);
-  Pose3 first_pose = Pose3();
-  int ego_pose_index = 1;
-  Symbol ego_sym = Symbol('x', ego_pose_index);
-  newFactors.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose);
-  initial_estimate.insert(ego_sym, first_pose);
+  // // Create first pose exactly at origin // NOTE: might want to do this in the future: Add prior on first pose // newFactors.addPrior(0, pose0, priorNoise);
+  // Pose3 first_pose = Pose3();
+  // int ego_pose_index = 1;
+  // Symbol ego_sym = Symbol('x', ego_pose_index);
+  // newFactors.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose);
+  // initial_estimate.insert(ego_sym, first_pose);
 
-  //  initialize points
-  initial_estimate.insert(symbol('L', 1), Point2(3.5784, 2.76944));
-  initial_estimate.insert(symbol('L', 6), Point2(-1.34989, 3.03492));
-  initial_estimate.insert(symbol('L', 0), Point2(0.725404, -0.0630549));
-  initial_estimate.insert(symbol('L', 5), Point2(0.714743, -0.204966));
+  // //  initialize points
+  // initial_estimate.insert(symbol('L', 1), Point2(3.5784, 2.76944));
+  // initial_estimate.insert(symbol('L', 6), Point2(-1.34989, 3.03492));
+  // initial_estimate.insert(symbol('L', 0), Point2(0.725404, -0.0630549));
+  // initial_estimate.insert(symbol('L', 5), Point2(0.714743, -0.204966));
 
 
-  // set some loop variables
-  size_t i = 1; // step counter
-  size_t k = 0; // relative pose measurement counter
-  bool initialized = false;
-  Pose3 lastPose = first_pose;
-  size_t countK = 0;
-  int obj_list_ind = 0; // this needs to be flexible since I dont know how many landmarks I see at each time, if any
+  // // set some loop variables
+  // size_t i = 1; // step counter
+  // size_t k = 0; // relative pose measurement counter
+  // bool initialized = false;
+  // Pose3 lastPose = first_pose;
+  // size_t countK = 0;
+  // int obj_list_ind = 0; // this needs to be flexible since I dont know how many landmarks I see at each time, if any
 
-  // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
-  // map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
-  map<Symbol, Pose3> tf_w_gt_t0_map, tf_w_est_t0_map;
-  int t_ind = 0;
-  for(const auto & ego_time : times) { 
-    Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
-    ego_pose_index = 1 + t_ind;
-    ego_sym = Symbol('x', ego_pose_index);
+  // // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
+  // // map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+  // map<Symbol, Pose3> tf_w_gt_t0_map, tf_w_est_t0_map;
+  // int t_ind = 0;
+  // for(const auto & ego_time : times) { 
+  //   Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
+  //   ego_pose_index = 1 + t_ind;
+  //   ego_sym = Symbol('x', ego_pose_index);
 
-    if (obj_list_ind >= obj_data.size()) {
-      cout << "DONE WITH DATA - encorperated all observations into graph" << endl;
-      break;
-    }
-    vector<raptor_measurement_t> raptor_measurement_vec;
-    simulate_measurement_from_bag(ego_time, t_ind, obj_list_ind, obj_data, obj_params_map, dt_thresh, tf_w_gt_t0_map, tf_w_est_t0_map, tf_w_ego_gt, tf_w_ego_est, raptor_measurement_vec);
-    if(tf_w_gt_t0_map.find(ego_sym) == tf_w_gt_t0_map.end()){ // key was not in map --> add it
-      tf_w_gt_t0_map[ego_sym] = tf_w_ego_gt;
-      tf_w_est_t0_map[ego_sym] = tf_w_ego_est;
-    }
-    // each of these is a a "measurement" of a landmark. Add a factor to the graph & an estimate of its value
-    for(const auto & meas : raptor_measurement_vec) {
-      // key was not in map --> add it (this is first time this object was seen)
-      if(tf_w_gt_t0_map.find(meas.sym) == tf_w_gt_t0_map.end()){ 
-        tf_w_gt_t0_map[meas.sym] = meas.tf_w_ado_gt;
-        tf_w_est_t0_map[meas.sym] = meas.tf_w_ado_est;
-      }
+  //   if (obj_list_ind >= obj_data.size()) {
+  //     cout << "DONE WITH DATA - encorperated all observations into graph" << endl;
+  //     break;
+  //   }
+  //   vector<raptor_measurement_t> raptor_measurement_vec;
+  //   simulate_measurement_from_bag(ego_time, t_ind, obj_list_ind, obj_data, obj_params_map, dt_thresh, tf_w_gt_t0_map, tf_w_est_t0_map, tf_w_ego_gt, tf_w_ego_est, raptor_measurement_vec);
+  //   if(tf_w_gt_t0_map.find(ego_sym) == tf_w_gt_t0_map.end()){ // key was not in map --> add it
+  //     tf_w_gt_t0_map[ego_sym] = tf_w_ego_gt;
+  //     tf_w_est_t0_map[ego_sym] = tf_w_ego_est;
+  //   }
+  //   // each of these is a a "measurement" of a landmark. Add a factor to the graph & an estimate of its value
+  //   for(const auto & meas : raptor_measurement_vec) {
+  //     // key was not in map --> add it (this is first time this object was seen)
+  //     if(tf_w_gt_t0_map.find(meas.sym) == tf_w_gt_t0_map.end()){ 
+  //       tf_w_gt_t0_map[meas.sym] = meas.tf_w_ado_gt;
+  //       tf_w_est_t0_map[meas.sym] = meas.tf_w_ado_est;
+  //     }
 
-      // add factor to graph
-      newFactors.emplace_shared<BetweenFactor<Pose3> >(ego_sym, meas.sym, meas.tf_ego_ado_est, raptorNoise);
-    }
-  }
+  //     // add factor to graph
+  //     newFactors.emplace_shared<BetweenFactor<Pose3> >(ego_sym, meas.sym, meas.tf_ego_ado_est, raptorNoise);
+  //   }
+  // }
 /*
   // Loop over odometry
   for(const TimedOdometry& timedOdometry: odometry) {
@@ -766,3 +773,54 @@ Rot3 eigen_matrix3f_to_rot3(Eigen::Matrix3f M_in) {
   M_out << M_in(0,0), M_in(0,1), M_in(0,2), M_in(1,0), M_in(1,1), M_in(1,2), M_in(2,0), M_in(2,1), M_in(2,2);
   return Rot3(M_out);
 }
+
+
+// bool areQuaternionsClose(Quaternion q1, Quaternion q2){
+// 	float dot = q1.dot(22); // cos(theta / 2)
+// 	if(dot < 0.0f){
+// 		return false;					
+// 	}
+// 	else{
+// 		return true;
+// 	}
+// }
+
+// void average_poses(vector<Pose3>, p_vec){
+
+
+
+// }
+
+// void average_quats(Quaternion &cumulative, Quaternion newRotation, Quaternion firstRotation, int addAmount) {
+//   //http://wiki.unity3d.com/index.php/Averaging_Quaternions_and_Vectors
+//   //Get an average (mean) from more then two quaternions (with two, slerp would be used).
+//   //Note: this only works if all the quaternions are relatively close together.
+//   //Usage: 
+//   //-Cumulative is an ___ which holds all the added x y z and w components.
+//   //-newRotation is the next rotation to be added to the average pool
+//   //-firstRotation is the first quaternion of the array to be averaged
+//   //-addAmount holds the total amount of quaternions which are currently added
+//   //This function returns the current average quaternion
+
+// 	float w = 0.0f;
+// 	float x = 0.0f;
+// 	float y = 0.0f;
+// 	float z = 0.0f;
+ 
+// 	//Before we add the new rotation to the average (mean), we have to check whether the quaternion has to be inverted. Because
+// 	//q and -q are the same rotation, but cannot be averaged, we have to make sure they are all the same.
+// 	if(!areQuaternionsClose(newRotation, firstRotation)){
+// 		newRotation = Quaternion(-newRotation.w, -newRotation.x, -newRotation.y, -newRotation.z);	
+// 	}
+ 
+// 	//Average the values
+// 	float addDet = 1f/(float)addAmount;
+// 	cumulative.w += newRotation.w;
+// 	w = cumulative.w * addDet;
+// 	cumulative.x += newRotation.x;
+// 	x = cumulative.x * addDet;
+// 	cumulative.y += newRotation.y;
+// 	y = cumulative.y * addDet;
+// 	cumulative.z += newRotation.z;
+// 	z = cumulative.z * addDet;		
+// }
