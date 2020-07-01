@@ -88,11 +88,30 @@ struct obj_param_t {
     long_name = long_name_; short_name = short_name_; obj_id = obj_id_;
     b_rm_roll = rm_r_; b_rm_pitch = rm_p_; b_rm_yaw = rm_y_;
   }
-} obj_params;
+};
+
+struct raptor_measurement_t {
+  Symbol sym;
+  Pose3 tf_w_ado_gt;
+  Pose3 tf_w_ado_est;
+  Pose3 tf_ego_ado_gt;
+  Pose3 tf_ego_ado_est;
+};
 
 // GTSAM-RAPTOR Function
 void run_isam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, obj_param_t> &obj_params_map, double dt_thresh);
 void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, obj_param_t> &obj_params_map, double dt_thresh);
+void simulate_measurement_from_bag(double ego_time, 
+                                  int t_ind, 
+                                  int &obj_list_ind, 
+                                  const object_est_gt_data_vec_t& obj_data, 
+                                  const map<std::string, obj_param_t> &obj_params_map, 
+                                  double dt_thresh,
+                                  map<Symbol, Pose3> &tf_w_gt_t0_map,
+                                  map<Symbol, Pose3> &tf_w_est_t0_map,
+                                  Pose3 &tf_w_ego_gt,      // output
+                                  Pose3 &tf_w_ego_est,     // output
+                                  vector<raptor_measurement_t> &raptor_measurement_vec);
 
 // Loading & Processing Functions
 void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, obj_param_t>, double dt_thresh);
@@ -105,6 +124,7 @@ void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, doub
 Rot3 remove_yaw(Rot3 R);
 Pose3 remove_yaw(Pose3 P);
 Eigen::Matrix3f rot3_to_matrix3f(Rot3 R);
+Rot3 eigen_matrix3f_to_rot3(Eigen::Matrix3f M_in);
 Eigen::Matrix3f create_rotation_matrix(float ax, float ay, float az);
 void debug_func();
 float fix_it(float f);
@@ -122,18 +142,21 @@ float fix_it(float f){
 void debug_func() {
   Eigen::Vector3f ea;
   // float ax = -0.18336085, ay = -0.73772085, az = -0.00000104;// failure values: -0.18336085, -0.73772085, -0.00000104
-  float ax = -0.05, ay = -0.05, az = -0.05;
-  // float ax = -M_PI_4, ay = -M_PI_4, az = -M_PI_4;// failure values: -0.18336085, -0.73772085, -0.00000104
+  // float ax = -0.05, ay = -0.05, az = -0.05;
+  float ax = -M_PI_4, ay = +M_PI_4, az = -M_PI_4;// failure values: -0.18336085, -0.73772085, -0.00000104
   Eigen::Matrix3f rot_matrix = create_rotation_matrix(ax, ay, az);
-  cout << "ax: " << ax << "(" << ax * 180.0/M_PI << "), ay: " << ay << "(" << ay*180.0/M_PI << "), az: " << az << "(" << az*180.0/M_PI << " rad (in degrees)" << endl;
-  cout << "rot_matrix: " << rot_matrix << endl;
+  cout << "\nax: " << ax << "(" << ax * 180.0/M_PI << "), ay: " << ay << "(" << ay*180.0/M_PI << "), az: " << az << "(" << az*180.0/M_PI << ") rad (in degrees)" << endl;
+  cout << "rot_matrix:\n" << rot_matrix << endl;
+  // int i = 0, j = 1, k = 2;
   int i = 0, j = 1, k = 2;
   ea = rot_matrix.eulerAngles(i, j, k); 
-  cout << "order: " << i << j << k << " --> ea: " << ea[0] << ", " << ea[1] << ", " << ea[2] << "\n" << endl;
+  cout << "order: " << i << j << k << " --> ea: " << ea[0] << " (" << ea[0]*180.0/M_PI << "), " << ea[1] << " (" << ea[1]*180.0/M_PI << "), " << ea[2] << " (" << ea[2]*180.0/M_PI << ")\n" << endl;
+  
+  
   cout << "    fixed --> ea: " << fix_it(ea[0]) << ", " << fix_it(ea[1]) << ", " << fix_it(ea[2]) << "\n" << endl;
-  i = 2; j = 1; k = 0;
-  ea = rot_matrix.eulerAngles(i, j, k); 
-  cout << "order: " << i << j << k << " --> ea: " << ea[0] << ", " << ea[1] << ", " << ea[2] << "\n" << endl;
+  // i = 2; j = 1; k = 0;
+  // ea = rot_matrix.eulerAngles(i, j, k); 
+  // cout << "order: " << i << j << k << " --> ea: " << ea[0] << " (" << ea[0]*180.0/M_PI << "), " << ea[1] << " (" << ea[1]*180.0/M_PI << "), " << ea[2] << " (" << ea[2]*180.0/M_PI << ")\n" << endl;
   cout<<endl;
 }
 
@@ -178,10 +201,10 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
 
   // STEP 0) Create graph & value objects, add first pose at origin with key '1'
   NonlinearFactorGraph graph;
-  Pose3 first_pose;
+  Pose3 first_pose = Pose3();
   int ego_pose_index = 1;
   Symbol ego_sym = Symbol('x', ego_pose_index);
-  graph.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), Pose3());
+  graph.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose);
   Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
 
   // Eventually I will use the ukf's covarience here, but for now use a constant one
@@ -204,9 +227,6 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
     ego_pose_index = 1 + t_ind;
     ego_sym = Symbol('x', ego_pose_index);
-    if(ego_pose_index == 44){
-      cout << "trouble case" << endl;
-    }
 
     if (obj_list_ind >= obj_data.size()) {
       cout << "encorperated all observations into graph" << endl;
@@ -253,11 +273,12 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       }
       obj_list_ind++;
     }
-    if (b_landmarks_observed)
+    if (b_landmarks_observed) {
       // 1D) only calculate our pose if we actually see objects
       initial_estimate.insert(ego_sym, Pose3(tf_w_ego_est));
       tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_est);
       tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
+    }
     b_landmarks_observed = false;
     t_ind++;
   }
@@ -321,102 +342,183 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
 }
 
 void run_isam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, obj_param_t> &obj_params_map, double dt_thresh) {
-  // // parameters
-  // size_t minK = 150; // minimum number of range measurements to process initially
-  // size_t incK = 25; // minimum number of range measurements to process after
-  // bool groundTruth = false;
-  // bool robust = true;
+  // parameters
+  size_t minK = floor(times.size()*0.1); // minimum number of range measurements to process initially
+  size_t incK = 1; // how often do we update the slam map? 1 - every time, 2 - every other etc etc
 
-  // // Set Noise parameters
-  // Vector priorSigmas = Vector3(1,1,M_PI);
-  // Vector odoSigmas = Vector3(0.05, 0.01, 0.1);
-  // double sigmaR = 100; // range standard deviation
+  NonlinearFactorGraph newFactors;
+  Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
+
+  // Set Noise parameters
+  Vector priorSigmas = Vector3(1,1,M_PI);
+  Vector odoSigmas = Vector3(0.05, 0.01, 0.1);
+  double sigmaR = 100; // range standard deviation
   // const NM::Base::shared_ptr // all same type
   // priorNoise = NM::Diagonal::Sigmas(priorSigmas), //prior
   // odoNoise = NM::Diagonal::Sigmas(odoSigmas), // odometry
-  // gaussian = NM::Isotropic::Sigma(1, sigmaR), // non-robust
-  // tukey = NM::Robust::Create(NM::mEstimator::Tukey::Create(15), gaussian), //robust
-  // rangeNoise = robust ? tukey : gaussian;
+  
+  // Eventually I will use the ukf's covarience here, but for now use a constant one
+  auto raptorNoise = noiseModel::Diagonal::Sigmas(
+          (Vector(6) << Vector3::Constant(0.01), Vector3::Constant(0.03)).finished());
 
-  // // Initialize iSAM
-  // ISAM2 isam;
+  // Initialize iSAM
+  ISAM2 isam;
 
-  // // Add prior on first pose
-  // Pose2 pose0 = Pose2(-34.2086489999201, 45.3007639991120,
-  //     M_PI - 2.02108900000000);
-  // NonlinearFactorGraph newFactors;
-  // newFactors.addPrior(0, pose0, priorNoise);
-  // Values initial;
-  // initial.insert(0, pose0);
+  // Create first pose exactly at origin // NOTE: might want to do this in the future: Add prior on first pose // newFactors.addPrior(0, pose0, priorNoise);
+  Pose3 first_pose = Pose3();
+  int ego_pose_index = 1;
+  Symbol ego_sym = Symbol('x', ego_pose_index);
+  newFactors.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose);
+  initial_estimate.insert(ego_sym, first_pose);
 
-  // //  initialize points
-  // if (groundTruth) { // from TL file
-  //   initial.insert(symbol('L', 1), Point2(-68.9265, 18.3778));
-  //   initial.insert(symbol('L', 6), Point2(-37.5805, 69.2278));
-  //   initial.insert(symbol('L', 0), Point2(-33.6205, 26.9678));
-  //   initial.insert(symbol('L', 5), Point2(1.7095, -5.8122));
-  // } else { // drawn from sigma=1 Gaussian in matlab version
-  //   initial.insert(symbol('L', 1), Point2(3.5784, 2.76944));
-  //   initial.insert(symbol('L', 6), Point2(-1.34989, 3.03492));
-  //   initial.insert(symbol('L', 0), Point2(0.725404, -0.0630549));
-  //   initial.insert(symbol('L', 5), Point2(0.714743, -0.204966));
-  // }
+  //  initialize points
+  initial_estimate.insert(symbol('L', 1), Point2(3.5784, 2.76944));
+  initial_estimate.insert(symbol('L', 6), Point2(-1.34989, 3.03492));
+  initial_estimate.insert(symbol('L', 0), Point2(0.725404, -0.0630549));
+  initial_estimate.insert(symbol('L', 5), Point2(0.714743, -0.204966));
 
-  // // set some loop variables
-  // size_t i = 1; // step counter
-  // size_t k = 0; // range measurement counter
-  // bool initialized = false;
-  // Pose2 lastPose = pose0;
-  // size_t countK = 0;
 
-  // // Loop over odometry
-  // gttic_(iSAM);
-  // for(const TimedOdometry& timedOdometry: odometry) {
-  //   //--------------------------------- odometry loop -----------------------------------------
-  //   double t;
-  //   Pose2 odometry;
-  //   boost::tie(t, odometry) = timedOdometry;
+  // set some loop variables
+  size_t i = 1; // step counter
+  size_t k = 0; // relative pose measurement counter
+  bool initialized = false;
+  Pose3 lastPose = first_pose;
+  size_t countK = 0;
+  int obj_list_ind = 0; // this needs to be flexible since I dont know how many landmarks I see at each time, if any
 
-  //   // add odometry factor
-  //   newFactors.push_back(BetweenFactor<Pose2>(i-1, i, odometry, odoNoise));
+  // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
+  // map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+  map<Symbol, Pose3> tf_w_gt_t0_map, tf_w_est_t0_map;
+  int t_ind = 0;
+  for(const auto & ego_time : times) { 
+    Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
+    ego_pose_index = 1 + t_ind;
+    ego_sym = Symbol('x', ego_pose_index);
 
-  //   // predict pose and add as initial estimate
-  //   Pose2 predictedPose = lastPose.compose(odometry);
-  //   lastPose = predictedPose;
-  //   initial.insert(i, predictedPose);
+    if (obj_list_ind >= obj_data.size()) {
+      cout << "DONE WITH DATA - encorperated all observations into graph" << endl;
+      break;
+    }
+    vector<raptor_measurement_t> raptor_measurement_vec;
+    simulate_measurement_from_bag(ego_time, t_ind, obj_list_ind, obj_data, obj_params_map, dt_thresh, tf_w_gt_t0_map, tf_w_est_t0_map, tf_w_ego_gt, tf_w_ego_est, raptor_measurement_vec);
+    if(tf_w_gt_t0_map.find(ego_sym) == tf_w_gt_t0_map.end()){ // key was not in map --> add it
+      tf_w_gt_t0_map[ego_sym] = tf_w_ego_gt;
+      tf_w_est_t0_map[ego_sym] = tf_w_ego_est;
+    }
+    // each of these is a a "measurement" of a landmark. Add a factor to the graph & an estimate of its value
+    for(const auto & meas : raptor_measurement_vec) {
+      // key was not in map --> add it (this is first time this object was seen)
+      if(tf_w_gt_t0_map.find(meas.sym) == tf_w_gt_t0_map.end()){ 
+        tf_w_gt_t0_map[meas.sym] = meas.tf_w_ado_gt;
+        tf_w_est_t0_map[meas.sym] = meas.tf_w_ado_est;
+      }
 
-  //   // Check if there are range factors to be added
-  //   while (k < K && t >= boost::get<0>(triples[k])) {
-  //     size_t j = boost::get<1>(triples[k]);
-  //     double range = boost::get<2>(triples[k]);
-  //     newFactors.push_back(RangeFactor<Pose2, Point2>(i, symbol('L', j), range,rangeNoise));
-  //     k = k + 1;
-  //     countK = countK + 1;
-  //   }
+      // add factor to graph
+      newFactors.emplace_shared<BetweenFactor<Pose3> >(ego_sym, meas.sym, meas.tf_ego_ado_est, raptorNoise);
+    }
+  }
+/*
+  // Loop over odometry
+  for(const TimedOdometry& timedOdometry: odometry) {
+    //--------------------------------- odometry loop -----------------------------------------
+    double t;
+    Pose2 odometry;
+    boost::tie(t, odometry) = timedOdometry;
 
-  //   // Check whether to update iSAM 2
-  //   if ((k > minK) && (countK > incK)) {
-  //     if (!initialized) { // Do a full optimize for first minK ranges
-  //       gttic_(batchInitialization);
-  //       LevenbergMarquardtOptimizer batchOptimizer(newFactors, initial);
-  //       initial = batchOptimizer.optimize();
-  //       gttoc_(batchInitialization);
-  //       initialized = true;
-  //     }
-  //     gttic_(update);
-  //     isam.update(newFactors, initial);
-  //     gttoc_(update);
-  //     gttic_(calculateEstimate);
-  //     Values result = isam.calculateEstimate();
-  //     gttoc_(calculateEstimate);
-  //     lastPose = result.at<Pose2>(i);
-  //     newFactors = NonlinearFactorGraph();
-  //     initial = Values();
-  //     countK = 0;
-  //   }
-  //   i += 1;
-  //   //--------------------------------- odometry loop -----------------------------------------
-  // } // end for
+    // add odometry factor
+    newFactors.push_back(BetweenFactor<Pose2>(i-1, i, odometry, odoNoise));
+
+    // predict pose and add as initial estimate
+    Pose2 predictedPose = lastPose.compose(odometry);
+    lastPose = predictedPose;
+    initial_estimate.insert(i, predictedPose);
+
+    // Check if there are range factors to be added
+    while (k < K && t >= boost::get<0>(triples[k])) {
+      size_t j = boost::get<1>(triples[k]);
+      double range = boost::get<2>(triples[k]);
+      newFactors.push_back(RangeFactor<Pose2, Point2>(i, symbol('L', j), range,rangeNoise));
+      k = k + 1;
+      countK = countK + 1;
+    }
+
+    // Check whether to update iSAM 2
+    if ((k > minK) && (countK > incK)) {
+      if (!initialized) { // Do a full optimize for first minK ranges
+        LevenbergMarquardtOptimizer batchOptimizer(newFactors, initial_estimate);
+        initial_estimate = batchOptimizer.optimize();
+        initialized = true;
+      }
+      isam.update(newFactors, initial_estimate);
+      Values result = isam.calculateEstimate();
+      lastPose = result.at<Pose2>(i);
+      newFactors = NonlinearFactorGraph();
+      initial_estimate = Values();
+      countK = 0;
+    }
+    i += 1;
+    //--------------------------------- odometry loop -----------------------------------------
+  } // end for
+*/
+}
+
+void simulate_measurement_from_bag(double ego_time, 
+                                  int t_ind, 
+                                  int &obj_list_ind, 
+                                  const object_est_gt_data_vec_t& obj_data, 
+                                  const map<std::string, obj_param_t> &obj_params_map, 
+                                  double dt_thresh,
+                                  map<Symbol, Pose3> &tf_w_gt_t0_map,
+                                  map<Symbol, Pose3> &tf_w_est_t0_map,
+                                  Pose3 &tf_w_ego_gt,      // output
+                                  Pose3 &tf_w_ego_est,     // output
+                                  vector<raptor_measurement_t> &raptor_measurement_vec) { // output
+  // double ego_time: current simulation time in seconds
+  // int t_ind: an int tracking which index of the set of times we are on
+  // int obj_list_ind: an int tracking where we are in our list of data (sorted by time, then by object id)
+  // object_est_gt_data_vec_t obj_data: the full map containing all observations (the keys are the times)
+  // map<std::string, obj_param_t> obj_params_map: parameter for each object
+  // double dt_thresh: how close in time a measurement has to be to the pose estimate to be considered the same (eventually interpolate?)
+  
+  int ego_pose_index = 1 + t_ind;
+  Symbol ego_sym = Symbol('x', ego_pose_index);
+  while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
+      // DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
+      // first condition means we have more data to process, second means this observation is cooresponding with this ego pose
+      raptor_measurement_t meas;
+      meas.sym = Symbol('l', get<1>(obj_data[obj_list_ind]));
+      // tuple<Symbol, Pose3, Pose3> tf_w_ado_data, tf_ego_ado_data;
+
+      meas.tf_ego_ado_gt = get<2>(obj_data[obj_list_ind]);
+      meas.tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); 
+      
+      // dont fill in map here, that will be done outside this function
+      if(t_ind == 0) {
+        tf_w_ego_gt = Pose3();
+        tf_w_ego_est = Pose3();  // since we define our initial pose as the origin, this is always "right"
+        meas.tf_w_ado_gt = Pose3(meas.tf_ego_ado_gt);
+        meas.tf_w_ado_est = Pose3(meas.tf_ego_ado_est);
+        raptor_measurement_vec.push_back(meas);
+      }
+      else {
+        if(tf_w_gt_t0_map.find(meas.sym) == tf_w_gt_t0_map.end()){ // this is the first time we are seeing this object
+          // in this situation we need to establish tf_w_ego from the other landmarks. if there are no other landmarks we should either save this for later or skip it
+          // tf_w_ego <-- from other landmarks
+          // tf_w_ado = tf_w_ego * tf_ego_ado
+          runtime_error("We do not handle the case where we dont see all objects on first timestep yet");
+        }
+        tf_w_ego_gt = tf_w_gt_t0_map[meas.sym] * (meas.tf_ego_ado_gt).inverse(); // gt ego pose in world frame
+        tf_w_ego_est = tf_w_est_t0_map[meas.sym] * (meas.tf_ego_ado_est).inverse(); // gt ego pose in world frame
+        meas.tf_w_ado_gt = tf_w_ego_gt * meas.tf_ego_ado_gt; 
+        meas.tf_w_ado_est = tf_w_ego_est * meas.tf_ego_ado_est; 
+
+        // tf_w_ado_vec.push_back( make_tuple(meas.sym, tf_w_ado_gt, tf_w_ado_est) );
+        // tf_ego_ado_vec.push_back( make_tuple(meas.sym, get<2>(obj_data[obj_list_ind]), get<3>(obj_data[obj_list_ind])) );
+        raptor_measurement_vec.push_back(meas);
+
+      }
+      obj_list_ind++;
+    }
 }
 
 //////////////////////////////////////////////////////////
@@ -572,16 +674,36 @@ Rot3 remove_yaw(Rot3 R) {
   // roll (X) pitch (Y) yaw (Z) (set Z to 0)
 
 
-  Eigen::Vector3f ea = rot3_to_matrix3f(R).eulerAngles(1, 1, 2); 
-  cout << "1) R as ea: " << ea[0] << ", " << ea[1] << ", " << ea[2] << "\n" << endl;
-  Eigen::Quaternionf Q_no_yaw = Eigen::AngleAxisf(ea[0], Eigen::Vector3f::UnitX()) * 
-                                Eigen::AngleAxisf(ea[1], Eigen::Vector3f::UnitY()) * 
-                                Eigen::AngleAxisf(0.0,   Eigen::Vector3f::UnitZ());
-  Rot3 R_out = Rot3(Quaternion(Q_no_yaw.w(), Q_no_yaw.x(), Q_no_yaw.y(), Q_no_yaw.z()));
-  Eigen::Vector3f ea_out = rot3_to_matrix3f(R_out).eulerAngles(1, 1, 2); 
-  cout << "2) R_out as ea: " << ea_out[0] << ", " << ea_out[1] << ", " << ea_out[2] << "\n" << endl;
-  return R_out;
+  // Eigen::Vector3f ea = rot3_to_matrix3f(R).eulerAngles(1, 1, 2); 
+  // cout << "1) R as ea: " << ea[0] << ", " << ea[1] << ", " << ea[2] << "\n" << endl;
+  // Eigen::Quaternionf Q_no_yaw = Eigen::AngleAxisf(ea[0], Eigen::Vector3f::UnitX()) * 
+  //                               Eigen::AngleAxisf(ea[1], Eigen::Vector3f::UnitY()) * 
+  //                               Eigen::AngleAxisf(0.0,   Eigen::Vector3f::UnitZ());
+  // Rot3 R_out = Rot3(Quaternion(Q_no_yaw.w(), Q_no_yaw.x(), Q_no_yaw.y(), Q_no_yaw.z()));
+  // Eigen::Vector3f ea_out = rot3_to_matrix3f(R_out).eulerAngles(1, 1, 2); 
+  // cout << "2) R_out as ea: " << ea_out[0] << ", " << ea_out[1] << ", " << ea_out[2] << "\n" << endl;
+  // return R_out;
 
+
+  // https://www.mecademic.com/resources/Euler-angles/Euler-angles
+  float alpha, beta, gamma;
+  Matrix3 M = R.matrix(), M_out;
+  double x,y,z,cx,cy,cz,sx,sy,sz;
+  sy = M(0,2);
+
+  if ( abs(abs(M(0,2)) - 1) > 0.0001) {
+    // not at a singularity
+    beta = asin(M(0,2));
+    gamma = atan2(-M(0,1), M(0,0));
+    alpha = atan2(-M(1,2), M(2,2));
+  }
+  else {
+    alpha = 0;
+    beta = M_PI_2;
+    gamma = atan2(M(1,0), M(1,1));
+  }
+  Eigen::Matrix3f rot_matrix = create_rotation_matrix(alpha, beta, 0.0);
+  return eigen_matrix3f_to_rot3(rot_matrix);
 }
 
 void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, double *rot_diff_rad, bool b_degrees){
@@ -636,4 +758,11 @@ Eigen::Matrix3f create_rotation_matrix(float ax, float ay, float az) {
   R_deltay << cos(ay), 0, sin(ay), 0, 1, 0, -sin(ay), 0, cos(ay);
   R_deltaz << cos(az), -sin(az), 0, sin(az), cos(az), 0, 0, 0, 1;
   return R_deltax * R_deltay * R_deltaz;
+}
+
+
+Rot3 eigen_matrix3f_to_rot3(Eigen::Matrix3f M_in) {
+  Matrix3 M_out;
+  M_out << M_in(0,0), M_in(0,1), M_in(0,2), M_in(1,0), M_in(1,1), M_in(1,2), M_in(2,0), M_in(2,1), M_in(2,2);
+  return Rot3(M_out);
 }
