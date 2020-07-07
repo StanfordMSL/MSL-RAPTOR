@@ -64,6 +64,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   
   // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
   map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+    map<Symbol, double> ego_time_map; // store the time at each camera position
   
   // STEP 1) loop through ego poses, at each time do the following:
   //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
@@ -72,9 +73,9 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   //  - 1D) Use estimate of current camera pose for value initalization
   int t_ind = 0;
   for(const auto & ego_time : times) {
-    if (t_ind > t_ind_cutoff) {
-      break;
-    }
+    // if (t_ind > t_ind_cutoff) {
+    //   break;
+    // }
     Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
     ego_pose_index = 1 + t_ind;
     ego_sym = Symbol('x', ego_pose_index);
@@ -136,6 +137,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       initial_estimate.insert(ego_sym, Pose3(tf_w_ego_est));
       tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_est);
       tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
+      ego_time_map[ego_sym] = ego_time;
     }
     b_landmarks_observed = false;
     t_ind++;
@@ -148,6 +150,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
 
   // STEP 3 Loop through each ego /landmark pose and compare estimate with ground truth (both before and after slam optimization)
   Values::ConstFiltered<Pose3> poses = result.filter<Pose3>();
+
   int i = 0;
   vector<double> t_diff_pre, rot_diff_pre, t_diff_post, rot_diff_post;
   double ave_t_diff_pre = 0, ave_rot_diff_pre = 0, ave_t_diff_post = 0, ave_rot_diff_post = 0;
@@ -185,7 +188,6 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     // cout << "post-process est pose:" << tf_w_est_postslam << endl;
     cout << "delta pre-slam: t = " << t_diff_pre_val << ", ang = " << rot_diff_pre_val << " deg" << endl;
     cout << "delta post-slam: t = " << t_diff_post_val << ", ang = " << rot_diff_post_val << " deg" << endl;
-
     i++;
   }
   ave_t_diff_pre /= double(i);
@@ -197,6 +199,18 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   cout << "final error = " << graph.error(result) << "\n" << endl;  // iterate over all the factors_ to accumulate the log probabilities
   cout << "Averages t_pre = " << ave_t_diff_pre << ", t_post = " << ave_t_diff_post << endl;
   cout << "Averages rot_pre = " << ave_rot_diff_pre << " deg, rot_post = " << ave_rot_diff_post << " deg" << endl;
+
+  string fn = "/mounted_folder/test_graphs_gtsam/graph1.csv";
+
+  cout << "writing results to: " << fn << endl;
+  write_results_csv(fn, ego_time_map, tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map);
+
+// undefined reference to 
+// write_results_csv(std::map<gtsam::Symbol, double, std::less<gtsam::Symbol>, std::allocator<std::pair<gtsam::Symbol const, double> > >, 
+//                   std::map<gtsam::Symbol, gtsam::Pose3, std::less<gtsam::Symbol>, std::allocator<std::pair<gtsam::Symbol const, gtsam::Pose3> > >, 
+//                   std::map<gtsam::Symbol, gtsam::Pose3, std::less<gtsam::Symbol>, std::allocator<std::pair<gtsam::Symbol const, gtsam::Pose3> > >, 
+//                   std::map<gtsam::Symbol, gtsam::Pose3, std::less<gtsam::Symbol>, std::allocator<std::pair<gtsam::Symbol const, gtsam::Pose3> > >)'
+
 }
 
 void run_isam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, obj_param_t> &obj_params_map, double dt_thresh) {

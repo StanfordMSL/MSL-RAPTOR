@@ -121,6 +121,42 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
   cout << endl;
 }
 
+void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, Pose3> tf_w_gt_map, map<Symbol, Pose3> tf_w_est_preslam_map, map<Symbol, Pose3> tf_w_est_postslam_map){
+  ofstream myFile(fn);
+  for(const auto& key_value: ego_time_map) {
+    // Extract Symbol and Pose from dict & store in map
+    Symbol sym = Symbol(key_value.first);
+    double time = key_value.second;
+    Pose3 tf_w_est_postslam = tf_w_est_postslam_map[sym];
+    // Find corresponding gt pose and preslam pose
+    Pose3 tf_w_gt = tf_w_gt_map[sym];
+    Pose3 tf_w_est_preslam = tf_w_est_preslam_map[sym];
+    myFile << time << ", " << sym << ", " << pose_to_string_line(tf_w_gt) << ", " 
+                                          << pose_to_string_line(tf_w_est_preslam) << ", " 
+                                          << pose_to_string_line(tf_w_est_postslam) << "\n"; 
+  }
+  myFile.close();
+}
+
+string pose_to_string_line(Pose3 p){
+  string s;
+  Point3 t = p.translation();
+  Rot3 R = p.rotation();
+  Matrix3 M = R.matrix();
+  s = to_string(t.x()) + ", ";
+  s += to_string(t.y()) + ", ";
+  s += to_string(t.z()) + ", ";
+  s += to_string(M(0,0)) + ", ";
+  s += to_string(M(0,1)) + ", ";
+  s += to_string(M(0,2)) + ", ";
+  s += to_string(M(1,0)) + ", ";
+  s += to_string(M(1,1)) + ", ";
+  s += to_string(M(1,2)) + ", ";
+  s += to_string(M(2,0)) + ", ";
+  s += to_string(M(2,1)) + ", ";
+  s += to_string(M(2,2));
+  return s;
+}
 
 //////////////////////////////////////////////////////////
 // Math Helper Functions
