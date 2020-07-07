@@ -7,10 +7,12 @@ set(CMAKE_VERBOSE_MAKEFILE 0)
 set(CMAKE_BUILD_TYPE Debug)
 # set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
+include_directories("./include")
+
 # Find GTSAM, either from a local build, or from a Debian/Ubuntu package.
 find_package(GTSAM REQUIRED)
 
-add_executable(gtsam_test src/gtsam_test.cpp)
+add_executable(gtsam_test src/gtsam_test.cpp src/msl_raptor_gtsam_utils.cpp)
 
 # By using CMake exported targets, a simple "link" dependency introduces the
 # include directories (-I) flags, links against Boost, and add any other
