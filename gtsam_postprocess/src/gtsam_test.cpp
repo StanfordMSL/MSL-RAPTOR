@@ -124,7 +124,8 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         //   cout << R2.xyz() << R2.yaw() << endl;
         //   cout << "end debug" << endl;
         // }
-        tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // gt ego pose in world frame
+        tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // est ego pose in world frame
+        tf_w_ego_est = Pose3(tf_w_ego_gt); // DEBUGGING ONLY!!!!
         if (obj_id != 2 && obj_id!=4){ // assume we see at least 1 object w/o symmetry 
           r_vec.push_back(Rot3(tf_w_ego_est.rotation()));
         }

@@ -123,14 +123,19 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
 
 void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, Pose3> tf_w_gt_map, map<Symbol, Pose3> tf_w_est_preslam_map, map<Symbol, Pose3> tf_w_est_postslam_map){
   ofstream myFile(fn);
-  for(const auto& key_value: ego_time_map) {
-    // Extract Symbol and Pose from dict & store in map
+  // for(const auto& key_value: ego_time_map) {
+  double time = 0;
+  for(const auto& key_value: tf_w_gt_map) {
     Symbol sym = Symbol(key_value.first);
-    double time = key_value.second;
     Pose3 tf_w_est_postslam = tf_w_est_postslam_map[sym];
-    // Find corresponding gt pose and preslam pose
     Pose3 tf_w_gt = tf_w_gt_map[sym];
     Pose3 tf_w_est_preslam = tf_w_est_preslam_map[sym];
+    if(sym.chr() == 'l' || sym.chr() == 'L'){
+      time = 0.0;
+    }
+    else {
+      time = ego_time_map[sym];
+    }
     myFile << time << ", " << sym << ", " << pose_to_string_line(tf_w_gt) << ", " 
                                           << pose_to_string_line(tf_w_est_preslam) << ", " 
                                           << pose_to_string_line(tf_w_est_postslam) << "\n"; 
