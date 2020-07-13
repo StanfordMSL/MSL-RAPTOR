@@ -97,17 +97,10 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       b_landmarks_observed = true; // set to true because we have at least 1 object seen
       Pose3 tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
       Pose3 tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
+      tf_ego_ado_est = Pose3(tf_ego_ado_gt); // DEBUG ONLY!!!!
       int obj_id = get<1>(obj_data[obj_list_ind]);
       Symbol ado_sym = Symbol('l', obj_id);
 
-      // if ( tf_ego_ado_maps.find(ego_sym) == tf_ego_ado_maps.end() ) {
-      //   // tf_ego_ado_maps[ego_sym] = {ado_sym , Pose3(tf_ego_ado_est)};
-      //   tf_ego_ado_maps[ego_sym] = map<Symbol, Pose3>;
-      // }
-      // else {
-      //   tf_ego_ado_maps[ego_sym][ado_sym] = Pose3(tf_ego_ado_est); // make_pair(tf_ego_ado_gt, tf_ego_ado_est);
-      // }
-      cout << ego_sym << ado_sym << endl;
       tf_ego_ado_maps[ego_sym][ado_sym] = Pose3(tf_ego_ado_est);
       
       // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
@@ -126,7 +119,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         // 1C) use gt position of landmark now & at t0 to get gt position of ego. Same for estimated position
         tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
         tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // est ego pose in world frame
-        tf_w_ego_est = Pose3(tf_w_ego_gt); // DEBUGGING ONLY!!!!
+        tf_w_ego_est = Pose3(tf_w_ego_gt); // DEBUG ONLY!!!!
         if (obj_id != 2 && obj_id != 4) { // assume we see at least 1 object w/o symmetry 
           r_vec.push_back(Rot3(tf_w_ego_est.rotation()));
         }

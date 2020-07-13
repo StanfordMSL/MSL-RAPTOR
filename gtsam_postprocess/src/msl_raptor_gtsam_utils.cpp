@@ -138,11 +138,6 @@ void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, 
                                                 << pose_to_string_line(tf_w_est_postslam) << "\n";
     }
     else {
-      cout << "ego: " << ego_sym << endl;
-      for (const auto & key_value : tf_ego_ado_maps[ego_sym]) {
-        cout << key_value.first  << endl;
-        cout << key_value.second << endl;
-      }
       time = ego_time_map[ego_sym];
       myFile << time << ", " << ego_sym << ", " << pose_to_string_line(tf_w_gt) << ", " 
                                                 << pose_to_string_line(tf_w_est_preslam) << ", " 
