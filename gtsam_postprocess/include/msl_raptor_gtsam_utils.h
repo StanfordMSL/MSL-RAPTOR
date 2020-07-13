@@ -136,7 +136,14 @@ struct raptor_measurement_t {
 void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, obj_param_t>, double dt_thresh);
 void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> & times);
 void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& ego_data, obj_param_t params, double dt_thresh);
-void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, Pose3> tf_w_gt_map, map<Symbol, Pose3> tf_w_est_preslam_map, map<Symbol, Pose3> tf_w_est_postslam_map);
+void write_results_csv(string fn, 
+                       map<Symbol, double> ego_time_map, 
+                       map<Symbol, Pose3> tf_w_gt_map, 
+                       map<Symbol, Pose3> tf_w_est_preslam_map, 
+                       map<Symbol, Pose3> tf_w_est_postslam_map,
+                       map<Symbol, map<Symbol, Pose3 > > tf_ego_ado_maps);
+                      //  map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps);
+
 string pose_to_string_line(Pose3 p);
 
 // Math Helper Functions

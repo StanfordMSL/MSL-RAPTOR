@@ -47,7 +47,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
 
   // STEP 0) Create graph & value objects, add first pose at origin with key '1'
-  int t_ind_cutoff = 12;
+  int t_ind_cutoff = 12000;
   NonlinearFactorGraph graph;
   Pose3 first_pose = Pose3();
   int ego_pose_index = 1;
@@ -64,7 +64,9 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   
   // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
   map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
-    map<Symbol, double> ego_time_map; // store the time at each camera position
+  map<Symbol, double> ego_time_map; // store the time at each camera position
+  // map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps;
+  map<Symbol, map<Symbol, Pose3 > > tf_ego_ado_maps;
   
   // STEP 1) loop through ego poses, at each time do the following:
   //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
@@ -73,10 +75,10 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   //  - 1D) Use estimate of current camera pose for value initalization
   int t_ind = 0;
   for(const auto & ego_time : times) {
-    // if (t_ind > t_ind_cutoff) {
-    //   break;
-    // }
-    Pose3 tf_w_ego_gt, tf_ego_ado_gt, tf_w_ego_est;
+    if (t_ind > t_ind_cutoff) {
+      break;
+    }
+    Pose3 tf_w_ego_gt, tf_w_ego_est;
     ego_pose_index = 1 + t_ind;
     ego_sym = Symbol('x', ego_pose_index);
 
@@ -94,8 +96,19 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       // first condition means we have more data to process, second means this observation is cooresponding with this ego pose
       b_landmarks_observed = true; // set to true because we have at least 1 object seen
       Pose3 tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
+      Pose3 tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
       int obj_id = get<1>(obj_data[obj_list_ind]);
       Symbol ado_sym = Symbol('l', obj_id);
+
+      // if ( tf_ego_ado_maps.find(ego_sym) == tf_ego_ado_maps.end() ) {
+      //   // tf_ego_ado_maps[ego_sym] = {ado_sym , Pose3(tf_ego_ado_est)};
+      //   tf_ego_ado_maps[ego_sym] = map<Symbol, Pose3>;
+      // }
+      // else {
+      //   tf_ego_ado_maps[ego_sym][ado_sym] = Pose3(tf_ego_ado_est); // make_pair(tf_ego_ado_gt, tf_ego_ado_est);
+      // }
+      cout << ego_sym << ado_sym << endl;
+      tf_ego_ado_maps[ego_sym][ado_sym] = Pose3(tf_ego_ado_est);
       
       // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
       graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
@@ -105,28 +118,16 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         // 1B) if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
         tf_w_gt_map[ado_sym] = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt
         tf_w_est_preslam_map[ado_sym] = get<3>(obj_data[obj_list_ind]); // tf_w_ado_est
-
         // add initial estimate for landmark (in world frame)
         initial_estimate.insert(ado_sym, Pose3(tf_ego_ado_est)); // since by construction at t=0 the world and ego pose are both the origin, this relative measurement is also in world frame
         tf_w_ego_gt = Pose3();
       }
       else {
         // 1C) use gt position of landmark now & at t0 to get gt position of ego. Same for estimated position
-        tf_ego_ado_gt = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
         tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
-        // if(false && obj_list_ind >= 199 && obj_list_ind< 204){
-        //   cout << "at debug" << endl;
-        //   Rot3 R = tf_ego_ado_gt.rotation();
-        //   cout << R << endl;
-        //   cout << R.xyz() << "\n"<< endl;
-        //   Rot3 R2 = remove_yaw(R);
-        //   cout << R2 << endl;
-        //   cout << R2.xyz() << R2.yaw() << endl;
-        //   cout << "end debug" << endl;
-        // }
         tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // est ego pose in world frame
         tf_w_ego_est = Pose3(tf_w_ego_gt); // DEBUGGING ONLY!!!!
-        if (obj_id != 2 && obj_id!=4){ // assume we see at least 1 object w/o symmetry 
+        if (obj_id != 2 && obj_id != 4) { // assume we see at least 1 object w/o symmetry 
           r_vec.push_back(Rot3(tf_w_ego_est.rotation()));
         }
         t_vec.push_back(Point3(tf_w_ego_est.translation()));
@@ -159,10 +160,6 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   for(const auto& key_value: poses) {
     // Extract Symbol and Pose from dict & store in map
     Symbol sym = Symbol(key_value.key);
-    if(sym == Symbol('x',44))
-    {
-      cout << "dsfs" << endl;
-    }
     Pose3 tf_w_est_postslam = key_value.value;
     tf_w_est_postslam_map[sym] = tf_w_est_postslam;
 
@@ -204,7 +201,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   string fn = "/mounted_folder/test_graphs_gtsam/graph1.csv";
 
   cout << "writing results to: " << fn << endl;
-  write_results_csv(fn, ego_time_map, tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map);
+  write_results_csv(fn, ego_time_map, tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps);
 
 // undefined reference to 
 // write_results_csv(std::map<gtsam::Symbol, double, std::less<gtsam::Symbol>, std::allocator<std::pair<gtsam::Symbol const, double> > >, 

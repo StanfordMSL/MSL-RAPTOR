@@ -121,24 +121,42 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
   cout << endl;
 }
 
-void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, Pose3> tf_w_gt_map, map<Symbol, Pose3> tf_w_est_preslam_map, map<Symbol, Pose3> tf_w_est_postslam_map){
+void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, Pose3> tf_w_gt_map, map<Symbol, Pose3> tf_w_est_preslam_map, map<Symbol, Pose3> tf_w_est_postslam_map, map<Symbol, map<Symbol, Pose3 > > tf_ego_ado_maps){
+// void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, Pose3> tf_w_gt_map, map<Symbol, Pose3> tf_w_est_preslam_map, map<Symbol, Pose3> tf_w_est_postslam_map, map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps){
   ofstream myFile(fn);
   // for(const auto& key_value: ego_time_map) {
   double time = 0;
   for(const auto& key_value: tf_w_gt_map) {
-    Symbol sym = Symbol(key_value.first);
-    Pose3 tf_w_est_postslam = tf_w_est_postslam_map[sym];
-    Pose3 tf_w_gt = tf_w_gt_map[sym];
-    Pose3 tf_w_est_preslam = tf_w_est_preslam_map[sym];
-    if(sym.chr() == 'l' || sym.chr() == 'L'){
+    Symbol ego_sym = Symbol(key_value.first);
+    Pose3 tf_w_est_postslam = tf_w_est_postslam_map[ego_sym];
+    Pose3 tf_w_gt = tf_w_gt_map[ego_sym];
+    Pose3 tf_w_est_preslam = tf_w_est_preslam_map[ego_sym];
+    if(ego_sym.chr() == 'l' || ego_sym.chr() == 'L'){
       time = 0.0;
+      myFile << time << ", " << ego_sym << ", " << pose_to_string_line(tf_w_gt) << ", " 
+                                                << pose_to_string_line(tf_w_est_preslam) << ", " 
+                                                << pose_to_string_line(tf_w_est_postslam) << "\n";
     }
     else {
-      time = ego_time_map[sym];
+      cout << "ego: " << ego_sym << endl;
+      for (const auto & key_value : tf_ego_ado_maps[ego_sym]) {
+        cout << key_value.first  << endl;
+        cout << key_value.second << endl;
+      }
+      time = ego_time_map[ego_sym];
+      myFile << time << ", " << ego_sym << ", " << pose_to_string_line(tf_w_gt) << ", " 
+                                                << pose_to_string_line(tf_w_est_preslam) << ", " 
+                                                << pose_to_string_line(tf_w_est_postslam) << "\n";
+      // map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps
+      Symbol ado_sym;
+      cout << "number of ado objects seen = " << tf_ego_ado_maps[ego_sym].size() << endl;
+      for (const auto & key_value : tf_ego_ado_maps[ego_sym]) {
+        ado_sym = key_value.first;
+        cout << key_value.first << " ado_sym: " << ado_sym << endl;
+        cout << key_value.second << endl;
+        myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(key_value.second) << "\n";
+      }
     }
-    myFile << time << ", " << sym << ", " << pose_to_string_line(tf_w_gt) << ", " 
-                                          << pose_to_string_line(tf_w_est_preslam) << ", " 
-                                          << pose_to_string_line(tf_w_est_postslam) << "\n"; 
   }
   myFile.close();
 }
