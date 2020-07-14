@@ -47,7 +47,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
 
   // STEP 0) Create graph & value objects, add first pose at origin
-  int t_ind_cutoff = 400;
+  int t_ind_cutoff = 3000;
   NonlinearFactorGraph graph;
   Pose3 first_pose = Pose3();
   int ego_pose_index = 1;
@@ -57,7 +57,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
 
   // bool b_fake_perfect_measurements = true;
   bool b_use_poses = true;
-  bool b_fake_traj = true;
+  bool b_fake_traj = false;
 
   // Eventually I will use the ukf's covarience here, but for now use a constant one
   noiseModel::Diagonal::shared_ptr constNoiseMatrix;
@@ -125,7 +125,6 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         else {
           initial_estimate.insert(ado_sym, Point3(tf_w_ado_est.translation())); 
         }
-        cout << "init'd ado: " << ado_sym << endl;
         if (!b_fake_traj){
           tf_w_ego_gt = Pose3();
         }
@@ -133,15 +132,18 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         continue;
       }
 
-      // Pose3 tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
-      // Pose3 tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
-      Pose3 tf_ego_ado_gt = tf_w_ego_gt.inverse() * tf_w_gt_map[ado_sym];  
-
-      // random_device rd;  // Will be used to obtain a seed for the random number engine
-      // mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
-      // uniform_real_distribution<> dis(-0.005, 0.005);
-      // Pose3 tf_ego_ado_est = tf_ego_ado_gt.compose( Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen))) );
-      Pose3 tf_ego_ado_est = Pose3(tf_ego_ado_gt);
+      Pose3 tf_ego_ado_gt, tf_ego_ado_est;
+      if (!b_fake_traj){
+        tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
+        tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
+      }
+      else {
+        tf_ego_ado_gt = tf_w_ego_gt.inverse() * tf_w_gt_map[ado_sym]; 
+        random_device rd;  // Will be used to obtain a seed for the random number engine
+        mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+        uniform_real_distribution<> dis(-0.005, 0.005);
+        tf_ego_ado_est = tf_ego_ado_gt.compose( Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen))) );
+      }
       tf_ego_ado_est = Pose3(tf_ego_ado_gt); // DEBUG ONLY!!!!
 
       tf_ego_ado_maps[ego_sym][ado_sym] = make_pair(Pose3(tf_ego_ado_gt), Pose3(tf_ego_ado_est)); // this is so these can be written to a csv file later
@@ -149,7 +151,6 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
       if (b_use_poses) {
         graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
-        // cout << "tf_ego_ado_gt: " << t_ind << tf_ego_ado_est << endl;
       }
       else {
         Point3 meas_vec = tf_ego_ado_est.translation();
@@ -157,8 +158,6 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         double range3d = meas_vec.squaredNorm();
         graph.emplace_shared<BearingRangeFactor<Pose3, Point3> >(ego_sym, ado_sym, bearing3d, range3d, constNoiseMatrix);
       }
-      cout << "added graph connection: " << ego_sym <<  " <--> " << ado_sym << endl;
-
 
       // 1C) use gt position of landmark now & at t0 to get gt position of ego. Same for estimated position
       if (!b_fake_traj){
@@ -171,7 +170,6 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     if (b_landmarks_observed) {
       // 1D) only calculate our pose if we actually see objects
       initial_estimate.insert(ego_sym, Pose3(tf_w_ego_est));
-      cout << "init'd ego: " << ego_sym << endl;
       tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_est);
       tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
       ego_time_map[ego_sym] = ego_time;
@@ -191,25 +189,11 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   int i = 0;
   vector<double> t_diff_pre, rot_diff_pre, t_diff_post, rot_diff_post;
   double ave_t_diff_pre = 0, ave_rot_diff_pre = 0, ave_t_diff_post = 0, ave_rot_diff_post = 0;
-  bool b_degrees = true;
-  Pose3 pose0_inv;
-
-  for (const auto& key_value: poses) {
-    Symbol sym = Symbol(key_value.key);
-    Pose3 tf_w_est_postslam = key_value.value;
-    if (sym.chr() != 'l' && sym.chr() != 'L') {
-      pose0_inv = Pose3(tf_w_est_postslam).inverse();
-      cout << sym << endl;
-      cout << tf_w_est_postslam << endl;
-      cout << pose0_inv << endl;
-      break;
-    }
-  }
-  
+  bool b_degrees = true;  
   for(const auto& key_value: poses) {
     // Extract Symbol and Pose from dict & store in map
     Symbol sym = Symbol(key_value.key);
-    Pose3 tf_w_est_postslam = key_value.value * pose0_inv;
+    Pose3 tf_w_est_postslam = key_value.value;
     tf_w_est_postslam_map[sym] = tf_w_est_postslam;
 
     // Find corresponding gt pose and preslam pose
