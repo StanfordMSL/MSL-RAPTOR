@@ -55,7 +55,13 @@ void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<do
     iss >> wx;
     iss >> wy;
     iss >> wz;
+    cout << "qw, qx...qz: " << qw << ", " << qx << ", " << qy << ", " << qz << endl;
+    // cout << "quat: " << Quaternion(qw, qx, qy, qz) << endl;
+    cout << "rot: " << Rot3(Quaternion(qw, qx, qy, qz)) << endl;
+    cout << "t: " << Point3(x, y, z) << endl;
+    cout << "pose: " << Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z)) << endl;
     pose = Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z));
+    // NOTE: this conversion from state to pose works the same as that in our python code (verified with test cases)
     times.insert(time);
     obj_data.push_back(make_tuple(time, pose));
     // obj_data.push_back(make_tuple(time, remove_yaw(pose)));
@@ -147,9 +153,11 @@ void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, 
       cout << "number of ado objects seen = " << tf_ego_ado_maps[ego_sym].size() << endl;
       for (const auto & key_value : tf_ego_ado_maps[ego_sym]) {
         ado_sym = key_value.first;
-        cout << key_value.first << " ado_sym: " << ado_sym << endl;
-        cout << key_value.second << endl;
-        myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(key_value.second) << "\n";
+        // cout << key_value.first << " ado_sym: " << ado_sym << endl;
+        Pose3 tf_ego_ado_est = key_value.second;
+        cout << tf_ego_ado_est << endl;
+        Pose3 tf_w_ado_est = tf_w_est_preslam * tf_ego_ado_est;
+        myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_est) << ", " << pose_to_string_line(tf_ego_ado_est) << "\n";
       }
     }
   }
@@ -181,6 +189,7 @@ string pose_to_string_line(Pose3 p){
 //////////////////////////////////////////////////////////
 
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est) {
+  // https://github.com/borglab/gtsam/blob/b1bb0c9ed58f62638c068d7b5332fe7e0e49a29b/examples/SFMExample.cpp
   // noise = np.array([random.uniform(-0.02, 0.02) for i in range(3)]) 
   std::random_device rd;  //Will be used to obtain a seed for the random number engine
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()

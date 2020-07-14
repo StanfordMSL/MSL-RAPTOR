@@ -21,6 +21,7 @@ from image_segmentor import ImageSegmentor
 import yaml
 
 def run_execution_loop():
+    pdb.set_trace()
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb')
     b_use_gt_pose_init = rospy.get_param('~b_use_gt_pose_init')  
     b_use_gt_detect_bb = rospy.get_param('~b_use_gt_detect_bb')  
@@ -366,7 +367,8 @@ class camera:
 if __name__ == '__main__':
     np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
     print("Starting MSL-RAPTOR main [running python {}]".format(sys.version_info[0]))
-    rospy.init_node('RAPTOR_MSL', anonymous=True)
+    # rospy.init_node('RAPTOR_MSL', anonymous=True)
     run_execution_loop()
     print("--------------- FINISHED ---------------")
 
+# state = np.array([0.719736, 0.231484, -0.056143, 0, 0, 0, 0.952022, 0.024644, -0.304932, -0.007894, 0,0,0])

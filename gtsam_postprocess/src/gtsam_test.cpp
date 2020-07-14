@@ -47,7 +47,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
 
   // STEP 0) Create graph & value objects, add first pose at origin with key '1'
-  int t_ind_cutoff = 12000;
+  int t_ind_cutoff = 3000;
   NonlinearFactorGraph graph;
   Pose3 first_pose = Pose3();
   int ego_pose_index = 1;
@@ -55,9 +55,16 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   graph.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose);
   Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
 
+  bool b_use_poses = true;
+
   // Eventually I will use the ukf's covarience here, but for now use a constant one
-  auto constNoiseMatrix = noiseModel::Diagonal::Sigmas(
-          (Vector(6) << Vector3::Constant(0.01), Vector3::Constant(0.03)).finished());
+  noiseModel::Diagonal::shared_ptr constNoiseMatrix;
+  if (b_use_poses) {
+    constNoiseMatrix = noiseModel::Diagonal::Sigmas( (Vector(6) << Vector3::Constant(1), Vector3::Constant(1) ).finished());
+  }
+  else {
+    constNoiseMatrix = noiseModel::Diagonal::Sigmas((Vector(3)<<0.01,0.01,0.03).finished());
+  }
 
   int obj_list_ind = 0; // this needs to be flexible since I dont know how many landmarks I see at each time, if any
   bool b_landmarks_observed = false; // set to true if we observe at least 1 landmark (so we know if we should try to estimate a pose)
@@ -100,11 +107,24 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       tf_ego_ado_est = Pose3(tf_ego_ado_gt); // DEBUG ONLY!!!!
       int obj_id = get<1>(obj_data[obj_list_ind]);
       Symbol ado_sym = Symbol('l', obj_id);
+      // if(ado_sym != Symbol('l', 3)) {
+      //   break;
+      // }
 
       tf_ego_ado_maps[ego_sym][ado_sym] = Pose3(tf_ego_ado_est);
+
+      // cout << tf_ego_ado_gt.translation().squaredNorm() << " " << tf_ego_ado_est.translation().squaredNorm() << endl;
       
       // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
-      graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
+      if (b_use_poses) {
+        graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
+      }
+      else {
+        Point3 meas_vec = tf_ego_ado_est.translation();
+        Unit3 bearing3d = Unit3(meas_vec);
+        double range3d = meas_vec.squaredNorm();
+        graph.emplace_shared<BearingRangeFactor<Pose3, Point3> >(ego_sym, ado_sym, bearing3d, range3d, constNoiseMatrix);
+      }
       // cout << "creating factor " << ego_sym << " <--> " << ado_sym << endl;
 
       if(t_ind == 0) {
@@ -112,7 +132,12 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         tf_w_gt_map[ado_sym] = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt
         tf_w_est_preslam_map[ado_sym] = get<3>(obj_data[obj_list_ind]); // tf_w_ado_est
         // add initial estimate for landmark (in world frame)
-        initial_estimate.insert(ado_sym, Pose3(tf_ego_ado_est)); // since by construction at t=0 the world and ego pose are both the origin, this relative measurement is also in world frame
+        if (b_use_poses) {
+          initial_estimate.insert(ado_sym, Pose3(tf_ego_ado_est)); // since by construction at t=0 the world and ego pose are both the origin, this relative measurement is also in world frame
+        }
+        else {
+          initial_estimate.insert(ado_sym, Point3(tf_ego_ado_est.translation())); 
+        }
         tf_w_ego_gt = Pose3();
       }
       else {
