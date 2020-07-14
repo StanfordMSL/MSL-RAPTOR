@@ -55,11 +55,11 @@ void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<do
     iss >> wx;
     iss >> wy;
     iss >> wz;
-    cout << "qw, qx...qz: " << qw << ", " << qx << ", " << qy << ", " << qz << endl;
+    // cout << "qw, qx...qz: " << qw << ", " << qx << ", " << qy << ", " << qz << endl;
     // cout << "quat: " << Quaternion(qw, qx, qy, qz) << endl;
-    cout << "rot: " << Rot3(Quaternion(qw, qx, qy, qz)) << endl;
-    cout << "t: " << Point3(x, y, z) << endl;
-    cout << "pose: " << Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z)) << endl;
+    // cout << "rot: " << Rot3(Quaternion(qw, qx, qy, qz)) << endl;
+    // cout << "t: " << Point3(x, y, z) << endl;
+    // cout << "pose: " << Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z)) << endl;
     pose = Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z));
     // NOTE: this conversion from state to pose works the same as that in our python code (verified with test cases)
     times.insert(time);
@@ -72,6 +72,8 @@ void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<do
 void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data, obj_param_t params, double dt_thresh) {
   // data.push_back(make_tuple(5, get<1>(data_est[0]), get<1>(data_est[0])));
   // now "sync" the gt and est for each object
+
+  bool b_verbose = false;
   
   double t_gt, t_est;
   uint next_est_time_ind = 0;
@@ -85,13 +87,15 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
           double t_diff, rot_diff; 
           calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff, &rot_diff, true);
 
-          cout << "\n-------------------------------------------------------------" << endl;
-          cout << "a) time = " << t_est << ". id = " << params.obj_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
+          if (b_verbose) {
+            cout << "\n-------------------------------------------------------------" << endl;
+            cout << "a) time = " << t_est << ". id = " << params.obj_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
+          }
           
           double t_diff2, rot_diff2;
           if (!params.b_rm_roll && !params.b_rm_pitch && !params.b_rm_yaw) {
             calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
-            cout << "b) \t\t\t   not symetric" << endl;
+            if (b_verbose) {cout << "b) \t\t\t   not symetric" << endl;}
           }
           else {
             if (params.b_rm_roll) {
@@ -104,13 +108,13 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
               Pose3 data_gt_no_yaw = remove_yaw(get<1>(data_gt[i]));
               Pose3 data_est_no_yaw = remove_yaw(get<1>(data_est[i]));
               calc_pose_delta(data_gt_no_yaw.inverse(), data_est_no_yaw, &t_diff2, &rot_diff2, true);
-              cout << "c) \t\t\t   w/o yaw:  t_delta2 = " << t_diff2 << ", r_delta2 = " << rot_diff2 << " deg" << endl;
+              if (b_verbose) {cout << "c) \t\t\t   w/o yaw:  t_delta2 = " << t_diff2 << ", r_delta2 = " << rot_diff2 << " deg" << endl;}
               calc_pose_delta(data_gt_no_yaw.inverse(), get<1>(data_gt[j]), &t_diff2, &rot_diff2, true);
-              cout << "d) \t\t\t   w/ vs. w/o yaw [gt]:   t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;
+              if (b_verbose) {cout << "d) \t\t\t   w/ vs. w/o yaw [gt]:   t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;}
               calc_pose_delta(data_est_no_yaw.inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
-              cout << "e) \t\t\t   w/ vs. w/o yaw [est]:  t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;
+              if (b_verbose) {cout << "e) \t\t\t   w/ vs. w/o yaw [est]:  t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;}
 
-              if (t_est > 31.7 && params.obj_id == 2 && t_est < 31.9) {
+              if (b_verbose && (t_est > 31.7 && params.obj_id == 2 && t_est < 31.9) ) {
                 cout << "f) gt yaw: "<< get<1>(data_gt[i]) << endl;              
                 cout << "g) gt no yaw: " << data_gt_no_yaw << endl;
                 cout << endl;  
@@ -148,7 +152,6 @@ void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, 
                                                 << pose_to_string_line(tf_w_ego_est_preslam) << ", " 
                                                 << pose_to_string_line(tf_w_ego_est_postslam) << "\n";
 
-      cout << "number of ado objects seen = " << tf_ego_ado_maps[ego_sym].size() << endl;
       for (const auto & key_value : tf_ego_ado_maps[ego_sym]) {
         Symbol ado_sym = key_value.first;
         pair<Pose3, Pose3> pose_gt_est_pair = key_value.second;

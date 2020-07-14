@@ -18,9 +18,9 @@ int main(int argc, char** argv) {
 
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
   map<string, obj_param_t> obj_param_map = {
-    {"bowl_white_small_norm", obj_param_t("bowl_white_small_norm", "bowl",   2, false, false, true)},
+    {"bowl_white_small_norm", obj_param_t("bowl_white_small_norm", "bowl",   2, false, false, false)}, //true
     {"camera_canon_len_norm", obj_param_t("camera_canon_len_norm", "camera", 3, false, false, false)},
-    {"can_arizona_tea_norm",  obj_param_t("can_arizona_tea_norm",  "can",    4, false, false, true)},
+    {"can_arizona_tea_norm",  obj_param_t("can_arizona_tea_norm",  "can",    4, false, false, false)}, //true
     {"laptop_air_xin_norm",   obj_param_t("laptop_air_xin_norm",   "laptop", 5, false, false, false)},
     {"mug_daniel_norm",       obj_param_t("mug_daniel_norm",       "mug",    6, false, false, false)}
   };
@@ -46,8 +46,8 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   // note: object id serves as landmark id, landmark is same as saying "ado"
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
 
-  // STEP 0) Create graph & value objects, add first pose at origin with key '1'
-  int t_ind_cutoff = 20;
+  // STEP 0) Create graph & value objects, add first pose at origin
+  int t_ind_cutoff = 4;
   NonlinearFactorGraph graph;
   Pose3 first_pose = Pose3();
   int ego_pose_index = 1;
@@ -67,6 +67,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     constNoiseMatrix = noiseModel::Diagonal::Sigmas((Vector(3)<<0.01,0.01,0.03).finished());
   }
 
+  int t_ind = 0;
   int obj_list_ind = 0; // this needs to be flexible since I dont know how many landmarks I see at each time, if any
   bool b_landmarks_observed = false; // set to true if we observe at least 1 landmark (so we know if we should try to estimate a pose)
   
@@ -75,13 +76,11 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   map<Symbol, double> ego_time_map; // store the time at each camera position
   // map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps;
   map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps;
+
   
-  // STEP 1) loop through ego poses, at each time do the following:
-  //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
-  //  - 1B) If first timestep, use the fact that x1 is defined to be origin to set ground truth pose of landmarks. Also use first estimate as initial estimate for landmark pose
-  //  - 1C) Otherwise, use gt / estimate of landmark poses from t0 and current time to gt / estimate of current camera pose (SUBSTITUE FOR ODOMETRY!!)
-  //  - 1D) Use estimate of current camera pose for value initalization
-  int t_ind = 0;
+  // build trajectory and get initial measurements of objects
+  map<Symbol, Pose3> tf_w_gt_map2, tf_w_est_preslam_map2; 
+  vector<pair<Pose3, Pose3>> tf_w_ego_gt_est_vec;
   for(const auto & ego_time : times) {
     if (t_ind > t_ind_cutoff) {
       break;
@@ -90,33 +89,82 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     ego_pose_index = 1 + t_ind;
     ego_sym = Symbol('x', ego_pose_index);
 
-    if (obj_list_ind >= obj_data.size()) {
-      cout << "encorperated all observations into graph" << endl;
+    while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
+      Pose3 tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
+      Pose3 tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
+      int obj_id = get<1>(obj_data[obj_list_ind]);
+      Symbol ado_sym = Symbol('l', obj_id);
+      // if(obj_id != 6 && obj_id != 5) {
+      if(obj_id == 2 || obj_id == 4) {
+        obj_list_ind++;
+        continue;
+      }
+
+      if(t_ind == 0) {
+        tf_w_gt_map[ado_sym] = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt
+        cout << ado_sym << ": " << tf_w_gt_map2[ado_sym] << endl;
+        tf_w_est_preslam_map2[ado_sym] = get<3>(obj_data[obj_list_ind]); // tf_w_ado_est
+        tf_w_ego_gt = Pose3();
+      }
+      else {
+        tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
+        tf_w_ego_est = tf_w_est_preslam_map2[ado_sym] * tf_ego_ado_est.inverse(); // est ego pose in world frame
+      }
+      obj_list_ind++;
+    }
+    tf_w_ego_gt_est_vec.push_back(make_pair(Pose3(tf_w_ego_gt), Pose3(tf_w_ego_est)));
+    t_ind++;
+  }
+  
+  // STEP 1) loop through ego poses, at each time do the following:
+  //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
+  //  - 1B) If first timestep, use the fact that x1 is defined to be origin to set ground truth pose of landmarks. Also use first estimate as initial estimate for landmark pose
+  //  - 1C) Otherwise, use gt / estimate of landmark poses from t0 and current time to gt / estimate of current camera pose (SUBSTITUE FOR ODOMETRY!!)
+  //  - 1D) Use estimate of current camera pose for value initalization
+  t_ind = 0;
+  obj_list_ind = 0; // this needs to be flexible since I dont know how many landmarks I see at each time, if any
+  for(const auto & ego_time : times) {
+    if (t_ind > t_ind_cutoff) {
       break;
     }
+    // Pose3 tf_w_ego_gt, tf_w_ego_est;
+    ego_pose_index = 1 + t_ind;
+    ego_sym = Symbol('x', ego_pose_index);
+
+    Pose3 tf_w_ego_gt  = tf_w_ego_gt_est_vec[t_ind].first;
+    Pose3 tf_w_ego_est = tf_w_ego_gt_est_vec[t_ind].second;
     
     // cout << "\n-----------------------------------------" << endl;
     // cout << "t_ind = " << t_ind << endl;
-    vector<Rot3> r_vec;
-    vector<Point3> t_vec;
     while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
       // DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
       // first condition means we have more data to process, second means this observation is cooresponding with this ego pose
       b_landmarks_observed = true; // set to true because we have at least 1 object seen
-      Pose3 tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
-      Pose3 tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
-      tf_ego_ado_est = Pose3(tf_ego_ado_gt); // DEBUG ONLY!!!!
       int obj_id = get<1>(obj_data[obj_list_ind]);
       Symbol ado_sym = Symbol('l', obj_id);
+      if(obj_id == 2 || obj_id == 4) {
+        obj_list_ind++;
+        continue;
+      }
+
+      // Pose3 tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
+      // Pose3 tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
+      Pose3 tf_ego_ado_gt = tf_w_ego_gt.inverse() * tf_w_gt_map[ado_sym];  
+
+      // random_device rd;  // Will be used to obtain a seed for the random number engine
+      // mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+      // uniform_real_distribution<> dis(-0.005, 0.005);
+      // Pose3 tf_ego_ado_est = tf_ego_ado_gt.compose( Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen))) );
+      Pose3 tf_ego_ado_est = Pose3(tf_ego_ado_gt);
+
+      // tf_ego_ado_est = Pose3(tf_ego_ado_gt); // DEBUG ONLY!!!!
 
       tf_ego_ado_maps[ego_sym][ado_sym] = make_pair(Pose3(tf_ego_ado_gt), Pose3(tf_ego_ado_est));
-      // tf_ego_ado_maps[ego_sym][ado_sym] = Pose3(tf_ego_ado_est);
 
-      // cout << tf_ego_ado_gt.translation().squaredNorm() << " " << tf_ego_ado_est.translation().squaredNorm() << endl;
-      
       // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
       if (b_use_poses) {
         graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
+        cout << "tf_ego_ado_gt: " << t_ind << tf_ego_ado_est << endl;
       }
       else {
         Point3 meas_vec = tf_ego_ado_est.translation();
@@ -126,10 +174,11 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       }
       // cout << "creating factor " << ego_sym << " <--> " << ado_sym << endl;
 
-      if(t_ind == 0) {
+      if(t_ind == 0) { 
         // 1B) if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
         tf_w_gt_map[ado_sym] = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt
         tf_w_est_preslam_map[ado_sym] = get<3>(obj_data[obj_list_ind]); // tf_w_ado_est
+        // tf_w_est_preslam_map[ado_sym] = get<3>(obj_data[obj_list_ind]); // tf_w_ado_est
         // add initial estimate for landmark (in world frame)
         if (b_use_poses) {
           initial_estimate.insert(ado_sym, Pose3(tf_ego_ado_est)); // since by construction at t=0 the world and ego pose are both the origin, this relative measurement is also in world frame
@@ -137,17 +186,13 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         else {
           initial_estimate.insert(ado_sym, Point3(tf_ego_ado_est.translation())); 
         }
-        tf_w_ego_gt = Pose3();
+        // tf_w_ego_gt = Pose3();
       }
       else {
         // 1C) use gt position of landmark now & at t0 to get gt position of ego. Same for estimated position
-        tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
-        tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // est ego pose in world frame
+        // tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
+        // tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // est ego pose in world frame
         tf_w_ego_est = Pose3(tf_w_ego_gt); // DEBUG ONLY!!!!
-        if (obj_id != 2 && obj_id != 4) { // assume we see at least 1 object w/o symmetry 
-          r_vec.push_back(Rot3(tf_w_ego_est.rotation()));
-        }
-        t_vec.push_back(Point3(tf_w_ego_est.translation()));
       }
       obj_list_ind++;
     }
@@ -174,10 +219,24 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   vector<double> t_diff_pre, rot_diff_pre, t_diff_post, rot_diff_post;
   double ave_t_diff_pre = 0, ave_rot_diff_pre = 0, ave_t_diff_post = 0, ave_rot_diff_post = 0;
   bool b_degrees = true;
+  Pose3 pose0_inv;
+
+  for (const auto& key_value: poses) {
+    Symbol sym = Symbol(key_value.key);
+    Pose3 tf_w_est_postslam = key_value.value;
+    if (sym.chr() != 'l' && sym.chr() != 'L') {
+      pose0_inv = Pose3(tf_w_est_postslam).inverse();
+      cout << sym << endl;
+      cout << tf_w_est_postslam << endl;
+      cout << pose0_inv << endl;
+      break;
+    }
+  }
+  
   for(const auto& key_value: poses) {
     // Extract Symbol and Pose from dict & store in map
     Symbol sym = Symbol(key_value.key);
-    Pose3 tf_w_est_postslam = key_value.value;
+    Pose3 tf_w_est_postslam = key_value.value * pose0_inv;
     tf_w_est_postslam_map[sym] = tf_w_est_postslam;
 
     // Find corresponding gt pose and preslam pose
@@ -219,13 +278,6 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
 
   cout << "writing results to: " << fn << endl;
   write_results_csv(fn, ego_time_map, tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps);
-
-// undefined reference to 
-// write_results_csv(std::map<gtsam::Symbol, double, std::less<gtsam::Symbol>, std::allocator<std::pair<gtsam::Symbol const, double> > >, 
-//                   std::map<gtsam::Symbol, gtsam::Pose3, std::less<gtsam::Symbol>, std::allocator<std::pair<gtsam::Symbol const, gtsam::Pose3> > >, 
-//                   std::map<gtsam::Symbol, gtsam::Pose3, std::less<gtsam::Symbol>, std::allocator<std::pair<gtsam::Symbol const, gtsam::Pose3> > >, 
-//                   std::map<gtsam::Symbol, gtsam::Pose3, std::less<gtsam::Symbol>, std::allocator<std::pair<gtsam::Symbol const, gtsam::Pose3> > >)'
-
 }
 
 void run_isam(const set<double> &times, const object_est_gt_data_vec_t& obj_data, const map<std::string, obj_param_t> &obj_params_map, double dt_thresh) {
