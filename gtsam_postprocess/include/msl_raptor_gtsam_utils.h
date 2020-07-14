@@ -133,6 +133,9 @@ struct raptor_measurement_t {
   Pose3 tf_ego_ado_est;
 };
 
+// Other Functions
+void gen_fake_trajectory(vector<pair<Pose3, Pose3>> & tf_w_ego_gt_est_vec, set<double> times, const object_est_gt_data_vec_t& obj_data, int t_ind_cutoff, double dt_thresh);
+
 // Data Loading Helper Functions
 void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, obj_param_t>, double dt_thresh);
 void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> & times);

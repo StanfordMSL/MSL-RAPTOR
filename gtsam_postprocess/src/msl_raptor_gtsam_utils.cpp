@@ -1,6 +1,45 @@
 #include "msl_raptor_gtsam_utils.h"
 
+void gen_fake_trajectory(vector<pair<Pose3, Pose3>> & tf_w_ego_gt_est_vec, set<double> times, const object_est_gt_data_vec_t& obj_data, int t_ind_cutoff, double dt_thresh) {
+    // build trajectory and get initial measurements of objects
+  map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map; 
+  // vector<pair<Pose3, Pose3>> tf_w_ego_gt_est_vec;
+  int t_ind = 0, ego_pose_index = 0, obj_list_ind = 0;
+  for(const auto & ego_time : times) {
+    if (t_ind > t_ind_cutoff) {
+      break;
+    }
+    Pose3 tf_w_ego_gt, tf_w_ego_est;
+    ego_pose_index = 1 + t_ind;
+    Symbol ego_sym = Symbol('x', ego_pose_index);
 
+    while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
+      Pose3 tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
+      Pose3 tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
+      int obj_id = get<1>(obj_data[obj_list_ind]);
+      Symbol ado_sym = Symbol('l', obj_id);
+      // if(obj_id != 6 && obj_id != 5) {
+      if(obj_id == 2 || obj_id == 4) {
+        obj_list_ind++;
+        continue;
+      }
+
+      if(t_ind == 0) {
+        tf_w_gt_map[ado_sym] = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt
+        // cout << ado_sym << ": " << tf_w_gt_map[ado_sym] << endl;
+        tf_w_est_preslam_map[ado_sym] = get<3>(obj_data[obj_list_ind]); // tf_w_ado_est
+        tf_w_ego_gt = Pose3();
+      }
+      else {
+        tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
+        tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // est ego pose in world frame
+      }
+      obj_list_ind++;
+    }
+    tf_w_ego_gt_est_vec.push_back(make_pair(Pose3(tf_w_ego_gt), Pose3(tf_w_ego_est)));
+    t_ind++;
+  }
+}
 //////////////////////////////////////////////////////////
 // Data Loading Helper Functions
 //////////////////////////////////////////////////////////
@@ -188,6 +227,7 @@ string pose_to_string_line(Pose3 p){
   s += to_string(M(2,2));
   return s;
 }
+
 
 //////////////////////////////////////////////////////////
 // Math Helper Functions
