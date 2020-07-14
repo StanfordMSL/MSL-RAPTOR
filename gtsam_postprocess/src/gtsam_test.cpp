@@ -89,26 +89,28 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     if (t_ind > t_ind_cutoff) {
       break;
     }
-    // Pose3 tf_w_ego_gt, tf_w_ego_est;
     ego_pose_index = 1 + t_ind;
     ego_sym = Symbol('x', ego_pose_index);
 
-    Pose3 tf_w_ego_gt  = tf_w_ego_gt_est_vec[t_ind].first;
-    Pose3 tf_w_ego_est = tf_w_ego_gt_est_vec[t_ind].second;
+    Pose3 tf_w_ego_gt, tf_w_ego_est;
+    if (b_fake_traj) {
+      tf_w_ego_gt  = tf_w_ego_gt_est_vec[t_ind].first;
+      tf_w_ego_est = tf_w_ego_gt_est_vec[t_ind].second;
+    }
     
     // cout << "\n-----------------------------------------" << endl;
     // cout << "t_ind = " << t_ind << endl;
     while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
       // DATA TYPE object_est_gt_data_vec_t: vector of tuples, each tuple is: <double time, int class id, Pose3 gt pose, Pose3 est pose>
       // first condition means we have more data to process, second means this observation is cooresponding with this ego pose
-      b_landmarks_observed = true; // set to true because we have at least 1 object seen
       int obj_id = get<1>(obj_data[obj_list_ind]);
       Symbol ado_sym = Symbol('l', obj_id);
       if(obj_id == 2 || obj_id == 4) {
         obj_list_ind++;
         continue;
       }
-
+      b_landmarks_observed = true; // set to true because we have at least 1 object seen
+      
       if(t_ind == 0) { 
         // 1B) if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
         Pose3 tf_w_ado_gt  = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt
@@ -123,6 +125,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         else {
           initial_estimate.insert(ado_sym, Point3(tf_w_ado_est.translation())); 
         }
+        cout << "init'd ado: " << ado_sym << endl;
         if (!b_fake_traj){
           tf_w_ego_gt = Pose3();
         }
@@ -146,7 +149,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
       if (b_use_poses) {
         graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
-        cout << "tf_ego_ado_gt: " << t_ind << tf_ego_ado_est << endl;
+        // cout << "tf_ego_ado_gt: " << t_ind << tf_ego_ado_est << endl;
       }
       else {
         Point3 meas_vec = tf_ego_ado_est.translation();
@@ -154,6 +157,8 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         double range3d = meas_vec.squaredNorm();
         graph.emplace_shared<BearingRangeFactor<Pose3, Point3> >(ego_sym, ado_sym, bearing3d, range3d, constNoiseMatrix);
       }
+      cout << "added graph connection: " << ego_sym <<  " <--> " << ado_sym << endl;
+
 
       // 1C) use gt position of landmark now & at t0 to get gt position of ego. Same for estimated position
       if (!b_fake_traj){
@@ -166,6 +171,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     if (b_landmarks_observed) {
       // 1D) only calculate our pose if we actually see objects
       initial_estimate.insert(ego_sym, Pose3(tf_w_ego_est));
+      cout << "init'd ego: " << ego_sym << endl;
       tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_est);
       tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
       ego_time_map[ego_sym] = ego_time;
