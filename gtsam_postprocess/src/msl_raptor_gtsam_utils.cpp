@@ -127,8 +127,8 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
   cout << endl;
 }
 
-void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, Pose3> tf_w_gt_map, map<Symbol, Pose3> tf_w_est_preslam_map, map<Symbol, Pose3> tf_w_est_postslam_map, map<Symbol, map<Symbol, Pose3 > > tf_ego_ado_maps){
-// void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, Pose3> tf_w_gt_map, map<Symbol, Pose3> tf_w_est_preslam_map, map<Symbol, Pose3> tf_w_est_postslam_map, map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps){
+// void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, Pose3> tf_w_gt_map, map<Symbol, Pose3> tf_w_est_preslam_map, map<Symbol, Pose3> tf_w_est_postslam_map, map<Symbol, map<Symbol, Pose3 > > tf_ego_ado_maps){
+void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, Pose3> tf_w_gt_map, map<Symbol, Pose3> tf_w_est_preslam_map, map<Symbol, Pose3> tf_w_est_postslam_map, map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps){
   ofstream myFile(fn);
   // for(const auto& key_value: ego_time_map) {
   double time = 0;
@@ -148,16 +148,16 @@ void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, 
       myFile << time << ", " << ego_sym << ", " << pose_to_string_line(tf_w_gt) << ", " 
                                                 << pose_to_string_line(tf_w_est_preslam) << ", " 
                                                 << pose_to_string_line(tf_w_est_postslam) << "\n";
-      // map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps
-      Symbol ado_sym;
+
       cout << "number of ado objects seen = " << tf_ego_ado_maps[ego_sym].size() << endl;
       for (const auto & key_value : tf_ego_ado_maps[ego_sym]) {
-        ado_sym = key_value.first;
-        // cout << key_value.first << " ado_sym: " << ado_sym << endl;
-        Pose3 tf_ego_ado_est = key_value.second;
+        Symbol ado_sym = key_value.first;
+        pair<Pose3, Pose3> pose_gt_est_pair = key_value.second;
+        Pose3 tf_ego_ado_gt  = pose_gt_est_pair.first;
+        Pose3 tf_ego_ado_est = pose_gt_est_pair.second;
         cout << tf_ego_ado_est << endl;
-        Pose3 tf_w_ado_est = tf_w_est_preslam * tf_ego_ado_est;
-        myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_est) << ", " << pose_to_string_line(tf_ego_ado_est) << "\n";
+        Pose3 tf_w_ado_gt  = tf_w_gt * tf_ego_ado_gt;
+        myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_gt) << ", " << pose_to_string_line(tf_ego_ado_est) << "\n";
       }
     }
   }

@@ -47,7 +47,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
 
   // STEP 0) Create graph & value objects, add first pose at origin with key '1'
-  int t_ind_cutoff = 3000;
+  int t_ind_cutoff = 20;
   NonlinearFactorGraph graph;
   Pose3 first_pose = Pose3();
   int ego_pose_index = 1;
@@ -55,6 +55,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   graph.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose);
   Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
 
+  // bool b_fake_perfect_measurements = true;
   bool b_use_poses = true;
 
   // Eventually I will use the ukf's covarience here, but for now use a constant one
@@ -73,7 +74,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
   map<Symbol, double> ego_time_map; // store the time at each camera position
   // map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps;
-  map<Symbol, map<Symbol, Pose3 > > tf_ego_ado_maps;
+  map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps;
   
   // STEP 1) loop through ego poses, at each time do the following:
   //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
@@ -107,11 +108,9 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       tf_ego_ado_est = Pose3(tf_ego_ado_gt); // DEBUG ONLY!!!!
       int obj_id = get<1>(obj_data[obj_list_ind]);
       Symbol ado_sym = Symbol('l', obj_id);
-      // if(ado_sym != Symbol('l', 3)) {
-      //   break;
-      // }
 
-      tf_ego_ado_maps[ego_sym][ado_sym] = Pose3(tf_ego_ado_est);
+      tf_ego_ado_maps[ego_sym][ado_sym] = make_pair(Pose3(tf_ego_ado_gt), Pose3(tf_ego_ado_est));
+      // tf_ego_ado_maps[ego_sym][ado_sym] = Pose3(tf_ego_ado_est);
 
       // cout << tf_ego_ado_gt.translation().squaredNorm() << " " << tf_ego_ado_est.translation().squaredNorm() << endl;
       

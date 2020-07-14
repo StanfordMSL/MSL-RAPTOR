@@ -142,8 +142,8 @@ void write_results_csv(string fn,
                        map<Symbol, Pose3> tf_w_gt_map, 
                        map<Symbol, Pose3> tf_w_est_preslam_map, 
                        map<Symbol, Pose3> tf_w_est_postslam_map,
-                       map<Symbol, map<Symbol, Pose3 > > tf_ego_ado_maps);
-                      //  map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps);
+                      //  map<Symbol, map<Symbol, Pose3 > > tf_ego_ado_maps);
+                       map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps);
 
 string pose_to_string_line(Pose3 p);
 
