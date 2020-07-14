@@ -21,7 +21,6 @@ from image_segmentor import ImageSegmentor
 import yaml
 
 def run_execution_loop():
-    pdb.set_trace()
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb')
     b_use_gt_pose_init = rospy.get_param('~b_use_gt_pose_init')  
     b_use_gt_detect_bb = rospy.get_param('~b_use_gt_detect_bb')  
