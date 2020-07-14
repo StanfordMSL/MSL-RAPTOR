@@ -58,6 +58,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   // bool b_fake_perfect_measurements = true;
   bool b_use_poses = true;
   bool b_fake_traj = false;
+  bool b_use_gt = false;
 
   // Eventually I will use the ukf's covarience here, but for now use a constant one
   noiseModel::Diagonal::shared_ptr constNoiseMatrix;
@@ -115,7 +116,9 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         // 1B) if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
         Pose3 tf_w_ado_gt  = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt
         Pose3 tf_w_ado_est = get<3>(obj_data[obj_list_ind]); // tf_w_ado_est
-        tf_w_ado_est = Pose3(tf_w_ado_gt); // DEBUG ONLY!!!!
+        if (b_use_gt) {
+          tf_w_ado_est = Pose3(tf_w_ado_gt); // DEBUG ONLY!!!!
+        }
         tf_w_gt_map[ado_sym] = tf_w_ado_gt;
         tf_w_est_preslam_map[ado_sym] = tf_w_ado_est;
         // add initial estimate for landmark (in world frame)
@@ -144,7 +147,9 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         uniform_real_distribution<> dis(-0.005, 0.005);
         tf_ego_ado_est = tf_ego_ado_gt.compose( Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen))) );
       }
-      tf_ego_ado_est = Pose3(tf_ego_ado_gt); // DEBUG ONLY!!!!
+      if (b_use_gt) {
+        tf_ego_ado_est = Pose3(tf_ego_ado_gt); // DEBUG ONLY!!!!
+      }
 
       tf_ego_ado_maps[ego_sym][ado_sym] = make_pair(Pose3(tf_ego_ado_gt), Pose3(tf_ego_ado_est)); // this is so these can be written to a csv file later
 
@@ -164,7 +169,9 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
         tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // est ego pose in world frame
       }
-      tf_w_ego_est = Pose3(tf_w_ego_gt); // DEBUG ONLY!!!!
+      if (b_use_gt) {
+        tf_w_ego_est = Pose3(tf_w_ego_gt); // DEBUG ONLY!!!!
+      }
       obj_list_ind++;
     }
     if (b_landmarks_observed) {
