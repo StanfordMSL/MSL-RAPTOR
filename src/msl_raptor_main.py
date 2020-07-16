@@ -19,8 +19,29 @@ from utils_msl_raptor.ukf_utils import state_to_tf, pose_to_3d_bb_proj, load_cla
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/src/front_end')
 from image_segmentor import ImageSegmentor
 import yaml
+import pickle
 
 def run_execution_loop():
+
+    pickle_path = "/mounted_folder/test_graphs_gtsam/gts/real_test/results_real_test_scene_1_"
+
+    for i in range(0, 389):
+        fn = pickle_path + "{:04d}.pkl".format(i)
+        print(fn)
+        with (open(fn, "rb")) as openfile:
+            data = pickle.load(openfile)
+            pdb.set_trace()
+            fn2 = "/mounted_folder/test_graphs_gtsam/gts/val/results_val_00000_0000.pkl"
+            with (open(fn2, "rb")) as openfile2:
+                data2 = pickle.load(openfile)
+            pdb.set_trace()
+
+
+
+
+
+    pdb.set_trace()
+
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb')
     b_use_gt_pose_init = rospy.get_param('~b_use_gt_pose_init')  
     b_use_gt_detect_bb = rospy.get_param('~b_use_gt_detect_bb')  

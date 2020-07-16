@@ -9,40 +9,6 @@
  * helper functions for raptor + gtsam
  */
 
-// // We will use Pose3 variables (x, y, z, Rot3) to represent the robot/landmark positions
-// #include <gtsam/geometry/Pose3.h>
-
-// // Once the optimized values have been calculated, we can also calculate the marginal covariance
-// // of desired variables
-// #include <gtsam/nonlinear/Marginals.h>
-
-// // The nonlinear solvers within GTSAM are iterative solvers, meaning they linearize the
-// // nonlinear functions around an initial linearization point, then solve the linear system
-// // to update the linearization point. This happens repeatedly until the solver converges
-// // to a consistent set of variable values. This requires us to specify an initial guess
-// // for each variable, held in a Values container.
-// #include <gtsam/nonlinear/Values.h>
-
-// // Each variable in the system (poses and landmarks) must be identified with a
-// // unique key. We can either use simple integer keys (1, 2, 3, ...) or symbols
-// // (X1, X2, L1). Here we will use Symbols
-// #include <gtsam/inference/Symbol.h>
-
-
-// // utilities include functions for extracting poses from optimization results
-// #include <gtsam/nonlinear/utilities.h>
-
-// // // My custom utils
-// // #include "include/msl_raptor_gtsam_utils.h"
-
-// // Misc Includes
-// #include <math.h>
-// #include <algorithm>
-// #include <random>
-// #include <fstream>
-// #include <iostream>
-
-
 // We will use Pose3 variables (x, y, z, Rot3) to represent the robot/landmark positions
 #include <gtsam/geometry/Pose3.h>
 
@@ -134,6 +100,7 @@ struct raptor_measurement_t {
 };
 
 // Other Functions
+void gen_all_fake_trajectories(map<Symbol, map<double, pair<Pose3, Pose3> > > & all_trajs, set<double> times, const object_est_gt_data_vec_t& obj_data, int t_ind_cutoff, double dt_thresh);
 void gen_fake_trajectory(vector<pair<Pose3, Pose3>> & tf_w_ego_gt_est_vec, set<double> times, const object_est_gt_data_vec_t& obj_data, int t_ind_cutoff, double dt_thresh);
 
 // Data Loading Helper Functions
@@ -152,6 +119,7 @@ string pose_to_string_line(Pose3 p);
 
 // Math Helper Functions
 Pose3 add_init_est_noise(const Pose3 &ego_pose_est);
+Pose3 add_noise_to_pose3(const Pose3 &pose_in, double dt, double dang);
 Rot3 remove_yaw(Rot3 R);
 Pose3 remove_yaw(Pose3 P);
 Eigen::Matrix3f rot3_to_matrix3f(Rot3 R);

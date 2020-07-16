@@ -59,14 +59,20 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   bool b_use_poses = true;
   bool b_fake_traj = false;
   bool b_use_gt = false;
+  bool b_robust = false;
 
   // Eventually I will use the ukf's covarience here, but for now use a constant one
   noiseModel::Diagonal::shared_ptr constNoiseMatrix;
+  noiseModel::Robust::shared_ptr huber;
   if (b_use_poses) {
-    constNoiseMatrix = noiseModel::Diagonal::Sigmas( (Vector(6) << Vector3::Constant(1), Vector3::Constant(1) ).finished());
+    constNoiseMatrix = noiseModel::Diagonal::Sigmas( (Vector(6) << Vector3::Constant(.1), Vector3::Constant(1.5) ).finished());
   }
   else {
     constNoiseMatrix = noiseModel::Diagonal::Sigmas((Vector(3)<<0.01,0.01,0.03).finished());
+  }
+  if (b_robust) {
+    // auto gaussian = noiseModel::Isotropic::Sigma(6, 0.01);
+    huber = noiseModel::Robust::Create( noiseModel::mEstimator::Huber::Create(1.345), constNoiseMatrix);
   }
   
   // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
@@ -78,6 +84,11 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   if (b_fake_traj) {
     gen_fake_trajectory(tf_w_ego_gt_est_vec, times, obj_data, t_ind_cutoff, dt_thresh);
   }
+  // bool b_gen_all_trajs = false;
+  // if(b_gen_all_trajs) {
+  //   map<Symbol, map<double, pair<Pose3, Pose3> > > all_trajs;
+  //   gen_all_fake_trajectories(all_trajs, times, obj_data, t_ind_cutoff, dt_thresh);
+  // }
   
   // STEP 1) loop through ego poses, at each time do the following:
   //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
@@ -110,20 +121,33 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         obj_list_ind++;
         continue;
       }
+
       b_landmarks_observed = true; // set to true because we have at least 1 object seen
+      Pose3 tf_ego_ado_gt, tf_ego_ado_est;
       
       if(t_ind == 0) { 
         // 1B) if first loop, assume all objects are seen and store their gt values - this will be used for intializing pose estimates
-        Pose3 tf_w_ado_gt  = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt
+        Pose3 tf_w_ado_gt  = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt - since by construction at t=0 the world and ego pose are both the origin, this relative measurement is also in world frame
         Pose3 tf_w_ado_est = get<3>(obj_data[obj_list_ind]); // tf_w_ado_est
         if (b_use_gt) {
           tf_w_ado_est = Pose3(tf_w_ado_gt); // DEBUG ONLY!!!!
         }
         tf_w_gt_map[ado_sym] = tf_w_ado_gt;
-        tf_w_est_preslam_map[ado_sym] = tf_w_ado_est;
+        // tf_w_est_preslam_map[ado_sym] = tf_w_ado_est;
+        // corrupted_pose = tf_w_ado_gt.compose(Pose3(Rot3::Rodrigues(-0.1, 0.2, 0.25), Point3(0.05, -0.10, 0.20)));
+        Pose3 corrupted_ado_pose = Pose3(tf_w_ado_gt);//add_noise_to_pose3(tf_w_ado_gt, .02, .06); 
+        tf_w_est_preslam_map[ado_sym] = corrupted_ado_pose;
+
+        // double t_diff_pre_val, rot_diff_pre_val;//, t_diff_post_val, rot_diff_post_val; 
+        // calc_pose_delta(tf_w_ado_gt, tf_w_ado_gt.inverse(), &t_diff_pre_val, &rot_diff_pre_val, true);
+        // cout << "***delta pre-slam: t = " << t_diff_pre_val << ", ang = " << rot_diff_pre_val << " deg" << endl;
+
         // add initial estimate for landmark (in world frame)
         if (b_use_poses) {
-          initial_estimate.insert(ado_sym, tf_w_ado_est); // since by construction at t=0 the world and ego pose are both the origin, this relative measurement is also in world frame
+          initial_estimate.insert(ado_sym, corrupted_ado_pose); 
+          // initial_estimate.insert(ado_sym, tf_w_ado_est); 
+          // initial_estimate.insert(ado_sym, tf_w_ado_gt); 
+          // initial_estimate.insert(ado_sym, add_noise_to_pose3(tf_w_ado_gt, .005, .03)); 
         }
         else {
           initial_estimate.insert(ado_sym, Point3(tf_w_ado_est.translation())); 
@@ -135,17 +159,15 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
         continue;
       }
 
-      Pose3 tf_ego_ado_gt, tf_ego_ado_est;
       if (!b_fake_traj){
         tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
         tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
       }
       else {
         tf_ego_ado_gt = tf_w_ego_gt.inverse() * tf_w_gt_map[ado_sym]; 
-        random_device rd;  // Will be used to obtain a seed for the random number engine
-        mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
-        uniform_real_distribution<> dis(-0.005, 0.005);
-        tf_ego_ado_est = tf_ego_ado_gt.compose( Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen))) );
+        tf_ego_ado_est = tf_w_ego_est.inverse() * tf_w_est_preslam_map[ado_sym]; 
+        // tf_ego_ado_est = tf_ego_ado_gt.compose( Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen))) );
+        
       }
       if (b_use_gt) {
         tf_ego_ado_est = Pose3(tf_ego_ado_gt); // DEBUG ONLY!!!!
@@ -155,13 +177,23 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
 
       // 1A) - add ego pose <--> landmark (i.e. ado) pose factor. syntax is: ego_id ("x1"), ado_id("l3"), measurment (i.e. relative pose in ego frame tf_ego_ado_est), measurement uncertanty (covarience)
       if (b_use_poses) {
-        graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
+        if (!b_robust) {
+          graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
+        }
+        else {
+          graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), huber);
+        }
       }
       else {
         Point3 meas_vec = tf_ego_ado_est.translation();
         Unit3 bearing3d = Unit3(meas_vec);
         double range3d = meas_vec.squaredNorm();
-        graph.emplace_shared<BearingRangeFactor<Pose3, Point3> >(ego_sym, ado_sym, bearing3d, range3d, constNoiseMatrix);
+        if (!b_robust) {
+          graph.emplace_shared<BearingRangeFactor<Pose3, Point3> >(ego_sym, ado_sym, bearing3d, range3d, constNoiseMatrix);
+        }
+        else {
+          graph.emplace_shared<BearingRangeFactor<Pose3, Point3> >(ego_sym, ado_sym, bearing3d, range3d, huber);
+        }
       }
 
       // 1C) use gt position of landmark now & at t0 to get gt position of ego. Same for estimated position
@@ -176,8 +208,26 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
     }
     if (b_landmarks_observed) {
       // 1D) only calculate our pose if we actually see objects
-      initial_estimate.insert(ego_sym, Pose3(tf_w_ego_est));
-      tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_est);
+      if (!b_use_gt) {
+        tf_w_ego_est = Pose3(tf_w_ego_gt); // DEBUG!!! <-- only used when i want gt initialization but not gt other things
+        initial_estimate.insert(ego_sym, Pose3(tf_w_ego_est));
+        tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_est);
+      }
+      else {
+        Pose3 corrupted_ego_pose = tf_w_ego_gt;
+        // tf_w_ego_gt = add_noise_to_pose3(tf_w_ego_gt, .005, .03); 
+        // Pose3 corrupted_ego_pose = add_noise_to_pose3(tf_w_ego_gt, .00001, .00004); 
+        // Pose3 corrupted_ego_pose = tf_w_ego_gt.compose(Pose3());
+        // Pose3 corrupted_ego_pose = Pose3();
+        // Pose3 corrupted_ego_pose = tf_w_ego_gt.compose(Pose3(Rot3::Rodrigues(0, 0, 0), Point3(1, 0.00, 0.00)));
+        // cout << tf_w_ego_gt << endl;
+        // Pose3 corrupted_ego_pose = tf_w_ego_gt * Pose3(Rot3::Rodrigues(0, 0, 0), Point3(0.05, 0.00, 0.00));
+        // cout << corrupted_ego_pose << endl;
+        initial_estimate.insert(ego_sym, Pose3(corrupted_ego_pose));
+        tf_w_est_preslam_map[ego_sym] = Pose3(corrupted_ego_pose);
+        // initial_estimate.insert(ego_sym, Pose3(tf_w_ego_gt));
+        // tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
+      }
       tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
       ego_time_map[ego_sym] = ego_time;
     }
@@ -189,6 +239,7 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   // STEP 2) create Levenberg-Marquardt optimizer for resulting factor graph, optimize
   LevenbergMarquardtOptimizer optimizer(graph, initial_estimate);
   Values result = optimizer.optimize();
+  cout << "done optimizing pose graph" << endl;
 
   // STEP 3 Loop through each ego /landmark pose and compare estimate with ground truth (both before and after slam optimization)
   Values::ConstFiltered<Pose3> poses = result.filter<Pose3>();

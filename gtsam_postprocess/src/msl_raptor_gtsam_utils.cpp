@@ -1,5 +1,45 @@
 #include "msl_raptor_gtsam_utils.h"
 
+//////////////////////////////////////////////////////////
+// Other Helper Functions
+//////////////////////////////////////////////////////////
+void gen_all_fake_trajectories(map<Symbol, map<double, pair<Pose3, Pose3> > > & all_trajs, set<double> times, const object_est_gt_data_vec_t& obj_data, int t_ind_cutoff, double dt_thresh) {
+    // build trajectory and get initial measurements of objects
+  map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map; 
+
+  // map<Symbol, map<double, pair<Pose3, Pose3> > > all_trajs;
+  // vector<pair<Pose3, Pose3>> tf_w_ego_gt_est_vec;
+  int t_ind = 0, ego_pose_index = 0, obj_list_ind = 0;
+  for(const auto & ego_time : times) {
+    if (t_ind > t_ind_cutoff) {
+      break;
+    }
+    Pose3 tf_w_ego_gt, tf_w_ego_est;
+    ego_pose_index = 1 + t_ind;
+    Symbol ego_sym = Symbol('x', ego_pose_index);
+
+    while(obj_list_ind < obj_data.size() && abs(get<0>(obj_data[obj_list_ind]) - ego_time) < dt_thresh ) {
+      Pose3 tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
+      Pose3 tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
+      int obj_id = get<1>(obj_data[obj_list_ind]);
+      Symbol ado_sym = Symbol('l', obj_id);
+
+      if(t_ind == 0) {
+        tf_w_gt_map[ado_sym] = get<2>(obj_data[obj_list_ind]); // tf_w_ado_gt
+        tf_w_est_preslam_map[ado_sym] = get<3>(obj_data[obj_list_ind]); // tf_w_ado_est
+        tf_w_ego_gt = Pose3();
+      }
+      else {
+        tf_w_ego_gt = tf_w_gt_map[ado_sym] * tf_ego_ado_gt.inverse(); // gt ego pose in world frame
+        tf_w_ego_est = tf_w_est_preslam_map[ado_sym] * tf_ego_ado_est.inverse(); // est ego pose in world frame
+      }
+      all_trajs[ado_sym][ego_time] = make_pair(tf_w_ego_gt, tf_w_ego_est);
+      obj_list_ind++;
+    }
+    t_ind++;
+  }
+}
+
 void gen_fake_trajectory(vector<pair<Pose3, Pose3>> & tf_w_ego_gt_est_vec, set<double> times, const object_est_gt_data_vec_t& obj_data, int t_ind_cutoff, double dt_thresh) {
     // build trajectory and get initial measurements of objects
   map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map; 
@@ -40,6 +80,7 @@ void gen_fake_trajectory(vector<pair<Pose3, Pose3>> & tf_w_ego_gt_est_vec, set<d
     t_ind++;
   }
 }
+
 //////////////////////////////////////////////////////////
 // Data Loading Helper Functions
 //////////////////////////////////////////////////////////
@@ -247,6 +288,16 @@ Pose3 add_init_est_noise(const Pose3 &ego_pose_est) {
   
   // cout << "tf after noise: " << ego_pose_est << endl;
 
+}
+
+Pose3 add_noise_to_pose3(const Pose3 &pose_in, double dt, double dang) {
+  std::random_device rd;  //Will be used to obtain a seed for the random number engine
+  std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+  std::uniform_real_distribution<> dis(-abs(dt), abs(dt));
+  std::uniform_real_distribution<> dis2(-abs(dang), abs(dang));
+  Pose3 pose_out = pose_in.compose( Pose3(Rot3::Rodrigues(dis(gen), dis(gen), dis(gen)), 
+                                          Point3(dis2(gen), dis2(gen), dis2(gen))) );
+  return pose_out;
 }
 
 Pose3 remove_yaw(Pose3 P) {
