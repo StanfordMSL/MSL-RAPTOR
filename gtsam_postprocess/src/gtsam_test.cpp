@@ -84,11 +84,14 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
   if (b_fake_traj) {
     gen_fake_trajectory(tf_w_ego_gt_est_vec, times, obj_data, t_ind_cutoff, dt_thresh);
   }
-  // bool b_gen_all_trajs = false;
-  // if(b_gen_all_trajs) {
-  //   map<Symbol, map<double, pair<Pose3, Pose3> > > all_trajs;
-  //   gen_all_fake_trajectories(all_trajs, times, obj_data, t_ind_cutoff, dt_thresh);
-  // }
+  bool b_gen_all_trajs = true;
+  if(b_gen_all_trajs) {
+    map<Symbol, map<double, pair<Pose3, Pose3> > > all_trajs;
+    gen_all_fake_trajectories(all_trajs, times, obj_data, t_ind_cutoff, dt_thresh);
+    string fn_traj = "/mounted_folder/test_graphs_gtsam/graph1.csv";
+    write_all_traj_csv(fn_traj, all_trajs);
+  }
+  return;
   
   // STEP 1) loop through ego poses, at each time do the following:
   //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 

@@ -249,6 +249,23 @@ void write_results_csv(string fn, map<Symbol, double> ego_time_map, map<Symbol, 
   myFile.close();
 }
 
+void write_all_traj_csv(string fn, map<Symbol, map<double, pair<Pose3, Pose3> > > & all_trajs) {
+  ofstream myFile(fn);
+  double time = 0;
+  for(const auto& sym_map_key_value: all_trajs) {
+    Symbol ado_sym = Symbol(sym_map_key_value.first);
+    map<double, pair<Pose3, Pose3> > ado_traj = sym_map_key_value.second;
+    for(const auto& time_poses_key_value: ado_traj) {
+      double time = time_poses_key_value.first;
+      pair<Pose3, Pose3> pose_gt_est_pair = time_poses_key_value.second;
+      Pose3 tf_w_ego_gt  = pose_gt_est_pair.first;
+      Pose3 tf_w_ego_est = pose_gt_est_pair.second;
+      myFile << ado_sym << ", " << time << ", " << pose_to_string_line(tf_w_ego_gt) << ", " << pose_to_string_line(tf_w_ego_est) << "\n";
+    }
+  }
+  myFile.close();
+}
+
 string pose_to_string_line(Pose3 p){
   string s;
   Point3 t = p.translation();
