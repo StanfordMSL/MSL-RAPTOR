@@ -96,8 +96,8 @@ void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, con
     // int obj_id = params.obj_id; //object_id_map[key_value_pair.second];
     cout << "Processing " << params.long_name << " (id = " << params.obj_id << ")" << endl;
 
-    // read_data_from_one_log(path + file_base + params.long_name + "_gt.log", ado_data_gt, times);
-    read_gt_datafiles(path + "gt_pose_data_" + params.long_name + ".txt", ado_data_gt, times);
+    read_data_from_one_log(path + file_base + params.long_name + "_gt.log", ado_data_gt, times);
+    // read_gt_datafiles(path + "gt_pose_data_scene_1_" + params.long_name + ".txt", ado_data_gt, times);
     read_data_from_one_log(path + file_base + params.long_name + "_est.log", ado_data_est, times);
     sync_est_and_gt(ado_data_est, ado_data_gt, ado_data_single, params, dt_thresh);
     ado_data.insert( ado_data.end(), ado_data_single.begin(), ado_data_single.end() ); // combine into 1 vector of all ado data
@@ -116,30 +116,29 @@ void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, con
 void read_gt_datafiles(const string fn, object_data_vec_t& obj_data, set<double> &times) {
   // space deliminated file: Time (s), ado_name, Ado State tf, Ego State tf. (tfs are x/y/z/r11,r12,r13,...,r33)
   ifstream infile(fn);
-  string line, s;
-  double time, x, y, z, vx, vy, vz, qx, qy, qz, qw, wx, wy, wz;
-  Pose3 pose;
-  getline(infile, line); // skip header of file
+  string line, dummy_str;
+  double time, x, y, z, r11, r12, r13, r21, r22, r23, r31, r32, r33;
+  Pose3 pose_tf_w_ado_gt;
   while (getline(infile, line)) {
     istringstream iss(line);
+    iss >> dummy_str; // this "absorbs" the # at the begining of the line
     iss >> time;
+    iss >> dummy_str; // this "absorbs" the ado object's name
     iss >> x;
     iss >> y;
     iss >> z;
-    iss >> vx;
-    iss >> vy;
-    iss >> vz;
-    iss >> qw;
-    iss >> qx;
-    iss >> qy;
-    iss >> qz;
-    iss >> wx;
-    iss >> wy;
-    iss >> wz;
-    pose = Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z));
-    // NOTE: this conversion from state to pose works the same as that in our python code (verified with test cases)
+    iss >> r11;
+    iss >> r12;
+    iss >> r13;
+    iss >> r21;
+    iss >> r22;
+    iss >> r23;
+    iss >> r31;
+    iss >> r32;
+    iss >> r33;
+    pose_tf_w_ado_gt = Pose3(Rot3(r11, r12, r13, r21, r22, r23, r31, r32, r33), Point3(x, y, z));
     times.insert(time);
-    obj_data.push_back(make_tuple(time, pose));
+    obj_data.push_back(make_tuple(time, pose_tf_w_ado_gt));
     // obj_data.push_back(make_tuple(time, remove_yaw(pose)));
   }
   return;
