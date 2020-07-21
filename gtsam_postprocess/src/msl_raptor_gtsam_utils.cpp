@@ -96,7 +96,8 @@ void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, con
     // int obj_id = params.obj_id; //object_id_map[key_value_pair.second];
     cout << "Processing " << params.long_name << " (id = " << params.obj_id << ")" << endl;
 
-    read_data_from_one_log(path + file_base + params.long_name + "_gt.log", ado_data_gt, times);
+    // read_data_from_one_log(path + file_base + params.long_name + "_gt.log", ado_data_gt, times);
+    read_gt_datafiles(path + "gt_pose_data_" + params.long_name + ".txt", ado_data_gt, times);
     read_data_from_one_log(path + file_base + params.long_name + "_est.log", ado_data_est, times);
     sync_est_and_gt(ado_data_est, ado_data_gt, ado_data_single, params, dt_thresh);
     ado_data.insert( ado_data.end(), ado_data_single.begin(), ado_data_single.end() ); // combine into 1 vector of all ado data
@@ -110,6 +111,40 @@ void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, con
     return get<0>(lhs) < get<0>(rhs); 
   });   // this should sort the vector by time (i.e. first element in each tuple). Tie breaker is object id
 }
+
+
+void read_gt_datafiles(const string fn, object_data_vec_t& obj_data, set<double> &times) {
+  // space deliminated file: Time (s), ado_name, Ado State tf, Ego State tf. (tfs are x/y/z/r11,r12,r13,...,r33)
+  ifstream infile(fn);
+  string line, s;
+  double time, x, y, z, vx, vy, vz, qx, qy, qz, qw, wx, wy, wz;
+  Pose3 pose;
+  getline(infile, line); // skip header of file
+  while (getline(infile, line)) {
+    istringstream iss(line);
+    iss >> time;
+    iss >> x;
+    iss >> y;
+    iss >> z;
+    iss >> vx;
+    iss >> vy;
+    iss >> vz;
+    iss >> qw;
+    iss >> qx;
+    iss >> qy;
+    iss >> qz;
+    iss >> wx;
+    iss >> wy;
+    iss >> wz;
+    pose = Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z));
+    // NOTE: this conversion from state to pose works the same as that in our python code (verified with test cases)
+    times.insert(time);
+    obj_data.push_back(make_tuple(time, pose));
+    // obj_data.push_back(make_tuple(time, remove_yaw(pose)));
+  }
+  return;
+}
+
 
 void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> &times){
   // log file header: Time (s), Ado State GT, Ego State GT, 3D Corner GT (X|Y|Z), Corner 2D Projections GT (r|c), Angled BB (r|c|w|h|ang_deg), Image Segmentation Mode
