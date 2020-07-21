@@ -22,26 +22,6 @@ import yaml
 import pickle
 
 def run_execution_loop():
-
-    pickle_path = "/mounted_folder/test_graphs_gtsam/gts/real_test/results_real_test_scene_1_"
-
-    for i in range(0, 389):
-        fn = pickle_path + "{:04d}.pkl".format(i)
-        print(fn)
-        with (open(fn, "rb")) as openfile:
-            data = pickle.load(openfile)
-            pdb.set_trace()
-            fn2 = "/mounted_folder/test_graphs_gtsam/gts/val/results_val_00000_0000.pkl"
-            with (open(fn2, "rb")) as openfile2:
-                data2 = pickle.load(openfile)
-            pdb.set_trace()
-
-
-
-
-
-    pdb.set_trace()
-
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb')
     b_use_gt_pose_init = rospy.get_param('~b_use_gt_pose_init')  
     b_use_gt_detect_bb = rospy.get_param('~b_use_gt_detect_bb')  
@@ -387,8 +367,6 @@ class camera:
 if __name__ == '__main__':
     np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
     print("Starting MSL-RAPTOR main [running python {}]".format(sys.version_info[0]))
-    # rospy.init_node('RAPTOR_MSL', anonymous=True)
+    rospy.init_node('RAPTOR_MSL', anonymous=True)
     run_execution_loop()
     print("--------------- FINISHED ---------------")
-
-# state = np.array([0.719736, 0.231484, -0.056143, 0, 0, 0, 0.952022, 0.024644, -0.304932, -0.007894, 0,0,0])
