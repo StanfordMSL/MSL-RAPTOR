@@ -322,7 +322,7 @@ void write_all_traj_csv(string fn, map<Symbol, map<double, pair<Pose3, Pose3> > 
       pair<Pose3, Pose3> pose_gt_est_pair = time_poses_key_value.second;
       Pose3 tf_w_ego_gt  = pose_gt_est_pair.first;
       Pose3 tf_w_ego_est = pose_gt_est_pair.second;
-      myFile << ado_sym << ", " << time << ", " << pose_to_string_line(tf_w_ego_gt) << ", " << pose_to_string_line(tf_w_ego_est) << "\n";
+      myFile << ado_sym << ", " << time << ", " << pose_to_string_line(tf_w_ego_gt) << ", " << pose_to_string_line(tf_w_ego_est) << pose_to_string_line((tf_w_ego_gt.inverse()) *tf_w_ego_est ) << "\n";
     }
   }
   myFile.close();
