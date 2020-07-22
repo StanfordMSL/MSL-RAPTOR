@@ -102,10 +102,12 @@ struct raptor_measurement_t {
 // Other Functions
 void gen_all_fake_trajectories(map<Symbol, map<double, pair<Pose3, Pose3> > > & all_trajs, set<double> times, const object_est_gt_data_vec_t& obj_data, int t_ind_cutoff, double dt_thresh);
 void gen_fake_trajectory(vector<pair<Pose3, Pose3>> & tf_w_ego_gt_est_vec, set<double> times, const object_est_gt_data_vec_t& obj_data, int t_ind_cutoff, double dt_thresh);
+void load_all_trajectories(map<Symbol, map<double, pair<Pose3, Pose3> > > & all_trajs, set<double> &times, const string path, map<string, obj_param_t> obj_params, double dt_thresh);
+void read_gt_datafiles(const string fn, map<double, pair<Pose3, Pose3> >& time_tf_w_ego_map, set<double> &times);
 
 // Data Loading Helper Functions
 void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, obj_param_t>, double dt_thresh);
-void read_gt_datafiles(const string fn, object_data_vec_t& obj_data, set<double> &times);
+// void read_gt_datafiles(const string fn, object_data_vec_t& obj_data, set<double> &times);
 void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> & times);
 void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& ego_data, obj_param_t params, double dt_thresh);
 void write_results_csv(string fn, 

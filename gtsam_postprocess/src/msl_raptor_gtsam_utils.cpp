@@ -85,19 +85,32 @@ void gen_fake_trajectory(vector<pair<Pose3, Pose3>> & tf_w_ego_gt_est_vec, set<d
 // Data Loading Helper Functions
 //////////////////////////////////////////////////////////
 
+void load_all_trajectories(map<Symbol, map<double, pair<Pose3, Pose3> > > & all_trajs, set<double> &times, const string path, map<string, obj_param_t> obj_params, double dt_thresh) {
+  object_data_vec_t ego_gt_data;
+  for(const auto &key_value_pair : obj_params) {
+    object_data_vec_t ego_data_gt_single_obj;
+    obj_param_t params = key_value_pair.second;
+    int obj_id = params.obj_id;
+    Symbol sym = Symbol('l', obj_id);
+
+    map<double, pair<Pose3, Pose3> > time_tf_w_ego_map;
+    read_gt_datafiles(path + "gt_pose_data_scene_1_" + params.long_name + ".txt", time_tf_w_ego_map, times);
+    all_trajs[sym] = time_tf_w_ego_map;
+  }
+}
+
 void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, const string path, const string file_base, map<string, obj_param_t> obj_params, double dt_thresh) {
   // for each object, load its est and gt log files to extract pose and time information. combine into a set of all times, and also all the data sorted by time
-  vector<object_data_vec_t> ado_data_gt, ado_data_est;
   for(const auto &key_value_pair : obj_params) {
-    object_data_vec_t ado_data_gt, ado_data_est;
+    object_data_vec_t ado_data_gt, ado_data_est, ego_data_gt;
     object_est_gt_data_vec_t ado_data_single;
     obj_param_t params = key_value_pair.second;
     // string obj_long_name = params.long_name; //key_value_pair.first;
     // int obj_id = params.obj_id; //object_id_map[key_value_pair.second];
     cout << "Processing " << params.long_name << " (id = " << params.obj_id << ")" << endl;
 
+    // read_gt_datafiles(path + "gt_pose_data_scene_1_" + params.long_name + ".txt", ego_data_gt, times);
     read_data_from_one_log(path + file_base + params.long_name + "_gt.log", ado_data_gt, times);
-    // read_gt_datafiles(path + "gt_pose_data_scene_1_" + params.long_name + ".txt", ado_data_gt, times);
     read_data_from_one_log(path + file_base + params.long_name + "_est.log", ado_data_est, times);
     sync_est_and_gt(ado_data_est, ado_data_gt, ado_data_single, params, dt_thresh);
     ado_data.insert( ado_data.end(), ado_data_single.begin(), ado_data_single.end() ); // combine into 1 vector of all ado data
@@ -110,15 +123,15 @@ void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, con
     }
     return get<0>(lhs) < get<0>(rhs); 
   });   // this should sort the vector by time (i.e. first element in each tuple). Tie breaker is object id
+
 }
 
-
-void read_gt_datafiles(const string fn, object_data_vec_t& obj_data, set<double> &times) {
+void read_gt_datafiles(const string fn, map<double, pair<Pose3, Pose3> >& time_tf_w_ego_map, set<double> &times) {
   // space deliminated file: Time (s), ado_name, Ado State tf, Ego State tf. (tfs are x/y/z/r11,r12,r13,...,r33)
   ifstream infile(fn);
   string line, dummy_str;
   double time, x, y, z, r11, r12, r13, r21, r22, r23, r31, r32, r33;
-  Pose3 pose_tf_w_ado_gt;
+  Pose3 pose_tf_w_ado_gt, pose_tf_w_ego_gt;
   while (getline(infile, line)) {
     istringstream iss(line);
     iss >> dummy_str; // this "absorbs" the # at the begining of the line
@@ -137,13 +150,28 @@ void read_gt_datafiles(const string fn, object_data_vec_t& obj_data, set<double>
     iss >> r32;
     iss >> r33;
     pose_tf_w_ado_gt = Pose3(Rot3(r11, r12, r13, r21, r22, r23, r31, r32, r33), Point3(x, y, z));
+    iss >> x;
+    iss >> y;
+    iss >> z;
+    iss >> r11;
+    iss >> r12;
+    iss >> r13;
+    iss >> r21;
+    iss >> r22;
+    iss >> r23;
+    iss >> r31;
+    iss >> r32;
+    iss >> r33;
+    pose_tf_w_ego_gt = Pose3(Rot3(r11, r12, r13, r21, r22, r23, r31, r32, r33), Point3(x, y, z));
+    // cout << pose_tf_w_ado_gt << endl;
     times.insert(time);
-    obj_data.push_back(make_tuple(time, pose_tf_w_ado_gt));
+    time_tf_w_ego_map[time] = make_pair(pose_tf_w_ego_gt, pose_tf_w_ado_gt);
+    // obj_data.push_back(make_tuple(time, pose_tf_w_ego_gt));
+    // obj_data.push_back(make_tuple(time, pose_tf_w_ego_gt.inverse() * pose_tf_w_ado_gt));
     // obj_data.push_back(make_tuple(time, remove_yaw(pose)));
   }
   return;
 }
-
 
 void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> &times){
   // log file header: Time (s), Ado State GT, Ego State GT, 3D Corner GT (X|Y|Z), Corner 2D Projections GT (r|c), Angled BB (r|c|w|h|ang_deg), Image Segmentation Mode

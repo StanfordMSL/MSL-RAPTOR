@@ -31,6 +31,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 class nocs_rb_to_ego_traj:
     def __init__(self):
+        self.b_save_output = False
         self.plot_traj_from_rb()
         # self.plot_traj_from_pkl()
         pdb.set_trace()
@@ -56,10 +57,11 @@ class nocs_rb_to_ego_traj:
         # self.fh['ego'] = open(filename_out,'w+')  # doing this here makes it appendable
 
         ado_names = ["bowl_white_small_norm", "camera_canon_len_norm", "can_arizona_tea_norm", "laptop_air_xin_norm", "mug_daniel_norm"]
-        self.fh = {}
-        for name in ado_names:
-            fn = "/mounted_folder/nocs/test/gt_pose_data_scene_1_{}.txt".format(name)
-            self.fh[name] = open(fn,'w+')  # doing this here makes it appendable
+        if self.b_save_output:
+            self.fh = {}
+            for name in ado_names:
+                fn = "/mounted_folder/nocs/test/gt_pose_data_scene_1_{}.txt".format(name)
+                self.fh[name] = open(fn,'w+')  # doing this here makes it appendable
 
         for i, (topic, msg, t) in enumerate(self.bag.read_messages()):
             t_split = topic.split("/")
@@ -89,11 +91,12 @@ class nocs_rb_to_ego_traj:
                     self.gt_ego_states[name] = np.reshape(tf_to_state_vec(np.eye(4)), (1, 13) )
                     self.gt_ado_states[name] = np.reshape(tf_to_state_vec(ros_pose_to_tf(msg.pose)), (1, 13) )
                 
-                data_out = "{} {} ".format(t.to_sec() - self.t0[name], name) + tf_to_str(tf_w_ado) + ' ' + tf_to_str(tf_w_ego)
-                np.savetxt(self.fh[name], X=[], header=data_out)
-        
-        for fh_key in self.fh:
-            self.fh[fh_key].close()
+                if self.b_save_output:
+                    data_out = "{} {} ".format(t.to_sec() - self.t0[name], name) + tf_to_str(tf_w_ado) + ' ' + tf_to_str(tf_w_ego)
+                    np.savetxt(self.fh[name], X=[], header=data_out)
+        if self.b_save_output:
+            for fh_key in self.fh:
+                self.fh[fh_key].close()
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
@@ -110,6 +113,7 @@ class nocs_rb_to_ego_traj:
         ax.set_zlabel('Z')
 
         plt.show(block=False)
+        pdb.set_trace()
 
 
 
