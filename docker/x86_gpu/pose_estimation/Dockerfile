@@ -124,6 +124,12 @@ RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch"' >> 
     echo 'alias metrics_go="python3 ~/msl_raptor_ws/src/msl_raptor/src/viz_tools/result_analyser.py"' >> ~/.bashrc && \
     echo 'alias weight_reset_go="rm ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt/*.pth"' >> ~/.bashrc
 
+# Add git aliases for convience
+RUN git config --global alias.co checkout && \
+    git config --global alias.br branch && \
+    git config --global alias.ci commit && \
+    git config --global alias.st status
+
 RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \
     git pull --recurse-submodules && \
