@@ -170,8 +170,8 @@ void run_batch_slam(const set<double> &times, const object_est_gt_data_vec_t& ob
       Pose3 tf_ego_ado_gt, tf_ego_ado_est;
       tf_ego_ado_gt = (tf_w_ego_gt_map[ego_time].inverse()) * tf_w_ado_gt_map[ado_sym][ego_time];
       // tf_ego_ado_gt  = get<2>(obj_data[obj_list_ind]); // current relative gt object pose
-      tf_ego_ado_est = get<2>(obj_data[obj_list_ind]); // estimated ado pose
-      // tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
+      // tf_ego_ado_est = get<2>(obj_data[obj_list_ind]); // estimated ado pose
+      tf_ego_ado_est = get<3>(obj_data[obj_list_ind]); // estimated ado pose
 
       tf_ego_ado_maps[ego_sym][ado_sym] = make_pair(Pose3(tf_ego_ado_gt), Pose3(tf_ego_ado_est)); // this is so these can be written to a csv file later
 
