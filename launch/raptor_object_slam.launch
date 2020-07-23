@@ -1,0 +1,13 @@
+<!-- Core launch file to run MSL-RAPTOR node -->
+<launch>
+
+  <!-- Launch our main node -->
+
+  <node name="MSL_RAPTOR_SLAM" pkg="msl_raptor" type="raptor_object_slam" output="screen">
+  </node>
+  <!-- <node name="MSL_RAPTOR_SLAM" pkg="msl_raptor" type="gtsam_ros_test" output="screen">
+  </node> -->
+  <!-- <node name="MSL_RAPTOR_SLAM" pkg="msl_raptor" type="talker" output="screen">
+  </node> -->
+
+</launch>
