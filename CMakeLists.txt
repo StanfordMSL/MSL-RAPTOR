@@ -214,6 +214,6 @@ include_directories(
 # catkin_add_nosetests(test)
 
 
-add_executable(raptor_object_slam src/raptor_object_slam.cpp)
+add_executable(raptor_object_slam src/raptor_object_slam.cpp src/file_io_utils.cpp)
 target_link_libraries(raptor_object_slam ${catkin_LIBRARIES} gtsam)
 # add_dependencies(talker beginner_tutorials_generate_messages_cpp)
