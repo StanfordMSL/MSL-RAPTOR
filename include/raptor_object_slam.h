@@ -45,9 +45,11 @@
 
 #include "ros/ros.h"
 #include "std_msgs/String.h"
-#include <rosbag/bag.h>
+// #include <rosbag/bag.h>
 
 #include <sstream>
 
 
 #include <gtsam/nonlinear/utilities.h>
+
+#include "file_io_utils.h"
