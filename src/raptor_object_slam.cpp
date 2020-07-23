@@ -51,7 +51,7 @@ class MSLRaptorSlamClass {
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "gtsam_ros_test");
+  ros::init(argc, argv, "raptor_object_slam");
   ros::NodeHandle nh("~");
 
   ros::Rate loop_rate(5);
@@ -59,7 +59,7 @@ int main(int argc, char **argv)
   // ros::param::get("~batch", strtmp);
   nh.param<bool>("batch_slam", b_batch_slam, true);
   std::string ego_ns;
-  nh.param<std::string>("ego_ns", ego_ns, "quad_7");
+  nh.param<std::string>("ego_ns", ego_ns, "quad7");
   std::string input_rosbag, processed_rosbag;
   nh.param<std::string>("input_rosbag", input_rosbag, "");
   nh.param<std::string>("processed_rosbag", processed_rosbag, "");

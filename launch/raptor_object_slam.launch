@@ -1,12 +1,14 @@
 <!-- Core launch file to run MSL-RAPTOR node -->
 <launch>
   <arg name="b_batch_slam"     default="1" />
+  <arg name="ego_ns"           default="quad7" />
   <arg name="input_rosbag"     default="/mounted_folder/nocs/test/scene_1.bag" />
   <arg name="processed_rosbag" default="/mounted_folder/raptor_processed_bags/nocs_test/msl_raptor_output_from_bag_scene_1.bag" />
 
   <!-- Launch raptor slam node -->
   <node name="MSL_RAPTOR_SLAM" pkg="msl_raptor" type="raptor_object_slam" output="screen">
     <param name="b_batch_slam"     value="$(arg b_batch_slam)"/> 
+    <param name="ego_ns"           value="$(arg ego_ns)"/> 
     <param name="input_rosbag"     value="$(arg input_rosbag)"/> 
     <param name="processed_rosbag" value="$(arg processed_rosbag)"/> 
   </node>
