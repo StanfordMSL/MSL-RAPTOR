@@ -3,35 +3,29 @@
 
 
 class MSLRaptorSlamClass {
+  // Note: tf_A_B is a transform that when right multipled by a vector in frame B produces the same vector in frame A: p_A = tf_A_B * p_B
+
   ros::NodeHandle nh;
   bool b_batch_slam;
+  std::string ego_ns;
+  map<string, obj_param_t> obj_param_map = {
+    {"bowl_white_small_norm", obj_param_t("bowl_white_small_norm", "bowl",   2, false, false, false)}, //true
+    {"camera_canon_len_norm", obj_param_t("camera_canon_len_norm", "camera", 3, false, false, false)},
+    {"can_arizona_tea_norm",  obj_param_t("can_arizona_tea_norm",  "can",    4, false, false, false)}, //true
+    {"laptop_air_xin_norm",   obj_param_t("laptop_air_xin_norm",   "laptop", 5, false, false, false)},
+    {"mug_daniel_norm",       obj_param_t("mug_daniel_norm",       "mug",    6, false, false, false)}
+  };
 
 
   public:
-    MSLRaptorSlamClass(bool b_batch_slam_, std::string test_string) {
-      ROS_INFO("IN CLASS: %s", test_string.c_str());
+    MSLRaptorSlamClass(bool b_batch_slam_, std::string ego_ns_) {
       b_batch_slam = b_batch_slam_;
+      ego_ns = ego_ns_;
+      ROS_INFO("ego ns: %s", ego_ns.c_str());
       ROS_INFO("batch slam?   %d", b_batch_slam);
-      gtsam::Pose3 pose_test;
-      rosbag::Bag bag;
-      gtsam::Values initial_estimate;
-      gtsam::utilities::extractPose3(initial_estimate);
-
-
-      // useful gtsam examples:
-      // https://github.com/borglab/gtsam/blob/develop/examples/VisualISAM2Example.cpp
-      // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp
-      // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample_large.cpp
-      // Note: tf_A_B is a transform that when right multipled by a vector in frame B produces the same vector in frame A: p_A = tf_A_B * p_B
 
       double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
-      map<string, obj_param_t> obj_param_map = {
-        {"bowl_white_small_norm", obj_param_t("bowl_white_small_norm", "bowl",   2, false, false, false)}, //true
-        {"camera_canon_len_norm", obj_param_t("camera_canon_len_norm", "camera", 3, false, false, false)},
-        {"can_arizona_tea_norm",  obj_param_t("can_arizona_tea_norm",  "can",    4, false, false, false)}, //true
-        {"laptop_air_xin_norm",   obj_param_t("laptop_air_xin_norm",   "laptop", 5, false, false, false)},
-        {"mug_daniel_norm",       obj_param_t("mug_daniel_norm",       "mug",    6, false, false, false)}
-      };
+      
       string path = "/mounted_folder/nocs_logs/";
       string base = "log_1_";
 
@@ -48,7 +42,7 @@ class MSLRaptorSlamClass {
     }
 
     void load_gt(std::string rosbag_fn) {
-      rslam_utils::load_gt_rosbag(rosbag_fn);
+      rslam_utils::load_gt_rosbag(rosbag_fn, ego_ns, obj_param_map);
     }
 
     ~MSLRaptorSlamClass() {
@@ -64,12 +58,14 @@ int main(int argc, char **argv)
   bool b_batch_slam;
   // ros::param::get("~batch", strtmp);
   nh.param<bool>("batch_slam", b_batch_slam, true);
+  std::string ego_ns;
+  nh.param<std::string>("ego_ns", ego_ns, "quad_7");
   std::string input_rosbag, processed_rosbag;
   nh.param<std::string>("input_rosbag", input_rosbag, "");
   nh.param<std::string>("processed_rosbag", processed_rosbag, "");
 
   // std::string my_test_string = "... this is a test...\n";
-  MSLRaptorSlamClass rslam = MSLRaptorSlamClass(b_batch_slam, "... this is a test...\n");
+  MSLRaptorSlamClass rslam = MSLRaptorSlamClass(b_batch_slam, ego_ns);
 
   rslam.load_gt(input_rosbag);
 
