@@ -300,7 +300,7 @@ int main(int argc, char **argv)
 
   rslam.load_gt(input_rosbag);
   rslam.load_raptor_data(processed_rosbag);
-  rslam.run_batch_slam();
+  // rslam.run_batch_slam();
 
   /**
    * A count of how many messages we have sent. This is used to create

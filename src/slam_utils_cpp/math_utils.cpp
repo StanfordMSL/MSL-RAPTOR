@@ -12,7 +12,7 @@ gtsam::Pose3 add_init_est_noise(const gtsam::Pose3 &ego_pose_est) {
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
   std::uniform_real_distribution<> dis(-0.00005, 0.00005);
   // gtsam::Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen)));
-  gtsam::Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(0.00,0.00,0.00));
+  gtsam::Pose3 delta(gtsam::Rot3::Rodrigues(0.0, 0.0, 0.0), gtsam::Point3(0.00,0.00,0.00));
   cout << "noise:" << delta << "tf before noise: " << ego_pose_est << endl;
   return ego_pose_est * delta;
   // ego_pose_est = ego_pose_est.compose(delta);
@@ -104,7 +104,7 @@ Eigen::Matrix3f create_rotation_matrix(float ax, float ay, float az) {
 }
 
 gtsam::Rot3 eigen_matrix3f_to_rot3(Eigen::Matrix3f M_in) {
-  Matrix3 M_out;
+  gtsam::Matrix3 M_out;
   M_out << M_in(0,0), M_in(0,1), M_in(0,2), M_in(1,0), M_in(1,1), M_in(1,2), M_in(2,0), M_in(2,1), M_in(2,2);
   return gtsam::Rot3(M_out);
 }

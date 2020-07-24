@@ -13,6 +13,6 @@ namespace rslam_utils {
     gtsam::Rot3 remove_yaw(gtsam::Rot3 R);
     Eigen::Matrix3f Rot3_to_matrix3f(gtsam::Rot3 R);
     Eigen::Matrix3f create_rotation_matrix(float ax, float ay, float az);
-    gtsam::Rot3 eigen_matrix3f_to_Rot3(Eigen::Matrix3f M_in);
+    gtsam::Rot3 eigen_matrix3f_to_rot3(Eigen::Matrix3f M_in);
     void calc_pose_delta(const gtsam::Pose3 & p1, const gtsam::Pose3 &p2, double *trans_diff, double *rot_diff_rad, bool b_degrees);
 }
