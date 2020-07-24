@@ -1,38 +1,33 @@
 #include "file_io_utils.h"
 
+using namespace std;
 namespace rslam_utils {
 
-void load_raptor_output_rosbag(std::string rosbag_fn, std::string ego_ns, std::map<std::string, obj_param_t> obj_param_map) {
-    ROS_INFO("loading raptor output rosbag: %s", rosbag_fn.c_str());
-    return;
-}
+  void load_rosbag(set<double> &times, map<string, object_est_gt_data_vec_t> obj_data, 
+                    string rosbag_fn, string ego_ns, map<string, obj_param_t> obj_param_map, double dt_thresh) {
+    // OUTPUT:  set<double> times; map<string, object_est_gt_data_vec_t> obj_data  [string is name, object_est_gt_data_vec_t is vector of <time, pose gt, pose est>]
+    ROS_INFO("loading rosbag: %s", rosbag_fn.c_str());
 
-void load_gt_rosbag(std::string rosbag_fn, std::string ego_ns, std::map<std::string, obj_param_t> obj_param_map) {
-    ROS_INFO("GT - loading rosbag: %s", rosbag_fn.c_str());
+    string gt_pose_topic  = "/mavros/vision_pose/pose";
+    string est_pose_topic  = "/mavros/local_position/pose";
+    string ego_gt_topic_str = "/" + ego_ns + gt_pose_topic;
+    string ego_est_topic_str = "/" + ego_ns + est_pose_topic;
+    string raptor_topic_str = "/" + ego_ns + "/msl_raptor_state";
+    vector<string> ado_long_names, ado_gt_topic_strs;
+    map<string, string> ado_topic_to_name;
+    for (const auto & key_val : obj_param_map) {
+        string ado_long_name = key_val.first;
+        ado_long_names.push_back(ado_long_name);
+        ado_gt_topic_strs.push_back(ado_long_name + gt_pose_topic);
+        ado_topic_to_name[ado_long_name + gt_pose_topic] = ado_long_name;
+    }
+
+    object_data_vec_t ego_data_gt, ego_data_est;   
+    map<string, object_data_vec_t> ado_data_gt, ado_data_est;
+
     rosbag::Bag bag;
     bag.open(rosbag_fn, rosbag::bagmode::Read);
-
-    // msl_raptor::AngledBbox cust_msg;
-    std::string gt_pose_topic  = "/mavros/vision_pose/pose";
-    std::string est_pose_topic = "/mavros/local_position/pose";
-
-    std::vector<std::string> ado_names, ado_gt_topic_strs, ado_est_topic_strs;
-    std::map<std::string, std::string> ado_topic_to_name;
-    for (const auto & key_val : obj_param_map) {
-        std::string ado_name = key_val.first;
-        ado_names.push_back(ado_name);
-        ado_gt_topic_strs.push_back(ado_name + gt_pose_topic);
-        ado_est_topic_strs.push_back(ado_name + est_pose_topic);
-        ado_topic_to_name[ado_name + gt_pose_topic] = ado_name;
-        ado_topic_to_name[ado_name + est_pose_topic] = ado_name;
-    }
-    std::string ego_gt_topic_str = "/" + ego_ns + gt_pose_topic;
-    std::string ego_est_topic_str = "/" + ego_ns + est_pose_topic;
-
-    object_data_vec_t ego_data_gt, ego_data_est;
-    std::map<std::string, object_data_vec_t> ado_data_gt, ado_data_est;
-
-    int num_msg_total = 0, num_poses = 0;
+    int num_msg_total = 0;
     double time = 0.0, time0 = -1, ave_dt = 0, last_time = 0;
     geometry_msgs::PoseStamped::ConstPtr geo_msg = nullptr;
     for(rosbag::MessageInstance const m: rosbag::View(bag)) {
@@ -45,54 +40,54 @@ void load_gt_rosbag(std::string rosbag_fn, std::string ego_ns, std::map<std::str
             time = m.getTime().toSec() - time0;
             ave_dt += time - last_time;
         }
+        times.insert(time);
 
         if (m.getTopic() == ego_gt_topic_str || ("/" + m.getTopic() == ego_gt_topic_str)) {
             geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
             if (geo_msg != nullptr) {
                 ego_data_gt.push_back(make_tuple(time, ros_geo_pose_to_gtsam(geo_msg->pose)));
-                num_poses++;
             }
         }
         else if (m.getTopic() == ego_est_topic_str || ("/" + m.getTopic() == ego_est_topic_str)) {
             geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
             if (geo_msg != nullptr) {
                 ego_data_est.push_back(make_tuple(time, ros_geo_pose_to_gtsam(geo_msg->pose)));
-                num_poses++;
+            }
+        }
+        else if (m.getTopic() == raptor_topic_str || ("/" + m.getTopic() == raptor_topic_str)) {
+            cout << "msl_raptor_msg" << endl;
+            msl_raptor::TrackedObjects::ConstPtr raptor_msg = m.instantiate<msl_raptor::TrackedObjects>();
+            if (raptor_msg != nullptr) {
+              cout << raptor_msg->tracked_objects.size() << endl;
+              for (const auto & tracked_obj : raptor_msg->tracked_objects){
+                ROS_INFO("%s", tracked_obj.class_str.c_str());
+                geometry_msgs::PoseStamped tmp_pose_stamped = tracked_obj.pose;
+                geometry_msgs::Pose tmp_pose = tmp_pose_stamped.pose;
+                gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tmp_pose);
+                ROS_INFO("%f", tmp_pose.position.x);
+                ado_data_gt[tracked_obj.class_str].push_back(make_tuple(time, ros_geo_pose_to_gtsam(tracked_obj.pose.pose))); // tracked_obj.pose is a posestamped, which has a field called pose
+              }
             }
         }
         else {
-            bool b_found = false;
             for (const auto &  topic_str : ado_gt_topic_strs) {
                 if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
                     geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
                     if (geo_msg != nullptr) {
                         ado_data_gt[ado_topic_to_name[topic_str]].push_back(make_tuple(time, ros_geo_pose_to_gtsam(geo_msg->pose)));
-                        b_found = true;
-                        num_poses++;
                         break;
-                    }
-                }
-            }
-            if (!b_found) {
-                for (const auto &  topic_str : ado_est_topic_strs) {
-                    if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
-                        geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-                        if (geo_msg != nullptr) {
-                            ado_data_est[ado_topic_to_name[topic_str]].push_back(make_tuple(time, ros_geo_pose_to_gtsam(geo_msg->pose)));
-                            b_found = true;
-                            num_poses++;
-                            break;
-                        }
                     }
                 }
             }
         }
         num_msg_total++;
     }
-    std::cout << "num messages = " << num_msg_total << " (" << num_poses << " poses)" << std::endl;
+    cout << "num messages = " << num_msg_total << endl;
     bag.close();
+
     return;
 }
+
 
 gtsam::Pose3 ros_geo_pose_to_gtsam(geometry_msgs::Pose ros_pose) {
   // Convert a ros pose structure to gtsam's Pose3 class
@@ -106,7 +101,7 @@ gtsam::Pose3 ros_geo_pose_to_gtsam(geometry_msgs::Pose ros_pose) {
 
 
 
-void read_gt_datafiles(const string fn, std::map<double, pair<gtsam::Pose3, gtsam::Pose3> >& time_tf_w_ego_map, set<double> &times) {
+void read_gt_datafiles(const string fn, map<double, pair<gtsam::Pose3, gtsam::Pose3> >& time_tf_w_ego_map, set<double> &times) {
   // space deliminated file: Time (s), ado_name, Ado State tf, Ego State tf. (tfs are x/y/z/r11,r12,r13,...,r33)
   ifstream infile(fn);
   string line, dummy_str;
@@ -247,7 +242,7 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
   cout << endl;
 }
 
-void write_results_csv(string fn, std::map<gtsam::Symbol, double> ego_time_map, std::map<gtsam::Symbol, gtsam::Pose3> tf_w_gt_map, std::map<gtsam::Symbol, gtsam::Pose3> tf_w_est_preslam_map, std::map<gtsam::Symbol, gtsam::Pose3> tf_w_est_postslam_map, std::map<gtsam::Symbol, std::map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > tf_ego_ado_maps) {
+void write_results_csv(string fn, map<gtsam::Symbol, double> ego_time_map, map<gtsam::Symbol, gtsam::Pose3> tf_w_gt_map, map<gtsam::Symbol, gtsam::Pose3> tf_w_est_preslam_map, map<gtsam::Symbol, gtsam::Pose3> tf_w_est_postslam_map, map<gtsam::Symbol, map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > tf_ego_ado_maps) {
   ofstream myFile(fn);
   double time = 0;
   for(const auto& key_value: tf_w_gt_map) {
@@ -285,12 +280,12 @@ void write_results_csv(string fn, std::map<gtsam::Symbol, double> ego_time_map, 
   myFile.close();
 }
 
-void write_all_traj_csv(string fn, std::map<gtsam::Symbol, std::map<double, pair<gtsam::Pose3, gtsam::Pose3> > > & all_trajs) {
+void write_all_traj_csv(string fn, map<gtsam::Symbol, map<double, pair<gtsam::Pose3, gtsam::Pose3> > > & all_trajs) {
   ofstream myFile(fn);
   double time = 0;
   for(const auto& sym_map_key_value: all_trajs) {
     gtsam::Symbol ado_sym = gtsam::Symbol(sym_map_key_value.first);
-    std::map<double, pair<gtsam::Pose3, gtsam::Pose3> > ado_traj = sym_map_key_value.second;
+    map<double, pair<gtsam::Pose3, gtsam::Pose3> > ado_traj = sym_map_key_value.second;
     for(const auto& time_poses_key_value: ado_traj) {
       double time = time_poses_key_value.first;
       pair<gtsam::Pose3, gtsam::Pose3> pose_gt_est_pair = time_poses_key_value.second;
