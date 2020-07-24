@@ -3,7 +3,7 @@
 namespace rslam_utils {
 
 void load_raptor_output_rosbag(std::string rosbag_fn, std::string ego_ns, std::map<std::string, obj_param_t> obj_param_map) {
-    ROS_INFO("loading raptor output rosbag: %s",rosbag_fn.c_str());
+    ROS_INFO("loading raptor output rosbag: %s", rosbag_fn.c_str());
     return;
 }
 
@@ -129,7 +129,7 @@ void read_gt_datafiles(const string fn, std::map<double, pair<gtsam::Pose3, gtsa
     iss >> r31;
     iss >> r32;
     iss >> r33;
-    pose_tf_w_ado_gt = gtsam::Pose3(Rot3(r11, r12, r13, r21, r22, r23, r31, r32, r33), Point3(x, y, z));
+    pose_tf_w_ado_gt = gtsam::Pose3(gtsam::Rot3(r11, r12, r13, r21, r22, r23, r31, r32, r33), gtsam::Point3(x, y, z));
     iss >> x;
     iss >> y;
     iss >> z;
@@ -142,13 +142,13 @@ void read_gt_datafiles(const string fn, std::map<double, pair<gtsam::Pose3, gtsa
     iss >> r31;
     iss >> r32;
     iss >> r33;
-    pose_tf_w_ego_gt = gtsam::Pose3(Rot3(r11, r12, r13, r21, r22, r23, r31, r32, r33), Point3(x, y, z));
+    pose_tf_w_ego_gt = gtsam::Pose3(gtsam::Rot3(r11, r12, r13, r21, r22, r23, r31, r32, r33), gtsam::Point3(x, y, z));
     // cout << pose_tf_w_ado_gt << endl;
     times.insert(time);
     time_tf_w_ego_map[time] = make_pair(pose_tf_w_ego_gt, pose_tf_w_ado_gt);
     // obj_data.push_back(make_tuple(time, pose_tf_w_ego_gt));
     // obj_data.push_back(make_tuple(time, pose_tf_w_ego_gt.inverse() * pose_tf_w_ado_gt));
-    // obj_data.push_back(make_tuple(time, remove_yaw(pose)));
+    // obj_data.push_back(make_tuple(time, rslam_utils::remove_yaw(pose)));
   }
   return;
 }
@@ -177,16 +177,10 @@ void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<do
     iss >> wx;
     iss >> wy;
     iss >> wz;
-    // cout << "qw, qx...qz: " << qw << ", " << qx << ", " << qy << ", " << qz << endl;
-    // cout << "quat: " << Quaternion(qw, qx, qy, qz) << endl;
-    // cout << "rot: " << Rot3(Quaternion(qw, qx, qy, qz)) << endl;
-    // cout << "t: " << Point3(x, y, z) << endl;
-    // cout << "pose: " << gtsam::Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z)) << endl;
-    pose = gtsam::Pose3(Rot3(Quaternion(qw, qx, qy, qz)), Point3(x, y, z));
+    pose = gtsam::Pose3(gtsam::Rot3(gtsam::Quaternion(qw, qx, qy, qz)), gtsam::Point3(x, y, z));
     // NOTE: this conversion from state to pose works the same as that in our python code (verified with test cases)
     times.insert(time);
     obj_data.push_back(make_tuple(time, pose));
-    // obj_data.push_back(make_tuple(time, remove_yaw(pose)));
     continue;
   }
 }
@@ -207,7 +201,7 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
         data.push_back(make_tuple((t_gt + t_est)/2, params.obj_id, get<1>(data_gt[i]), get<1>(data_est[j])));
         if (params.obj_id != 1) { // no pose data for ego robot, all zeros
           double t_diff, rot_diff; 
-          calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff, &rot_diff, true);
+          rslam_utils::calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff, &rot_diff, true);
 
           if (b_verbose) {
             cout << "\n-------------------------------------------------------------" << endl;
@@ -216,7 +210,7 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
           
           double t_diff2, rot_diff2;
           if (!params.b_rm_roll && !params.b_rm_pitch && !params.b_rm_yaw) {
-            calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
+            rslam_utils::calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
             if (b_verbose) {cout << "b) \t\t\t   not symetric" << endl;}
           }
           else {
@@ -227,13 +221,13 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
               runtime_error("Need to implement remove_pitch()!");
             }
             if (params.b_rm_yaw) {
-              gtsam::Pose3 data_gt_no_yaw = remove_yaw(get<1>(data_gt[i]));
-              gtsam::Pose3 data_est_no_yaw = remove_yaw(get<1>(data_est[i]));
-              calc_pose_delta(data_gt_no_yaw.inverse(), data_est_no_yaw, &t_diff2, &rot_diff2, true);
+              gtsam::Pose3 data_gt_no_yaw = rslam_utils::remove_yaw(get<1>(data_gt[i]));
+              gtsam::Pose3 data_est_no_yaw = rslam_utils::remove_yaw(get<1>(data_est[i]));
+              rslam_utils::calc_pose_delta(data_gt_no_yaw.inverse(), data_est_no_yaw, &t_diff2, &rot_diff2, true);
               if (b_verbose) {cout << "c) \t\t\t   w/o yaw:  t_delta2 = " << t_diff2 << ", r_delta2 = " << rot_diff2 << " deg" << endl;}
-              calc_pose_delta(data_gt_no_yaw.inverse(), get<1>(data_gt[j]), &t_diff2, &rot_diff2, true);
+              rslam_utils::calc_pose_delta(data_gt_no_yaw.inverse(), get<1>(data_gt[j]), &t_diff2, &rot_diff2, true);
               if (b_verbose) {cout << "d) \t\t\t   w/ vs. w/o yaw [gt]:   t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;}
-              calc_pose_delta(data_est_no_yaw.inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
+              rslam_utils::calc_pose_delta(data_est_no_yaw.inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
               if (b_verbose) {cout << "e) \t\t\t   w/ vs. w/o yaw [est]:  t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;}
 
               if (b_verbose && (t_est > 31.7 && params.obj_id == 2 && t_est < 31.9) ) {
@@ -310,9 +304,9 @@ void write_all_traj_csv(string fn, std::map<gtsam::Symbol, std::map<double, pair
 
 string pose_to_string_line(gtsam::Pose3 p) {
   string s;
-  Point3 t = p.translation();
-  Rot3 R = p.rotation();
-  Matrix3 M = R.matrix();
+  gtsam::Point3 t = p.translation();
+  gtsam::Rot3 R = p.rotation();
+  gtsam::Matrix3 M = R.matrix();
   s = to_string(t.x()) + ", ";
   s += to_string(t.y()) + ", ";
   s += to_string(t.z()) + ", ";

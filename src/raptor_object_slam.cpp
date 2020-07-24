@@ -51,29 +51,29 @@ class MSLRaptorSlamClass {
       // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
       map<Symbol, map<double, pair<Pose3, Pose3> > > all_trajs;
       set<double> tmp;
-      load_all_trajectories(all_trajs, tmp, "/mounted_folder/nocs_logs/", obj_param_map, dt_thresh);
+      // load_all_trajectories(all_trajs, tmp, "/mounted_folder/nocs_logs/", obj_param_map, dt_thresh);
       map<double, Pose3> tf_w_ego_gt_map;
       map<Symbol, map<double, Pose3> > tf_w_ado_gt_map;
 
-      for(const auto & ego_time : times) {
-        bool b_found_matching_time = false;
-        for (const auto & key_val : all_trajs) {
-          Symbol sym = key_val.first;
-          map<double, pair<Pose3, Pose3> > pose_map = key_val.second;
-          for (const auto & key_val2 : pose_map) {
-            double time = key_val2.first;
-            if (abs(time - ego_time) < dt_thresh) {
-              tf_w_ado_gt_map[sym][ego_time] = key_val2.second.second; // tf_w_ado_gt
-              tf_w_ego_gt_map[ego_time] = key_val2.second.first; // tf_w_ego_gt
-              b_found_matching_time = true;
-              break;
-            }
-          }
-          // if (b_found_matching_time) {
-          //   break;
-          // }
-        }
-      }
+      // for(const auto & ego_time : times) {
+      //   bool b_found_matching_time = false;
+      //   for (const auto & key_val : all_trajs) {
+      //     Symbol sym = key_val.first;
+      //     map<double, pair<Pose3, Pose3> > pose_map = key_val.second;
+      //     for (const auto & key_val2 : pose_map) {
+      //       double time = key_val2.first;
+      //       if (abs(time - ego_time) < dt_thresh) {
+      //         tf_w_ado_gt_map[sym][ego_time] = key_val2.second.second; // tf_w_ado_gt
+      //         tf_w_ego_gt_map[ego_time] = key_val2.second.first; // tf_w_ego_gt
+      //         b_found_matching_time = true;
+      //         break;
+      //       }
+      //     }
+      //     // if (b_found_matching_time) {
+      //     //   break;
+      //     // }
+      //   }
+      // }
 
       // STEP 0) Create graph & value objects, add first pose at origin
       int t_ind_cutoff = 3000;
@@ -234,8 +234,8 @@ class MSLRaptorSlamClass {
         Pose3 tf_w_est_preslam = tf_w_est_preslam_map[sym];
         
         double t_diff_pre_val, rot_diff_pre_val, t_diff_post_val, rot_diff_post_val; 
-        calc_pose_delta(tf_w_est_preslam, tf_w_gt_inv, &t_diff_pre_val, &rot_diff_pre_val, b_degrees);
-        calc_pose_delta(tf_w_est_postslam, tf_w_gt_inv, &t_diff_post_val, &rot_diff_post_val, b_degrees);
+        rslam_utils::calc_pose_delta(tf_w_est_preslam, tf_w_gt_inv, &t_diff_pre_val, &rot_diff_pre_val, b_degrees);
+        rslam_utils::calc_pose_delta(tf_w_est_postslam, tf_w_gt_inv, &t_diff_post_val, &rot_diff_post_val, b_degrees);
         t_diff_pre.push_back(t_diff_pre_val);
         rot_diff_pre.push_back(rot_diff_pre_val);
         t_diff_post.push_back(t_diff_post_val);
@@ -267,7 +267,7 @@ class MSLRaptorSlamClass {
       string fn = "/mounted_folder/test_graphs_gtsam/graph1.csv";
 
       cout << "writing results to: " << fn << endl;
-      write_results_csv(fn, ego_time_map, tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps);
+      rslam_utils::write_results_csv(fn, ego_time_map, tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps);
     }
 
     void load_gt(string rosbag_fn) {
@@ -277,8 +277,7 @@ class MSLRaptorSlamClass {
       rslam_utils::load_raptor_output_rosbag(rosbag_fn, ego_ns, obj_param_map);
     }
 
-    ~MSLRaptorSlamClass() {
-    }
+    ~MSLRaptorSlamClass() {}
 };
 
 int main(int argc, char **argv)

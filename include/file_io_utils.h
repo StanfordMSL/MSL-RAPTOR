@@ -16,12 +16,13 @@
 #include <msl_raptor/TrackedObject.h>
 #include <msl_raptor/TrackedObjects.h>
 
+#include "math_utils.h"
 #include "shared_imports.h"
 
 namespace rslam_utils {
     void load_raptor_output_rosbag(std::string, std::string ego_ns, std::map<std::string, obj_param_t> obj_param_map);
     void load_gt_rosbag(std::string, std::string ego_ns, std::map<std::string, obj_param_t> obj_param_map);
-    gtsam::Pose3 ros_geo_pose_to_gtsam_pose3(geometry_msgs::Pose ros_pose);
+    gtsam::Pose3 ros_geo_pose_to_gtsam(geometry_msgs::Pose ros_pose);
 
     void read_gt_datafiles(const string fn, std::map<double, pair<gtsam::Pose3, gtsam::Pose3> >& time_tf_w_ego_map, set<double> &times);
     void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<double> &times);

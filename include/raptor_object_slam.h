@@ -29,5 +29,6 @@
 
 // Custom Includes
 #include "file_io_utils.h"
+#include "math_utils.h"
 #include "shared_imports.h"
 
