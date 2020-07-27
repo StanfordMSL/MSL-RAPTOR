@@ -71,6 +71,12 @@ namespace rslam_utils {
               geometry_msgs::Pose tmp_pose = tmp_pose_stamped.pose;
               gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tmp_pose);
               ado_data_est[class_to_ado_long_name[tracked_obj.class_str]].push_back(make_tuple(time, ros_geo_pose_to_gtsam(tracked_obj.pose.pose))); // tracked_obj.pose is a posestamped, which has a field called pose
+              // if (tracked_obj.class_str == "camera") {
+              //   cout << tracked_obj.class_str << endl;
+              //   cout << class_to_ado_long_name[tracked_obj.class_str] << endl;
+              //   cout << tmp << endl;
+              //   cout << endl;
+              // }
             }
           }
         }
@@ -97,8 +103,12 @@ namespace rslam_utils {
         continue; // this means we had optitrack data, but no raptor data for this object
       }
       object_est_gt_data_vec_t ado_data_single;
+      int a = ado_data_est[ado_name].size();
+      int b = ado_data_gt[ado_name].size();
       sync_est_and_gt(ado_data_est[ado_name], ado_data_gt[ado_name], ado_data_single, obj_param_map[ado_name], dt_thresh);
       ado_data[ado_name] = ado_data_single;
+      cout << ado_data[ado_name].size() << endl;
+      cout << endl;
     }
     object_est_gt_data_vec_t ego_data;
     sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, obj_param_t(ego_ns, ego_ns, 1, false, false, false), dt_thresh);
@@ -122,9 +132,10 @@ void zip_data_by_ego(vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string
     for (const auto & key_val : ado_data) {
       string ado_name = key_val.first;
       object_est_gt_data_vec_t ado_data_one_obj = key_val.second;
+      cout << ado_data_one_obj.size() << endl;
       for (const auto & ado_data_single : ado_data_one_obj) {
         double t_est = get<0>(ado_data_single);
-        if(dt_thresh > abs(time - t_est)) {
+        if(dt_thresh > std::abs(time - t_est)) {
           gtsam::Pose3 ado_gt = get<2>(ado_data_single);
           gtsam::Pose3 ado_est = get<3>(ado_data_single);
           measurements[ado_name] = make_tuple(ado_gt, ado_est);
@@ -231,65 +242,114 @@ void read_data_from_one_log(const string fn, object_data_vec_t& obj_data, set<do
   }
 }
 
+
+
 void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data, obj_param_t params, double dt_thresh) {
-  // data.push_back(make_tuple(5, get<1>(data_est[0]), get<1>(data_est[0])));
-  // now "sync" the gt and est for each object
+  // for each ado datapoint (after gt data has begun), interpolate to gt poses to find where the ado was taken
 
   bool b_verbose = true;
-  
-  double t_gt, t_est;
-  uint next_est_time_ind = 0;
-  for (uint i = 0; i < data_gt.size(); i++) {
-    t_gt = get<0>(data_gt[i]);
-    for (uint j = next_est_time_ind; j < data_est.size(); j++) {
-      t_est = get<0>(data_est[j]);
-      if(dt_thresh > abs(t_gt - t_est)) {
-        data.push_back(make_tuple((t_gt + t_est)/2, params.obj_id, get<1>(data_gt[i]), get<1>(data_est[j])));
-        if (params.obj_id != 1) { // no pose data for ego robot, all zeros
-          double t_diff, rot_diff; 
-          rslam_utils::calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff, &rot_diff, true);
+  double t_gt, t_est, t_prev_gt = 0, t_prev_est = 0;
+  uint next_gt_time_ind = 0;
 
-          if (b_verbose) {
-            cout << "\n-------------------------------------------------------------" << endl;
-            cout << "a) time = " << t_est << ". id = " << params.obj_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
-          }
-          
-          double t_diff2, rot_diff2;
-          if (!params.b_rm_roll && !params.b_rm_pitch && !params.b_rm_yaw) {
-            rslam_utils::calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
-            if (b_verbose) {cout << "b) \t\t\t   not symetric" << endl;}
-          }
-          else {
-            if (params.b_rm_roll) {
-              runtime_error("Need to implement remove_roll()!");
-            }
-            if (params.b_rm_pitch) {
-              runtime_error("Need to implement remove_pitch()!");
-            }
-            if (params.b_rm_yaw) {
-              gtsam::Pose3 data_gt_no_yaw = rslam_utils::remove_yaw(get<1>(data_gt[i]));
-              gtsam::Pose3 data_est_no_yaw = rslam_utils::remove_yaw(get<1>(data_est[i]));
-              rslam_utils::calc_pose_delta(data_gt_no_yaw.inverse(), data_est_no_yaw, &t_diff2, &rot_diff2, true);
-              if (b_verbose) {cout << "c) \t\t\t   w/o yaw:  t_delta2 = " << t_diff2 << ", r_delta2 = " << rot_diff2 << " deg" << endl;}
-              rslam_utils::calc_pose_delta(data_gt_no_yaw.inverse(), get<1>(data_gt[j]), &t_diff2, &rot_diff2, true);
-              if (b_verbose) {cout << "d) \t\t\t   w/ vs. w/o yaw [gt]:   t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;}
-              rslam_utils::calc_pose_delta(data_est_no_yaw.inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
-              if (b_verbose) {cout << "e) \t\t\t   w/ vs. w/o yaw [est]:  t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;}
+  gtsam::Pose3 prev_gt, prev_est;
 
-              if (b_verbose && (t_est > 31.7 && params.obj_id == 2 && t_est < 31.9) ) {
-                cout << "f) gt yaw: "<< get<1>(data_gt[i]) << endl;              
-                cout << "g) gt no yaw: " << data_gt_no_yaw << endl;
-                cout << endl;  
-              }
-            }
-          }
-          
-        }
-        next_est_time_ind = j + 1;
+  int gt_ind = 0;
+  double t_gt0 = get<0>(data_gt[gt_ind]);
+
+  for (uint i = 0; i < data_est.size()-1; i++) {
+    t_est = get<0>(data_est[i]);
+    if (t_est < t_gt0) {
+      continue;
+    }
+
+    double t_gt1, t_gt2, s;
+    while (get<0>(data_gt[gt_ind]) < t_est) {
+      t_gt1 = get<0>(data_gt[gt_ind]);
+      prev_gt = get<1>(data_gt[gt_ind]);
+      gt_ind++;
+      if(gt_ind >= data_gt.size()) {
         break;
       }
     }
+    t_gt2 = get<0>(data_gt[gt_ind]);
+    s = (t_est - t_gt1) / (t_gt2 - t_gt1);
+    cout << "t_gt1 = " << t_gt1 << " < t_est = " << t_est << " < t_gt2 = " << t_gt2 << " --> s = " << s << endl;
+    cout << prev_gt << endl;
+    cout << get<1>(data_gt[gt_ind]) << endl;
+    gtsam::Pose3 tf_gt = interp_pose(prev_gt, get<1>(data_gt[gt_ind]), s);
+    cout << tf_gt << endl;
+    data.push_back(make_tuple(t_est, params.obj_id, tf_gt, get<1>(data_est[i])));
+
+
+    // for (uint j = next_gt_time_ind; j < data_gt.size(); j++) {
+    //   t_gt = get<0>(data_gt[j]);
+    //   if (t_est < t_gt){
+    //     continue;
+    //   }
+    //   double t_gt2 = get<0>(data_gt[j+1]);
+    //   double t_est2 = get<0>(data_est[i+1]);
+    //   double s = (t_est - t_gt) / (t_gt2 - t_gt);
+    //   gtsam::Pose3 tf_gt = interp_pose(get<1>(data_gt[j]), get<1>(data_gt[j+1]), s);
+    //   data.push_back(make_tuple(t_est, params.obj_id, tf_gt, get<1>(data_est[j])));
+    // }
+    // prev_gt  = get<1>(data_gt[i]);
+    // prev_est = get<1>(data_est[i]);
+    // t_prev_gt = t_gt;
+    // t_prev_est = t_est;
   }
+
+  // uint next_est_time_ind = 0;
+  // for (uint i = 0; i < data_gt.size(); i++) {
+  //   t_gt = get<0>(data_gt[i]);
+  //   for (uint j = next_est_time_ind; j < data_est.size(); j++) {
+  //     t_est = get<0>(data_est[j]);
+  //     if(dt_thresh > std::abs(t_gt - t_est)) {
+  //       data.push_back(make_tuple((t_gt + t_est)/2, params.obj_id, get<1>(data_gt[i]), get<1>(data_est[j])));
+  //       if (params.obj_id != 1) { // no pose data for ego robot, all zeros
+  //         double t_diff, rot_diff; 
+  //         rslam_utils::calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff, &rot_diff, true);
+
+  //         if (b_verbose) {
+  //           cout << "\n-------------------------------------------------------------" << endl;
+  //           cout << "a) time = " << t_est << ". id = " << params.obj_id << ".  gt / est diff:  t_delta = " << t_diff << ", r_delta = " << rot_diff << " deg" << endl;
+  //         }
+          
+  //         double t_diff2, rot_diff2;
+  //         if (!params.b_rm_roll && !params.b_rm_pitch && !params.b_rm_yaw) {
+  //           rslam_utils::calc_pose_delta(get<1>(data_gt[i]).inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
+  //           if (b_verbose) {cout << "b) \t\t\t   not symetric" << endl;}
+  //         }
+  //         else {
+  //           if (params.b_rm_roll) {
+  //             runtime_error("Need to implement remove_roll()!");
+  //           }
+  //           if (params.b_rm_pitch) {
+  //             runtime_error("Need to implement remove_pitch()!");
+  //           }
+  //           if (params.b_rm_yaw) {
+  //             gtsam::Pose3 data_gt_no_yaw = rslam_utils::remove_yaw(get<1>(data_gt[i]));
+  //             gtsam::Pose3 data_est_no_yaw = rslam_utils::remove_yaw(get<1>(data_est[i]));
+  //             rslam_utils::calc_pose_delta(data_gt_no_yaw.inverse(), data_est_no_yaw, &t_diff2, &rot_diff2, true);
+  //             if (b_verbose) {cout << "c) \t\t\t   w/o yaw:  t_delta2 = " << t_diff2 << ", r_delta2 = " << rot_diff2 << " deg" << endl;}
+  //             rslam_utils::calc_pose_delta(data_gt_no_yaw.inverse(), get<1>(data_gt[j]), &t_diff2, &rot_diff2, true);
+  //             if (b_verbose) {cout << "d) \t\t\t   w/ vs. w/o yaw [gt]:   t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;}
+  //             rslam_utils::calc_pose_delta(data_est_no_yaw.inverse(), get<1>(data_est[j]), &t_diff2, &rot_diff2, true);
+  //             if (b_verbose) {cout << "e) \t\t\t   w/ vs. w/o yaw [est]:  t_diff = " << t_diff2 << ", r_diff = " << rot_diff2 << " deg" << endl;}
+
+  //             if (b_verbose && (t_est > 31.7 && params.obj_id == 2 && t_est < 31.9) ) {
+  //               cout << "f) gt yaw: "<< get<1>(data_gt[i]) << endl;              
+  //               cout << "g) gt no yaw: " << data_gt_no_yaw << endl;
+  //               cout << endl;  
+  //             }
+  //           }
+  //         }
+          
+  //       }
+  //       next_est_time_ind = j + 1;
+  //       break;
+  //     }
+  //   }
+  // }
   cout << endl;
 }
 

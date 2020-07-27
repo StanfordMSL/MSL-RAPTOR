@@ -5,6 +5,18 @@
 //////////////////////////////////////////////////////////
 
 namespace rslam_utils {
+
+gtsam::Pose3 interp_pose(gtsam::Pose3 tf1, gtsam::Pose3 tf2, double s) {
+  // tf1 is be the earlier pose, tf2 the later. s is between 0 and 1
+  if (s < 0 || s > 1) {
+    std::runtime_error("interpolation value must be between 0 and 1");
+  }
+  gtsam::Pose3 tf_out;
+  gtsam::Rot3 Rout = tf1.rotation().slerp(s, tf2.rotation());
+  gtsam::Point3 pout = s*(tf2.translation() - tf1.translation()) + tf1.translation();
+  return gtsam::Pose3(Rout, pout);
+}
+
 gtsam::Pose3 add_init_est_noise(const gtsam::Pose3 &ego_pose_est) {
   // https://github.com/borglab/gtsam/blob/b1bb0c9ed58f62638c068d7b5332fe7e0e49a29b/examples/SFMExample.cpp
   // noise = np.array([random.uniform(-0.02, 0.02) for i in range(3)]) 
