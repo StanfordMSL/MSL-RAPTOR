@@ -21,7 +21,7 @@
 #include "shared_imports.h"
 
 namespace rslam_utils {
-    void load_rosbag(set<double> &times, std::map<std::string, object_est_gt_data_vec_t> obj_data, 
+    void load_rosbag(set<double> &times, std::map<std::string, object_est_gt_data_vec_t> &obj_data, 
                     std::string rosbag_fn, std::string ego_ns, std::map<std::string, obj_param_t> obj_param_map, double dt_thresh);
     // void load_raptor_output_rosbag(set<double> &times, object_data_vec_t &ego_data_est, std::map<std::string, object_data_vec_t> &ado_data_est, 
     //                                 std::string rosbag_fn, std::string ego_ns, std::map<std::string, obj_param_t> obj_param_map);

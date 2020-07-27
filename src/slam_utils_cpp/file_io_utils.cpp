@@ -3,10 +3,19 @@
 using namespace std;
 namespace rslam_utils {
 
-  void load_rosbag(set<double> &times, map<string, object_est_gt_data_vec_t> obj_data, 
+  void load_rosbag(set<double> &times, map<string, object_est_gt_data_vec_t> &obj_data, 
                     string rosbag_fn, string ego_ns, map<string, obj_param_t> obj_param_map, double dt_thresh) {
     // OUTPUT:  set<double> times; map<string, object_est_gt_data_vec_t> obj_data  [string is name, object_est_gt_data_vec_t is vector of <time, pose gt, pose est>]
     ROS_INFO("loading rosbag: %s", rosbag_fn.c_str());
+
+    cout << "WARNING!!! USING HARDCODED Class-to-object_str map! This is for debug only!" << endl;
+    map<string, string> class_to_ado_long_name = {
+      {"bowl", "bowl_white_small_norm"},
+      {"camera", "camera_canon_len_norm"},
+      {"can", "can_arizona_tea_norm"}, 
+      {"laptop", "laptop_air_xin_norm"},
+      {"cup", "mug_daniel_norm"}
+    };
 
     string gt_pose_topic  = "/mavros/vision_pose/pose";
     string est_pose_topic  = "/mavros/local_position/pose";
@@ -18,8 +27,8 @@ namespace rslam_utils {
     for (const auto & key_val : obj_param_map) {
         string ado_long_name = key_val.first;
         ado_long_names.push_back(ado_long_name);
-        ado_gt_topic_strs.push_back(ado_long_name + gt_pose_topic);
-        ado_topic_to_name[ado_long_name + gt_pose_topic] = ado_long_name;
+        ado_gt_topic_strs.push_back("/" + ado_long_name + gt_pose_topic);
+        ado_topic_to_name["/" + ado_long_name + gt_pose_topic] = ado_long_name;
     }
 
     object_data_vec_t ego_data_gt, ego_data_est;   
@@ -55,36 +64,45 @@ namespace rslam_utils {
             }
         }
         else if (m.getTopic() == raptor_topic_str || ("/" + m.getTopic() == raptor_topic_str)) {
-            cout << "msl_raptor_msg" << endl;
-            msl_raptor::TrackedObjects::ConstPtr raptor_msg = m.instantiate<msl_raptor::TrackedObjects>();
-            if (raptor_msg != nullptr) {
-              cout << raptor_msg->tracked_objects.size() << endl;
-              for (const auto & tracked_obj : raptor_msg->tracked_objects){
-                ROS_INFO("%s", tracked_obj.class_str.c_str());
-                geometry_msgs::PoseStamped tmp_pose_stamped = tracked_obj.pose;
-                geometry_msgs::Pose tmp_pose = tmp_pose_stamped.pose;
-                gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tmp_pose);
-                ROS_INFO("%f", tmp_pose.position.x);
-                ado_data_gt[tracked_obj.class_str].push_back(make_tuple(time, ros_geo_pose_to_gtsam(tracked_obj.pose.pose))); // tracked_obj.pose is a posestamped, which has a field called pose
-              }
+          msl_raptor::TrackedObjects::ConstPtr raptor_msg = m.instantiate<msl_raptor::TrackedObjects>();
+          if (raptor_msg != nullptr) {
+            for (const auto & tracked_obj : raptor_msg->tracked_objects){
+              // ROS_INFO("%s", tracked_obj.class_str.c_str());
+              geometry_msgs::PoseStamped tmp_pose_stamped = tracked_obj.pose;
+              geometry_msgs::Pose tmp_pose = tmp_pose_stamped.pose;
+              gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tmp_pose);
+              ado_data_est[class_to_ado_long_name[tracked_obj.class_str]].push_back(make_tuple(time, ros_geo_pose_to_gtsam(tracked_obj.pose.pose))); // tracked_obj.pose is a posestamped, which has a field called pose
             }
+          }
         }
         else {
-            for (const auto &  topic_str : ado_gt_topic_strs) {
-                if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
-                    geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
-                    if (geo_msg != nullptr) {
-                        ado_data_gt[ado_topic_to_name[topic_str]].push_back(make_tuple(time, ros_geo_pose_to_gtsam(geo_msg->pose)));
-                        break;
-                    }
-                }
+          for (const auto &  topic_str : ado_gt_topic_strs) {
+            if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
+              geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+              if (geo_msg != nullptr) {
+                  ado_data_gt[ado_topic_to_name[topic_str]].push_back(make_tuple(time, ros_geo_pose_to_gtsam(geo_msg->pose)));
+                  break;
+              }
             }
-        }
-        num_msg_total++;
+          }
+      }
+      num_msg_total++;
     }
     cout << "num messages = " << num_msg_total << endl;
     bag.close();
 
+    for(const auto &key_value_pair : ado_data_gt) {
+      string ado_name = key_value_pair.first;
+      if(ado_data_est.find(ado_name) == ado_data_est.end()){
+        continue; // this means we had optitrack data, but no raptor data for this object
+      }
+      object_est_gt_data_vec_t ado_data_single;
+      sync_est_and_gt(ado_data_est[ado_name], ado_data_gt[ado_name], ado_data_single, obj_param_map[ado_name], dt_thresh);
+      obj_data[ado_name] = ado_data_single;
+    }
+    object_est_gt_data_vec_t ego_data_single;
+    sync_est_and_gt(ego_data_est, ego_data_gt, ego_data_single, obj_param_t(ego_ns, ego_ns, 1, false, false, false), dt_thresh);
+    obj_data[ego_ns] = ego_data_single;
     return;
 }
 
@@ -184,7 +202,7 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
   // data.push_back(make_tuple(5, get<1>(data_est[0]), get<1>(data_est[0])));
   // now "sync" the gt and est for each object
 
-  bool b_verbose = false;
+  bool b_verbose = true;
   
   double t_gt, t_est;
   uint next_est_time_ind = 0;
