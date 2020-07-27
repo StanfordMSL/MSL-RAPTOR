@@ -324,6 +324,46 @@ void write_batch_slam_inputs_csv(string fn, vector<tuple<double, gtsam::Pose3, g
   myFile.close();
 }
 
+
+void write_results_csv2(string fn, vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, tuple<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
+                                  map<gtsam::Symbol, gtsam::Pose3> &tf_w_est_preslam_map, 
+                                  map<gtsam::Symbol, gtsam::Pose3> &tf_w_est_postslam_map, 
+                                  map<gtsam::Symbol, map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > &tf_ego_ado_maps,
+                                  map<string, obj_param_t> &obj_param_map) {
+  ofstream myFile(fn);
+  int t_ind = 0;
+  for (const auto & raptor_step : raptor_data ) {
+    int ego_pose_index = 1 + t_ind;
+    double time = get<0>(raptor_step);
+    gtsam::Symbol ego_sym = gtsam::Symbol('x', ego_pose_index);
+    gtsam::Pose3 tf_w_ego_gt = get<1>(raptor_step);
+    gtsam::Pose3 tf_w_ego_est_pre = tf_w_est_preslam_map[ego_sym];
+    gtsam::Pose3 tf_w_ego_est_post = tf_w_est_postslam_map[ego_sym];
+
+    myFile << time << ", " << ego_sym << ", " << pose_to_string_line(tf_w_ego_gt) << ", " 
+                                              << pose_to_string_line(tf_w_ego_est_pre) << ", " 
+                                              << pose_to_string_line(tf_w_ego_est_post) << "\n";
+
+    map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > measurements = tf_ego_ado_maps[ego_sym];
+
+    for (const auto & single_ado_meas : measurements) {
+      gtsam::Symbol ado_sym = single_ado_meas.first;
+      gtsam::Pose3 tf_ego_ado_gt = get<0>(single_ado_meas.second);
+      gtsam::Pose3 tf_ego_ado_est = get<1>(single_ado_meas.second);
+
+      gtsam::Pose3 tf_w_ado_gt        = tf_w_ego_gt * tf_ego_ado_gt;
+      gtsam::Pose3 tf_w_ado_est_pre   = tf_w_ego_est_pre * tf_ego_ado_est;
+      gtsam::Pose3 tf_w_ado_est_post  = tf_w_ego_est_post * tf_ego_ado_est;
+
+      myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_gt) << ", " 
+                                              << pose_to_string_line(tf_w_ado_est_pre) << ", " 
+                                              << pose_to_string_line(tf_w_ado_est_post) << "\n";
+    }
+    t_ind++;
+  }
+  myFile.close();
+}
+
 void write_results_csv(string fn, map<gtsam::Symbol, double> ego_time_map, map<gtsam::Symbol, gtsam::Pose3> tf_w_gt_map, map<gtsam::Symbol, gtsam::Pose3> tf_w_est_preslam_map, map<gtsam::Symbol, gtsam::Pose3> tf_w_est_postslam_map, map<gtsam::Symbol, map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > tf_ego_ado_maps) {
   ofstream myFile(fn);
   double time = 0;

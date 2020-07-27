@@ -43,5 +43,11 @@ namespace rslam_utils {
                             std::map<gtsam::Symbol, std::map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > tf_ego_ado_maps);
     void write_all_traj_csv(string fn, std::map<gtsam::Symbol, std::map<double, pair<gtsam::Pose3, gtsam::Pose3> > > & all_trajs);
 
+    void write_results_csv2(string fn, vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, tuple<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
+                             map<gtsam::Symbol, gtsam::Pose3> &tf_w_est_preslam_map, 
+                             map<gtsam::Symbol, gtsam::Pose3> &tf_w_est_postslam_map, 
+                             map<gtsam::Symbol, map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > &tf_ego_ado_maps,
+                             map<string, obj_param_t> &obj_param_map);
+
     string pose_to_string_line(gtsam::Pose3 p);
 }

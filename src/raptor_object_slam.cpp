@@ -33,8 +33,8 @@ class MSLRaptorSlamClass {
 
       // dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
       
-      string path = "/mounted_folder/nocs_logs/";
-      string base = "log_1_";
+      // string path = "/mounted_folder/nocs_logs/";
+      // string base = "log_1_";
 
       // object_est_gt_data_vec_t ado_data; // all ado data in 1 vector sorted by time (to be filled in by load_log_files)
       // set<double> times;  // set of all unique times (to be filled in by load_log_files)
@@ -56,8 +56,8 @@ class MSLRaptorSlamClass {
       vector<tuple<double, Pose3, Pose3, map<string, tuple<Pose3, Pose3> > > > raptor_data; // time, ego_pose_gt, ego_pose_est, ado_name_to_gt_est_poses
       rslam_utils::load_rosbag(raptor_data, processed_rosbag, ego_ns, obj_param_map, dt_thresh); // "fills in" times, ego_data_gt, ado_data_gt
       string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
-      rslam_utils::write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
-      // run_batch_slam(raptor_data);
+      // rslam_utils::write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
+      run_batch_slam(raptor_data);
     }
 
 
@@ -245,7 +245,8 @@ class MSLRaptorSlamClass {
       string fn = "/mounted_folder/test_graphs_gtsam/graph1.csv";
 
       cout << "writing results to: " << fn << endl;
-      rslam_utils::write_results_csv(fn, ego_time_map, tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps);
+      // rslam_utils::write_results_csv(fn, ego_time_map, tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps);
+      rslam_utils::write_results_csv2(fn, raptor_data, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps, obj_param_map);
     }
 
     // void load_gt(string rosbag_fn) {
