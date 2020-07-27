@@ -57,7 +57,7 @@ class rosbag_combiner:
             # if b_first_bag:
             #     topics.extend(common_topics)
             for topic, msg, t in bag_in.read_messages(topics=topics):
-                print(msg)
+                # print(topic)
                 if topic.split('/')[-1] == "msl_raptor_state":
                     # all_tracked_obj.append(msg.TrackedObject)
                     # pdb.set_trace()
@@ -84,12 +84,12 @@ if __name__ == '__main__':
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
         # program = rosbags_to_logs(rb_name=my_rb_name, data_source=my_data_source, ego_yaml=my_ego_yaml, ado_yaml=my_ado_yaml, b_save_3dbb_imgs=my_b_save_3dbb_imgs)
         rb_path = "/mounted_folder/raptor_processed_bags/nocs_test/"
-        rb_names = ["msl_raptor_output_from_bag_scene_1_bowl_while_small_norm.bag",
+        rb_names = ["msl_raptor_output_from_bag_scene_1_bowl_white_small_norm.bag",
                     "msl_raptor_output_from_bag_scene_1_camera_canon_len_norm.bag",
                     "msl_raptor_output_from_bag_scene_1_can_arizona_tea_norm.bag",
                     "msl_raptor_output_from_bag_scene_1_laptop_air_xin_norm.bag",
                     "msl_raptor_output_from_bag_scene_1_mug_daniel_norm.bag"]
-        rb_namespaces = ["bowl_while_small_norm",
+        rb_namespaces = ["bowl_white_small_norm",
                         "camera_canon_len_norm",
                         "can_arizona_tea_norm",
                         "laptop_air_xin_norm",
