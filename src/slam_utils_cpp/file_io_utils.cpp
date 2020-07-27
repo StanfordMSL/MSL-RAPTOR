@@ -49,7 +49,6 @@ namespace rslam_utils {
             time = m.getTime().toSec() - time0;
             ave_dt += time - last_time;
         }
-        // times.insert(time);
 
         if (m.getTopic() == ego_gt_topic_str || ("/" + m.getTopic() == ego_gt_topic_str)) {
             geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
@@ -292,6 +291,37 @@ void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, obje
     }
   }
   cout << endl;
+}
+
+void write_batch_slam_inputs_csv(string fn, vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, tuple<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
+                                  map<string, obj_param_t> obj_param_map) {
+  ofstream myFile(fn);
+  int t_ind = 0;
+  for (const auto & raptor_step : raptor_data ) {
+    double time = get<0>(raptor_step);
+    gtsam::Pose3 tf_w_ego_gt = get<1>(raptor_step);
+    gtsam::Pose3 tf_w_ego_est = get<2>(raptor_step);
+    map<string, tuple<gtsam::Pose3, gtsam::Pose3> > measurements = get<3>(raptor_step);
+
+    int ego_pose_index = 1 + t_ind;
+    gtsam::Symbol ego_sym = gtsam::Symbol('x', ego_pose_index);
+    myFile << time << ", " << ego_sym << ", " << pose_to_string_line(tf_w_ego_gt) << ", " 
+                                              << pose_to_string_line(tf_w_ego_est) << ", " 
+                                              << pose_to_string_line(tf_w_ego_est) << "\n";
+
+    for (const auto & single_ado_meas : measurements) {
+      string ado_name = single_ado_meas.first;
+      gtsam::Pose3 tf_w_ado_gt = get<0>(single_ado_meas.second);
+      gtsam::Pose3 tf_w_ado_est = get<1>(single_ado_meas.second);
+      gtsam::Symbol ado_sym = gtsam::Symbol('l', obj_param_map[ado_name].obj_id);
+
+      myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_gt) << ", " 
+                                              << pose_to_string_line(tf_w_ado_est) << ", " 
+                                              << pose_to_string_line(tf_w_ado_est) << "\n";
+    }
+    t_ind++;
+  }
+  myFile.close();
 }
 
 void write_results_csv(string fn, map<gtsam::Symbol, double> ego_time_map, map<gtsam::Symbol, gtsam::Pose3> tf_w_gt_map, map<gtsam::Symbol, gtsam::Pose3> tf_w_est_preslam_map, map<gtsam::Symbol, gtsam::Pose3> tf_w_est_postslam_map, map<gtsam::Symbol, map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > tf_ego_ado_maps) {

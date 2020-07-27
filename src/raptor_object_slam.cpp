@@ -55,7 +55,9 @@ class MSLRaptorSlamClass {
       // map<string, object_est_gt_data_vec_t> raptor_data;
       vector<tuple<double, Pose3, Pose3, map<string, tuple<Pose3, Pose3> > > > raptor_data; // time, ego_pose_gt, ego_pose_est, ado_name_to_gt_est_poses
       rslam_utils::load_rosbag(raptor_data, processed_rosbag, ego_ns, obj_param_map, dt_thresh); // "fills in" times, ego_data_gt, ado_data_gt
-      run_batch_slam(raptor_data);
+      string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
+      rslam_utils::write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
+      // run_batch_slam(raptor_data);
     }
 
 

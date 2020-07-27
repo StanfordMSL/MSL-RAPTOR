@@ -35,6 +35,9 @@ namespace rslam_utils {
 
     void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data, obj_param_t params, double dt_thresh);
 
+    void write_batch_slam_inputs_csv(string fn, vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, tuple<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
+                                    map<string, obj_param_t> obj_param_map);
+                                    
     void write_results_csv(string fn, std::map<gtsam::Symbol, double> ego_time_map, std::map<gtsam::Symbol, gtsam::Pose3> tf_w_gt_map, 
                             std::map<gtsam::Symbol, gtsam::Pose3> tf_w_est_preslam_map, std::map<gtsam::Symbol, gtsam::Pose3> tf_w_est_postslam_map, 
                             std::map<gtsam::Symbol, std::map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > tf_ego_ado_maps);
