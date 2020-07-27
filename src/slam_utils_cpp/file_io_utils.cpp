@@ -3,7 +3,7 @@
 using namespace std;
 namespace rslam_utils {
 
-  void load_rosbag(set<double> &times, map<string, object_est_gt_data_vec_t> &obj_data, 
+  void load_rosbag(vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, tuple<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, // set<double> &times, map<string, object_est_gt_data_vec_t> &obj_data, 
                     string rosbag_fn, string ego_ns, map<string, obj_param_t> obj_param_map, double dt_thresh) {
     // OUTPUT:  set<double> times; map<string, object_est_gt_data_vec_t> obj_data  [string is name, object_est_gt_data_vec_t is vector of <time, pose gt, pose est>]
     ROS_INFO("loading rosbag: %s", rosbag_fn.c_str());
@@ -49,7 +49,7 @@ namespace rslam_utils {
             time = m.getTime().toSec() - time0;
             ave_dt += time - last_time;
         }
-        times.insert(time);
+        // times.insert(time);
 
         if (m.getTopic() == ego_gt_topic_str || ("/" + m.getTopic() == ego_gt_topic_str)) {
             geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
@@ -91,6 +91,7 @@ namespace rslam_utils {
     cout << "num messages = " << num_msg_total << endl;
     bag.close();
 
+    map<string, object_est_gt_data_vec_t> ado_data;
     for(const auto &key_value_pair : ado_data_gt) {
       string ado_name = key_value_pair.first;
       if(ado_data_est.find(ado_name) == ado_data_est.end()){
@@ -98,12 +99,45 @@ namespace rslam_utils {
       }
       object_est_gt_data_vec_t ado_data_single;
       sync_est_and_gt(ado_data_est[ado_name], ado_data_gt[ado_name], ado_data_single, obj_param_map[ado_name], dt_thresh);
-      obj_data[ado_name] = ado_data_single;
+      ado_data[ado_name] = ado_data_single;
     }
-    object_est_gt_data_vec_t ego_data_single;
-    sync_est_and_gt(ego_data_est, ego_data_gt, ego_data_single, obj_param_t(ego_ns, ego_ns, 1, false, false, false), dt_thresh);
-    obj_data[ego_ns] = ego_data_single;
+    object_est_gt_data_vec_t ego_data;
+    sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, obj_param_t(ego_ns, ego_ns, 1, false, false, false), dt_thresh);
+    // vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, tuple<gtsam::Pose3, gtsam::Pose3> > > > raptor_data;
+    zip_data_by_ego(raptor_data, ego_data, ado_data, dt_thresh);
     return;
+}
+
+void zip_data_by_ego(vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, tuple<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
+                      object_est_gt_data_vec_t ego_data, map<string, object_est_gt_data_vec_t> ado_data, double dt_thresh) {
+  // Combine all data into a single data structure that can be looped over. Each element simulates a potential "measurement" from msl_raptor
+
+  for (const auto & ego_data_single : ego_data) {
+    double time = get<0>(ego_data_single);
+    gtsam::Pose3 ego_gt = get<2>(ego_data_single);
+    gtsam::Pose3 ego_est = get<3>(ego_data_single);
+
+    map<string, tuple<gtsam::Pose3, gtsam::Pose3> > measurements;
+    bool b_meas_found = false;
+
+    for (const auto & key_val : ado_data) {
+      string ado_name = key_val.first;
+      object_est_gt_data_vec_t ado_data_one_obj = key_val.second;
+      for (const auto & ado_data_single : ado_data_one_obj) {
+        double t_est = get<0>(ado_data_single);
+        if(dt_thresh > abs(time - t_est)) {
+          gtsam::Pose3 ado_gt = get<2>(ado_data_single);
+          gtsam::Pose3 ado_est = get<3>(ado_data_single);
+          measurements[ado_name] = make_tuple(ado_gt, ado_est);
+          b_meas_found = true;
+          break;
+        }
+      }
+    }
+    if (b_meas_found) {
+      raptor_data.emplace_back(time, ego_gt, ego_est, measurements);
+    }
+  }
 }
 
 
