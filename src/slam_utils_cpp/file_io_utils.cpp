@@ -131,16 +131,36 @@ void convert_data_to_static_obstacles(vector<tuple<double, string, gtsam::Pose3,
     cout << ado_name << "... gt: " << tf_w_ado_gt << endl;
     // cout << ado_name << "... gt: " << tf_w_ado_gt << " est: " << tf_w_ado_est << endl;
   }
-
+  
+  gtsam::Pose3 prev, prev_w_ego, prev_w_ado; int idx = 0;
   for (const auto & rstep : raptor_data) {
+    // tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3>
     double t = get<0>(rstep);
     string ado_name = get<1>(rstep);
+    if(ado_name != "mug_daniel_norm") { //  "bowl_white_small_norm"  "camera_canon_len_norm"  "can_arizona_tea_norm"  "laptop_air_xin_norm"  "mug_daniel_norm"
+      continue;
+    }
     gtsam::Pose3 tf_ego_ado_gt = (get<2>(rstep).inverse()) * get<4>(rstep); // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
     gtsam::Pose3 tf_ego_ado_est = (get<3>(rstep).inverse()) * get<5>(rstep); // (tf_w_ego_est.inverse()) * tf_w_ado_est;
     gtsam::Pose3 tf_w_ego_gt = tf_w_ado0_gt[ado_name] * (tf_ego_ado_gt.inverse());
     gtsam::Pose3 tf_w_ego_est = tf_w_ado0_est[ado_name] * (tf_ego_ado_est.inverse());
+    if(idx == 0) {
+      prev = tf_w_ego_gt; 
+      prev_w_ado = get<4>(rstep);
+    }
+
+    if ( (tf_w_ego_gt.translation() - prev.translation()).norm() > 0.5) {
+        cout << "jump detected! (idx = " << idx << "). jump = " << (tf_w_ego_gt.translation() - prev.translation()).norm() << endl;
+        cout << "tf_w_ado now:" << get<4>(rstep) << endl;
+        cout << "tf_w_ado prev:" << prev_w_ado << endl;
+        cout << "tf_w_ego_gt now:" << tf_w_ego_gt << endl;
+        cout << "tf_w_ego_gt prev:" << prev << endl;
+        cout << endl;
+    }
 
     data_out.emplace_back(t, ado_name, tf_w_ego_gt, tf_w_ego_est, tf_w_ado0_gt[ado_name], tf_w_ado0_est[ado_name]);
+    idx++;
+    prev = tf_w_ego_gt; 
   }
 
   raptor_data = data_out;
@@ -191,10 +211,13 @@ int get_tf_w_ado_for_all_objects(const vector<tuple<double, string, gtsam::Pose3
         gtsam::Pose3 tf_w_ego_gt  = interp_pose(tf_w_ego_gt1,  tf_w_ego_gt2,  s); // ego pose corresponding to current measuremnt 
         gtsam::Pose3 tf_w_ego_est = interp_pose(tf_w_ego_est1, tf_w_ego_est2, s);
 
-        cout << "s = " << s << endl;
-        cout << tf_w_ego_gt1 << endl;
-        cout << tf_ego_ado_gt2 << endl;
-        cout << tf_w_ego_gt << endl;
+        // cout << "t1 = " << t1 << endl;
+        // cout << "t2 = " << t2 << endl;
+        // cout << "t = " << t << endl;
+        // cout << "s = " << s << endl;
+        // cout << tf_w_ego_gt1 << endl;
+        // cout << tf_w_ego_gt2 << endl;
+        // cout << tf_w_ego_gt << endl;
 
         tf_w_ado0_gt[ado_name]  = tf_w_ego_gt  * tf_ego_ado_gt;
         tf_w_ado0_est[ado_name] = tf_w_ego_est * tf_ego_ado_est;
