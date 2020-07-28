@@ -8,6 +8,7 @@ class MSLRaptorSlamClass {
 
   ros::NodeHandle nh;
   bool b_batch_slam;
+  bool b_nocs_data;
   string ego_ns;
   map<string, obj_param_t> obj_param_map = {
     {"bowl_white_small_norm", obj_param_t("bowl_white_small_norm", "bowl",   2, false, false, false)}, //true
@@ -25,9 +26,10 @@ class MSLRaptorSlamClass {
   // data_tuple a;
 
   public:
-    MSLRaptorSlamClass(bool b_batch_slam_, string ego_ns_) {
+    MSLRaptorSlamClass(bool b_batch_slam_, string ego_ns_, bool b_nocs_data_) {
       b_batch_slam = b_batch_slam_;
       ego_ns = ego_ns_;
+      b_nocs_data = b_nocs_data_;
       ROS_INFO("ego ns: %s", ego_ns.c_str());
       ROS_INFO("batch slam?   %d", b_batch_slam);
 
@@ -54,7 +56,7 @@ class MSLRaptorSlamClass {
       // std::map<std::string, object_data_vec_t> ado_data_gt, ado_data_est;
       // map<string, object_est_gt_data_vec_t> raptor_data;
       vector<tuple<double, string, Pose3, Pose3, Pose3, Pose3> > raptor_data; // time, ego_pose_gt, ego_pose_est, ado_name_to_gt_est_poses
-      rslam_utils::load_rosbag(raptor_data, processed_rosbag, ego_ns, obj_param_map, dt_thresh); // "fills in" times, ego_data_gt, ado_data_gt
+      rslam_utils::load_rosbag(raptor_data, processed_rosbag, ego_ns, obj_param_map, dt_thresh, b_nocs_data); // "fills in" times, ego_data_gt, ado_data_gt
       string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
       // rslam_utils::write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
       run_batch_slam(raptor_data);
@@ -262,9 +264,10 @@ int main(int argc, char **argv)
   ros::NodeHandle nh("~");
 
   ros::Rate loop_rate(5);
-  bool b_batch_slam;
+  bool b_batch_slam, b_nocs_data;
   // ros::param::get("~batch", strtmp);
-  nh.param<bool>("batch_slam", b_batch_slam, true);
+  nh.param<bool>("b_batch_slam", b_batch_slam, true);
+  nh.param<bool>("b_nocs_data", b_nocs_data, false);
   string ego_ns;
   nh.param<string>("ego_ns", ego_ns, "quad7");
   string input_rosbag, processed_rosbag;
@@ -272,7 +275,7 @@ int main(int argc, char **argv)
   nh.param<string>("processed_rosbag", processed_rosbag, "");
 
   // string my_test_string = "... this is a test...\n";
-  MSLRaptorSlamClass rslam = MSLRaptorSlamClass(b_batch_slam, ego_ns);
+  MSLRaptorSlamClass rslam = MSLRaptorSlamClass(b_batch_slam, ego_ns, b_nocs_data);
 
   rslam.run_batch_slam_from_rosbag(processed_rosbag);
 

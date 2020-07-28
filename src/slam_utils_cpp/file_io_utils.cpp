@@ -4,7 +4,7 @@ using namespace std;
 namespace rslam_utils {
 
   void load_rosbag(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, // set<double> &times, map<string, object_est_gt_data_vec_t> &obj_data, 
-                    string rosbag_fn, string ego_ns, map<string, obj_param_t> obj_param_map, double dt_thresh) {
+                    string rosbag_fn, string ego_ns, map<string, obj_param_t> obj_param_map, double dt_thresh, bool b_nocs_data) {
     // OUTPUT:  set<double> times; map<string, object_est_gt_data_vec_t> obj_data  [string is name, object_est_gt_data_vec_t is vector of <time, pose gt, pose est>]
     ROS_INFO("loading rosbag: %s", rosbag_fn.c_str());
 
@@ -65,18 +65,11 @@ namespace rslam_utils {
         else if (m.getTopic() == raptor_topic_str || ("/" + m.getTopic() == raptor_topic_str)) {
           msl_raptor::TrackedObjects::ConstPtr raptor_msg = m.instantiate<msl_raptor::TrackedObjects>();
           if (raptor_msg != nullptr) {
-            for (const auto & tracked_obj : raptor_msg->tracked_objects){
-              // ROS_INFO("%s", tracked_obj.class_str.c_str());
+            for (const auto & tracked_obj : raptor_msg->tracked_objects) {
               geometry_msgs::PoseStamped tmp_pose_stamped = tracked_obj.pose;
               geometry_msgs::Pose tmp_pose = tmp_pose_stamped.pose;
               gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tmp_pose);
               ado_data_est[class_to_ado_long_name[tracked_obj.class_str]].push_back(make_tuple(time, ros_geo_pose_to_gtsam(tracked_obj.pose.pose))); // tracked_obj.pose is a posestamped, which has a field called pose
-              // if (tracked_obj.class_str == "camera") {
-              //   cout << tracked_obj.class_str << endl;
-              //   cout << class_to_ado_long_name[tracked_obj.class_str] << endl;
-              //   cout << tmp << endl;
-              //   cout << endl;
-              // }
             }
           }
         }
@@ -112,9 +105,38 @@ namespace rslam_utils {
     }
     object_est_gt_data_vec_t ego_data;
     sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, obj_param_t(ego_ns, ego_ns, 1, false, false, false), dt_thresh);
-    // vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > raptor_data;
     zip_data_by_ego(raptor_data, ego_data, ado_data, dt_thresh);
+    if (b_nocs_data) {
+      convert_data_to_static_obstacles(raptor_data);
+    }
     return;
+}
+
+void convert_data_to_static_obstacles(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data) {
+  vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > data_out;
+  bool b_first_step = true;
+  gtsam::Pose3 tf_w_ado0_gt, tf_w_ado0_est;
+  for (const auto & rstep : raptor_data) {
+    double t = get<0>(rstep);
+    string ado_name = get<1>(rstep);
+    gtsam::Pose3 tf_w_ego_gt = get<2>(rstep);
+    gtsam::Pose3 tf_w_ego_est = get<3>(rstep);
+    gtsam::Pose3 tf_w_ado_gt = get<4>(rstep);
+    gtsam::Pose3 tf_w_ado_est = get<5>(rstep);
+    gtsam::Pose3 tf_ego_ado_gt = (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
+    gtsam::Pose3 tf_ego_ado_est = (tf_w_ego_est.inverse()) * tf_w_ado_est;
+    if (b_first_step) {  // assume ego pose at first timestep is world frame
+      b_first_step = false;
+      tf_w_ado0_gt = tf_ego_ado_gt;
+      tf_w_ado0_est = tf_ego_ado_est;
+    }
+    tf_w_ego_gt = tf_w_ado0_gt * (tf_w_ado_gt.inverse());
+    tf_w_ego_est = tf_w_ado0_est * (tf_w_ado_est.inverse());
+
+    data_out.emplace_back(t, ado_name, tf_w_ego_gt, tf_w_ego_est, tf_w_ado0_gt, tf_w_ado0_est);
+  }
+
+  raptor_data = data_out;
 }
 
 void zip_data_by_ego(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, 
