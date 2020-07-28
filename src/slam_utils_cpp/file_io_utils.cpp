@@ -121,8 +121,34 @@ namespace rslam_utils {
 void convert_data_to_static_obstacles(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, int num_ado_objs) {
   // assume all ado objects are static and calculate the world pose of ego
   vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > data_out;
+  
   map<string, gtsam::Pose3> tf_w_ado0_gt, tf_w_ado0_est;
+  int num_ado_obj_seen = get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est, num_ado_objs);
+  assert(num_ado_obj_seen == num_ado_objs);
 
+  for (const auto & rstep : raptor_data) {
+    double t = get<0>(rstep);
+    string ado_name = get<1>(rstep);
+    gtsam::Pose3 tf_ego_ado_gt = (get<2>(rstep).inverse()) * get<4>(rstep); // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
+    gtsam::Pose3 tf_ego_ado_est = (get<3>(rstep).inverse()) * get<5>(rstep); // (tf_w_ego_est.inverse()) * tf_w_ado_est;
+
+    if (tf_w_ado0_gt.find(ado_name) == tf_w_ado0_gt.end() ) { // assume ego pose at first timestep is world frame
+      tf_w_ado0_gt[ado_name] = tf_ego_ado_gt;
+      tf_w_ado0_est[ado_name] = tf_ego_ado_est;
+    }
+    gtsam::Pose3 tf_w_ego_gt = tf_w_ado0_gt[ado_name] * (tf_ego_ado_gt.inverse());
+    gtsam::Pose3 tf_w_ego_est = tf_w_ado0_est[ado_name] * (tf_ego_ado_est.inverse());
+
+    cout << tf_w_ego_gt << endl;
+
+    data_out.emplace_back(t, ado_name, tf_w_ego_gt, tf_w_ego_est, tf_w_ado0_gt[ado_name], tf_w_ado0_est[ado_name]);
+  }
+
+  raptor_data = data_out;
+}
+
+int get_tf_w_ado_for_all_objects(const vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, 
+                                  map<string, gtsam::Pose3> &tf_w_ado0_gt, map<string, gtsam::Pose3> &tf_w_ado0_est, int num_ado_objs) {
   // first get world frame poses of each ado object
   bool b_first_step = true;
   gtsam::Pose3 tf_w_ego_gt1, tf_w_ego_est1;
@@ -179,35 +205,13 @@ void convert_data_to_static_obstacles(vector<tuple<double, string, gtsam::Pose3,
     }
     ridx++;
   }
-  assert(num_ado_obj_seen == num_ado_objs);
   // for (const auto & key_val : tf_w_ado0_gt) {
   //   string ado_name = key_val.first;
   //   gtsam::Pose3 tf_w_ado_gt = key_val.second;
   //   gtsam::Pose3 tf_w_ado_est = tf_w_ado0_est[ado_name];
   //   cout << ado_name << "... gt: " << tf_w_ado_gt << " est: " << tf_w_ado_est << endl;
   // }
-
-  for (const auto & rstep : raptor_data) {
-    double t = get<0>(rstep);
-    string ado_name = get<1>(rstep);
-    gtsam::Pose3 tf_ego_ado_gt = (get<2>(rstep).inverse()) * get<4>(rstep); // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
-    gtsam::Pose3 tf_ego_ado_est = (get<3>(rstep).inverse()) * get<5>(rstep); // (tf_w_ego_est.inverse()) * tf_w_ado_est;
-
-
-
-    if (tf_w_ado0_gt.find(ado_name) == tf_w_ado0_gt.end() ) { // assume ego pose at first timestep is world frame
-      tf_w_ado0_gt[ado_name] = tf_ego_ado_gt;
-      tf_w_ado0_est[ado_name] = tf_ego_ado_est;
-    }
-    gtsam::Pose3 tf_w_ego_gt = tf_w_ado0_gt[ado_name] * (tf_ego_ado_gt.inverse());
-    gtsam::Pose3 tf_w_ego_est = tf_w_ado0_est[ado_name] * (tf_ego_ado_est.inverse());
-
-    cout << tf_w_ego_gt << endl;
-
-    data_out.emplace_back(t, ado_name, tf_w_ego_gt, tf_w_ego_est, tf_w_ado0_gt[ado_name], tf_w_ado0_est[ado_name]);
-  }
-
-  raptor_data = data_out;
+  return num_ado_obj_seen;
 }
 
 void zip_data_by_ego(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, 
