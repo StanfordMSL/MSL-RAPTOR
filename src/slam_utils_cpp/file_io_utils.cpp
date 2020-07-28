@@ -107,33 +107,104 @@ namespace rslam_utils {
     sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, obj_param_t(ego_ns, ego_ns, 1, false, false, false), dt_thresh);
     zip_data_by_ego(raptor_data, ego_data, ado_data, dt_thresh);
     if (b_nocs_data) {
-      convert_data_to_static_obstacles(raptor_data);
+      string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
+      write_batch_slam_inputs_csv(fn,raptor_data, obj_param_map);
+      convert_data_to_static_obstacles(raptor_data, obj_param_map.size());
+
+      fn = "/mounted_folder/test_graphs_gtsam/batch_input2.csv";
+      write_batch_slam_inputs_csv(fn,raptor_data, obj_param_map);
+
     }
     return;
 }
 
-void convert_data_to_static_obstacles(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data) {
+void convert_data_to_static_obstacles(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, int num_ado_objs) {
+  // assume all ado objects are static and calculate the world pose of ego
   vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > data_out;
+  map<string, gtsam::Pose3> tf_w_ado0_gt, tf_w_ado0_est;
+
+  // first get world frame poses of each ado object
   bool b_first_step = true;
-  gtsam::Pose3 tf_w_ado0_gt, tf_w_ado0_est;
+  gtsam::Pose3 tf_w_ego_gt1, tf_w_ego_est1;
+  double t1;
+  int ridx = 0, num_ado_obj_seen = 0;
   for (const auto & rstep : raptor_data) {
     double t = get<0>(rstep);
     string ado_name = get<1>(rstep);
-    gtsam::Pose3 tf_w_ego_gt = get<2>(rstep);
-    gtsam::Pose3 tf_w_ego_est = get<3>(rstep);
-    gtsam::Pose3 tf_w_ado_gt = get<4>(rstep);
-    gtsam::Pose3 tf_w_ado_est = get<5>(rstep);
-    gtsam::Pose3 tf_ego_ado_gt = (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
-    gtsam::Pose3 tf_ego_ado_est = (tf_w_ego_est.inverse()) * tf_w_ado_est;
-    if (b_first_step) {  // assume ego pose at first timestep is world frame
+    gtsam::Pose3 tf_ego_ado_gt = (get<2>(rstep).inverse()) * get<4>(rstep); // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
+    gtsam::Pose3 tf_ego_ado_est = (get<3>(rstep).inverse()) * get<5>(rstep); // (tf_w_ego_est.inverse()) * tf_w_ado_est;
+    if (b_first_step) {
+      // here ego is identity by definition
+      tf_w_ado0_gt[ado_name] = tf_ego_ado_gt;
+      tf_w_ado0_est[ado_name] = tf_ego_ado_est;
       b_first_step = false;
-      tf_w_ado0_gt = tf_ego_ado_gt;
-      tf_w_ado0_est = tf_ego_ado_est;
+      t1 = t;
+      tf_w_ego_gt1 = tf_w_ado0_gt[ado_name] * (tf_ego_ado_gt.inverse());
+      tf_w_ego_est1 = tf_w_ado0_est[ado_name] * (tf_ego_ado_est.inverse());
+      num_ado_obj_seen++;
     }
-    tf_w_ego_gt = tf_w_ado0_gt * (tf_w_ado_gt.inverse());
-    tf_w_ego_est = tf_w_ado0_est * (tf_w_ado_est.inverse());
+    else{
+      if (tf_w_ado0_gt.find(ado_name) != tf_w_ado0_gt.end() ) {
+        t1 = t;
+        tf_w_ego_gt1 = tf_w_ado0_gt[ado_name] * (tf_ego_ado_gt.inverse());
+        tf_w_ego_est1 = tf_w_ado0_est[ado_name] * (tf_ego_ado_est.inverse());
+      }
+      else {
+        //first time we have seen this ado object
+        int i = ridx + 1;
+        string ado_name2 = get<1>(raptor_data[i]);
+        while (tf_w_ado0_gt.find(ado_name2) == tf_w_ado0_gt.end()){
+          i++;
+          ado_name2 = get<1>(raptor_data[i]);
+        }
+        double t2 = get<0>(raptor_data[i]);
+        gtsam::Pose3 tf_ego_ado_gt2  = (get<2>(raptor_data[i]).inverse()) * get<4>(raptor_data[i]); // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
+        gtsam::Pose3 tf_ego_ado_est2 = (get<3>(raptor_data[i]).inverse()) * get<5>(raptor_data[i]); // (tf_w_ego_est.inverse()) * tf_w_ado_est;
+        gtsam::Pose3 tf_w_ego_gt2    = tf_w_ado0_gt[ado_name2]  * (tf_ego_ado_gt2.inverse());
+        gtsam::Pose3 tf_w_ego_est2   = tf_w_ado0_est[ado_name2] * (tf_ego_ado_est2.inverse());
+        double s = (t - t1) / (t2 - t1);
+        gtsam::Pose3 tf_w_ego_gt  = interp_pose(tf_w_ego_gt1,  tf_w_ego_gt2,  s); // ego pose corresponding to current measuremnt 
+        gtsam::Pose3 tf_w_ego_est = interp_pose(tf_w_ego_est1, tf_w_ego_est2, s);
 
-    data_out.emplace_back(t, ado_name, tf_w_ego_gt, tf_w_ego_est, tf_w_ado0_gt, tf_w_ado0_est);
+        tf_w_ado0_gt[ado_name]  = tf_w_ego_gt  * tf_ego_ado_gt;
+        tf_w_ado0_est[ado_name] = tf_w_ego_est * tf_ego_ado_est;
+        num_ado_obj_seen++;
+        t1 = t2;
+        tf_w_ego_gt1 = tf_w_ego_gt2;
+        tf_w_ego_est1 = tf_w_ego_est2;
+      }
+      if (num_ado_obj_seen == num_ado_objs) {
+        break; // this is just to save us from having to loop over all the data
+      }
+    }
+    ridx++;
+  }
+  assert(num_ado_obj_seen == num_ado_objs);
+  // for (const auto & key_val : tf_w_ado0_gt) {
+  //   string ado_name = key_val.first;
+  //   gtsam::Pose3 tf_w_ado_gt = key_val.second;
+  //   gtsam::Pose3 tf_w_ado_est = tf_w_ado0_est[ado_name];
+  //   cout << ado_name << "... gt: " << tf_w_ado_gt << " est: " << tf_w_ado_est << endl;
+  // }
+
+  for (const auto & rstep : raptor_data) {
+    double t = get<0>(rstep);
+    string ado_name = get<1>(rstep);
+    gtsam::Pose3 tf_ego_ado_gt = (get<2>(rstep).inverse()) * get<4>(rstep); // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
+    gtsam::Pose3 tf_ego_ado_est = (get<3>(rstep).inverse()) * get<5>(rstep); // (tf_w_ego_est.inverse()) * tf_w_ado_est;
+
+
+
+    if (tf_w_ado0_gt.find(ado_name) == tf_w_ado0_gt.end() ) { // assume ego pose at first timestep is world frame
+      tf_w_ado0_gt[ado_name] = tf_ego_ado_gt;
+      tf_w_ado0_est[ado_name] = tf_ego_ado_est;
+    }
+    gtsam::Pose3 tf_w_ego_gt = tf_w_ado0_gt[ado_name] * (tf_ego_ado_gt.inverse());
+    gtsam::Pose3 tf_w_ego_est = tf_w_ado0_est[ado_name] * (tf_ego_ado_est.inverse());
+
+    cout << tf_w_ego_gt << endl;
+
+    data_out.emplace_back(t, ado_name, tf_w_ego_gt, tf_w_ego_est, tf_w_ado0_gt[ado_name], tf_w_ado0_est[ado_name]);
   }
 
   raptor_data = data_out;
@@ -170,8 +241,8 @@ void zip_data_by_ego(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gt
       cout << "t_gt1 = " << t_gt1 << " < t_est = " << t_est << " < t_gt2 = " << t_gt2 << " --> s = " << s << endl;
       cout << prev_gt << endl;
       cout << get<2>(ego_data[ego_ind]) << endl;
-      gtsam::Pose3 tf_ego_gt = rslam_utils::interp_pose(prev_gt, get<2>(ego_data[ego_ind]), s);
-      gtsam::Pose3 tf_ego_est = rslam_utils::interp_pose(prev_est, get<2>(ego_data[ego_ind]), s);
+      gtsam::Pose3 tf_ego_gt = interp_pose(prev_gt, get<2>(ego_data[ego_ind]), s);
+      gtsam::Pose3 tf_ego_est = interp_pose(prev_est, get<2>(ego_data[ego_ind]), s);
       raptor_data.emplace_back(t_est, ado_name, tf_ego_gt, tf_ego_est, get<2>(ado_data_single), get<3>(ado_data_single));
     }
   }

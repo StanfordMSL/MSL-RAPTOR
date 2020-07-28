@@ -264,10 +264,14 @@ int main(int argc, char **argv)
   ros::NodeHandle nh("~");
 
   ros::Rate loop_rate(5);
+  
   bool b_batch_slam, b_nocs_data;
-  // ros::param::get("~batch", strtmp);
-  nh.param<bool>("b_batch_slam", b_batch_slam, true);
-  nh.param<bool>("b_nocs_data", b_nocs_data, false);
+  int b_batch_slam_int, b_nocs_data_int;
+  nh.param("b_batch_slam", b_batch_slam_int, 1);
+  b_batch_slam = b_batch_slam_int == 1;
+  nh.param("b_nocs_data", b_nocs_data_int, 0);  
+  b_nocs_data = b_nocs_data_int == 1;
+
   string ego_ns;
   nh.param<string>("ego_ns", ego_ns, "quad7");
   string input_rosbag, processed_rosbag;
