@@ -237,18 +237,9 @@ class MSLRaptorSlamClass {
       cout << "Averages rot_pre = " << ave_rot_diff_pre << " deg, rot_post = " << ave_rot_diff_post << " deg" << endl;
 
       string fn = "/mounted_folder/test_graphs_gtsam/graph1.csv";
-
       cout << "writing results to: " << fn << endl;
-      // rslam_utils::write_results_csv(fn, ego_time_map, tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps);
       rslam_utils::write_results_csv(fn, raptor_data, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps, obj_param_map);
     }
-
-    // void load_gt(string rosbag_fn) {
-    //   rslam_utils::load_gt_rosbag(times, ego_data_gt, ado_data_gt, rosbag_fn, ego_ns, obj_param_map, dt_thresh);
-    // }
-    // void load_raptor_data(string rosbag_fn) {
-    //   rslam_utils::load_raptor_output_rosbag(rosbag_fn, ego_ns, obj_param_map);
-    // }
 
     ~MSLRaptorSlamClass() {}
 };
@@ -257,8 +248,6 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "raptor_object_slam");
   ros::NodeHandle nh("~");
-
-  ros::Rate loop_rate(5);
   
   bool b_batch_slam, b_nocs_data;
   int b_batch_slam_int, b_nocs_data_int;
@@ -273,29 +262,15 @@ int main(int argc, char **argv)
   nh.param<string>("input_rosbag", input_rosbag, "");
   nh.param<string>("processed_rosbag", processed_rosbag, "");
 
-  // string my_test_string = "... this is a test...\n";
   MSLRaptorSlamClass rslam = MSLRaptorSlamClass(b_batch_slam, ego_ns, b_nocs_data);
 
   rslam.run_batch_slam_from_rosbag(processed_rosbag);
 
-  /**
-   * A count of how many messages we have sent. This is used to create
-   * a unique string for each message.
-   */
-  int count = 0;
+  ros::Rate loop_rate(5);
   while (ros::ok())
   {
-    std_msgs::String msg;
-    stringstream ss;
-    ss << "hello raptor object slam world " << count;
-    msg.data = ss.str();
-    // ROS_INFO("%s", msg.data.c_str());
-    // chatter_pub.publish(msg);
-
     ros::spinOnce();
-
     loop_rate.sleep();
-    ++count;
   }
   ros::shutdown();
   return 0;
