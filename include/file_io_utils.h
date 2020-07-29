@@ -43,7 +43,9 @@ namespace rslam_utils {
     void write_batch_slam_inputs_csv(string fn, vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
                                     map<string, obj_param_t> obj_param_map);
                                     
-    void write_all_traj_csv(string fn, std::map<gtsam::Symbol, std::map<double, pair<gtsam::Pose3, gtsam::Pose3> > > & all_trajs);
+    void write_all_traj_csv(string fn, const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data,
+                            map<gtsam::Symbol, map<double, pair<gtsam::Pose3, gtsam::Pose3> > > & all_trajs,
+                            map<string, obj_param_t> &obj_param_map, int num_ado_objs);
 
     void write_results_csv(string fn, const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
                             map<gtsam::Symbol, gtsam::Pose3> &tf_w_est_preslam_map, 
