@@ -19,11 +19,6 @@ class MSLRaptorSlamClass {
   };
 
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
-  // set<double> times;
-  // object_data_vec_t ego_data_gt;
-  // std::map<std::string, object_data_vec_t> ado_data_gt;
-  // object_est_gt_data_vec_t obj_data; // vector<data_tuple>
-  // data_tuple a;
 
   public:
     MSLRaptorSlamClass(bool b_batch_slam_, string ego_ns_, bool b_nocs_data_) {
@@ -77,7 +72,7 @@ class MSLRaptorSlamClass {
       Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
 
       // bool b_fake_perfect_measurements = true;
-      bool b_use_gt = false;
+      bool b_use_gt = true;
       bool b_use_gt_init = true;
       if (b_use_gt) {
         b_use_gt_init = true;

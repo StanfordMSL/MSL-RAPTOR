@@ -137,9 +137,9 @@ void convert_data_to_static_obstacles(vector<tuple<double, string, gtsam::Pose3,
     // tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3>
     double t = get<0>(rstep);
     string ado_name = get<1>(rstep);
-    if(ado_name != "mug_daniel_norm") { //  "bowl_white_small_norm"  "camera_canon_len_norm"  "can_arizona_tea_norm"  "laptop_air_xin_norm"  "mug_daniel_norm"
-      continue;
-    }
+    // if(ado_name != "mug_daniel_norm") { //  "bowl_white_small_norm"  "camera_canon_len_norm"  "can_arizona_tea_norm"  "laptop_air_xin_norm"  "mug_daniel_norm"
+    //   continue;
+    // }
     gtsam::Pose3 tf_ego_ado_gt = (get<2>(rstep).inverse()) * get<4>(rstep); // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
     gtsam::Pose3 tf_ego_ado_est = (get<3>(rstep).inverse()) * get<5>(rstep); // (tf_w_ego_est.inverse()) * tf_w_ado_est;
     gtsam::Pose3 tf_w_ego_gt = tf_w_ado0_gt[ado_name] * (tf_ego_ado_gt.inverse());
@@ -200,6 +200,9 @@ int get_tf_w_ado_for_all_objects(const vector<tuple<double, string, gtsam::Pose3
         string ado_name2 = get<1>(raptor_data[i]);
         while (tf_w_ado0_gt.find(ado_name2) == tf_w_ado0_gt.end()){
           i++;
+          if (i >= raptor_data.size() ) {
+            cout << "WARNING AT END OF DATA!!" << endl;
+          }
           ado_name2 = get<1>(raptor_data[i]);
         }
         double t2 = get<0>(raptor_data[i]);
@@ -239,16 +242,11 @@ void zip_data_by_ego(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gt
                       object_est_gt_data_vec_t ego_data, map<string, object_est_gt_data_vec_t> ado_data, double dt_thresh) {
   // Combine all data into a single data structure that can be looped over. Each element simulates a potential "measurement" from msl_raptor
 
-  // map<string, int> ado_index;
   for (const auto & key_val : ado_data) {
     string ado_name = key_val.first;
     object_est_gt_data_vec_t ado_data_one_obj = key_val.second;
-    // double t_est = ado_data_one_obj
-    // ado_index[key_val.first] = 0;
-    // map<string, tuple<gtsam::Pose3, gtsam::Pose3> > measurements;
     int ego_ind = 0;
     for (const auto & ado_data_single : ado_data_one_obj) {
-      // measurements[ado_name] = make_tuple(get<2>(ado_data_single), get<3>(ado_data_single));
       double t_est = get<0>(ado_data_single);
       double t_gt1, t_gt2, s;
       gtsam::Pose3 prev_gt, prev_est;

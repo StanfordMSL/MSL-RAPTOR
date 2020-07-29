@@ -79,7 +79,8 @@ if __name__ == '__main__':
                     "msl_raptor_output_from_bag_scene_1_camera_canon_len_norm.bag",
                     # "msl_raptor_output_from_bag_scene_1_can_arizona_tea_norm.bag",
                     "msl_raptor_output_from_bag_scene_1_laptop_air_xin_norm.bag",
-                    "msl_raptor_output_from_bag_scene_1_mug_daniel_norm.bag"]
+                    "msl_raptor_output_from_bag_scene_1_mug_daniel_norm.bag"
+                   ]
         rb_namespaces = [
                         # "bowl_white_small_norm",
                         "camera_canon_len_norm",
