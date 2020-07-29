@@ -21,7 +21,7 @@
 #include "shared_imports.h"
 
 namespace rslam_utils {
-    void load_rosbag(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, //set<double> &times, std::map<std::string, object_est_gt_data_vec_t> &obj_data, 
+    void load_rosbag(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, int &num_ado_objs,
                     std::string rosbag_fn, std::string ego_ns, std::map<std::string, obj_param_t> obj_param_map, double dt_thresh, bool b_nocs_data);
                     
     void convert_data_to_static_obstacles(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, int num_ado_objs);

@@ -3,7 +3,7 @@
 using namespace std;
 namespace rslam_utils {
 
-  void load_rosbag(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, // set<double> &times, map<string, object_est_gt_data_vec_t> &obj_data, 
+  void load_rosbag(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, int &num_ado_objs,
                     string rosbag_fn, string ego_ns, map<string, obj_param_t> obj_param_map, double dt_thresh, bool b_nocs_data) {
     // OUTPUT:  set<double> times; map<string, object_est_gt_data_vec_t> obj_data  [string is name, object_est_gt_data_vec_t is vector of <time, pose gt, pose est>]
     ROS_INFO("loading rosbag: %s", rosbag_fn.c_str());
@@ -78,16 +78,18 @@ namespace rslam_utils {
             if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
               geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
               if (geo_msg != nullptr) {
-                  ado_data_gt[ado_topic_to_name[topic_str]].push_back(make_tuple(time, ros_geo_pose_to_gtsam(geo_msg->pose)));
-                  break;
+                ado_data_gt[ado_topic_to_name[topic_str]].push_back(make_tuple(time, ros_geo_pose_to_gtsam(geo_msg->pose)));
+                break;
               }
             }
           }
       }
       num_msg_total++;
     }
-    cout << "num messages = " << num_msg_total << endl;
+    num_ado_objs = ado_data_gt.size();
+    cout << "num messages = " << num_msg_total << ", # ado objects: " << num_ado_objs << endl;
     bag.close();
+
 
     map<string, object_est_gt_data_vec_t> ado_data;
     for(const auto &key_value_pair : ado_data_gt) {
@@ -96,20 +98,69 @@ namespace rslam_utils {
         continue; // this means we had optitrack data, but no raptor data for this object
       }
       object_est_gt_data_vec_t ado_data_single;
-      // int a = ado_data_est[ado_name].size();
-      // int b = ado_data_gt[ado_name].size();
       sync_est_and_gt(ado_data_est[ado_name], ado_data_gt[ado_name], ado_data_single, obj_param_map[ado_name], dt_thresh);
       ado_data[ado_name] = ado_data_single;
-      // cout << ado_data[ado_name].size() << endl;
-      // cout << endl;
     }
     object_est_gt_data_vec_t ego_data;
     sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, obj_param_t(ego_ns, ego_ns, 1, false, false, false), dt_thresh);
+
+
+    // first find the lowest time index
+    map<string, int> ado_idxs;  // ado name, ado index, 
+    double current_time = 1000000000;
+    for (const auto & key_val : ado_data) {
+      ado_idxs[key_val.first] = 0;
+      double time = get<0>(key_val.second[0]);
+      if (time < current_time) {
+        current_time = time;
+      }
+    } // done finding lowest time index
+
+    // Next, step through the times grouping them if they fall within dt_thresh. Stop when all are grouped
+    vector<pair<double, map<string, tuple<gtsam::Pose3, gtsam::Pose3>>>> ado_data_grouped;
+    bool b_finished = false;
+    while(!b_finished) {
+      map<string, tuple<gtsam::Pose3, gtsam::Pose3>> measurement;
+      double meas_time = 0, next_time = 1000000000;
+      b_finished = true; // this is last round unless one of our ado vectors still has more left
+      for (const auto & key_val : ado_data) {
+        string ado_name = key_val.first;
+        if (ado_idxs[ado_name] < 0) {
+          continue; // this means we reached the end of this vector
+        }
+        
+        object_est_gt_data_vec_t ado_data_single = key_val.second;
+        data_tuple ado_data_tuple = ado_data_single[ado_idxs[ado_name]];
+        double this_ado_time = get<0>(ado_data_tuple);
+        if ( dt_thresh > std::abs(this_ado_time - current_time) ) {
+          // this ado data is part of this msl_raptor iteration
+          measurement[ado_name] = make_tuple(get<2>(ado_data_tuple), get<3>(ado_data_tuple));
+          meas_time += this_ado_time;
+          if (ado_idxs[ado_name] + 1 < ado_data_single.size()) {
+            ado_idxs[ado_name]++;
+            b_finished = false; // do at least 1 more round
+          }
+          else {
+            ado_idxs[ado_name] = -1; // mark this as finished
+          }
+        }
+        if ( (ado_idxs[ado_name] >= 0) && (get<0>(ado_data_single[ado_idxs[ado_name]]) < next_time) ) {
+          next_time = get<0>(ado_data_single[ado_idxs[ado_name]]); // get the next closest ado time to use for next raptor iteration
+        }
+      }
+      ado_data_grouped.emplace_back( meas_time / ((double)measurement.size()), measurement );
+      current_time = next_time;
+    } // done grouping measurements
+
+
+
+
+
     zip_data_by_ego(raptor_data, ego_data, ado_data, dt_thresh);
     if (b_nocs_data) {
       string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
       write_batch_slam_inputs_csv(fn,raptor_data, obj_param_map);
-      convert_data_to_static_obstacles(raptor_data, ado_data.size());
+      convert_data_to_static_obstacles(raptor_data, num_ado_objs);
 
       fn = "/mounted_folder/test_graphs_gtsam/batch_input2.csv";
       write_batch_slam_inputs_csv(fn,raptor_data, obj_param_map);
@@ -335,6 +386,11 @@ namespace rslam_utils {
                                     map<gtsam::Symbol, map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > &tf_ego_ado_maps,
                                     map<string, obj_param_t> &obj_param_map) {
     ofstream myFile(fn);
+    // for (const auto & ado_sym : ado_sym_list) {
+    //     myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_gt) << ", " 
+    //                                             << pose_to_string_line(tf_w_ado_est_pre) << ", " 
+    //                                             << pose_to_string_line(tf_w_ado_est_post) << "\n";
+    // }
     int t_ind = 0;
     for (const auto & raptor_step : raptor_data ) {
       int ego_pose_index = 1 + t_ind;
