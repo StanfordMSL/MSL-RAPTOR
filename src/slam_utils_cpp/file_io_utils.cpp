@@ -112,7 +112,7 @@ namespace rslam_utils {
     if (b_nocs_data) {
       string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
       write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
-      string fn = "/mounted_folder/test_graphs_gtsam/all_trajs.csv";
+      fn = "/mounted_folder/test_graphs_gtsam/all_trajs.csv";
       map<gtsam::Symbol, map<double, pair<gtsam::Pose3, gtsam::Pose3> > > all_trajs;
       write_all_traj_csv(fn, raptor_data, all_trajs, obj_param_map, num_ado_objs);
       convert_data_to_static_obstacles(raptor_data, num_ado_objs);
