@@ -3,7 +3,7 @@
 using namespace std;
 namespace rslam_utils {
 
-  void load_rosbag(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, int &num_ado_objs,
+  void load_rosbag(vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int &num_ado_objs,
                     string rosbag_fn, string ego_ns, map<string, obj_param_t> obj_param_map, double dt_thresh, bool b_nocs_data) {
     // OUTPUT:  set<double> times; map<string, object_est_gt_data_vec_t> obj_data  [string is name, object_est_gt_data_vec_t is vector of <time, pose gt, pose est>]
     ROS_INFO("loading rosbag: %s", rosbag_fn.c_str());
@@ -104,7 +104,23 @@ namespace rslam_utils {
     object_est_gt_data_vec_t ego_data;
     sync_est_and_gt(ego_data_est, ego_data_gt, ego_data, obj_param_t(ego_ns, ego_ns, 1, false, false, false), dt_thresh);
 
+    vector<pair<double, map<string, pair<gtsam::Pose3, gtsam::Pose3>>>> ado_data_grouped;
+    group_ado_measurements_by_time(ado_data_grouped, ado_data, dt_thresh);
 
+    zip_data_by_ego(raptor_data, ego_data, ado_data_grouped, dt_thresh);
+    if (b_nocs_data) {
+      string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
+      write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
+      convert_data_to_static_obstacles(raptor_data, num_ado_objs);
+
+      fn = "/mounted_folder/test_graphs_gtsam/batch_input2.csv";
+      write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
+    }
+    return;
+  }
+
+  void group_ado_measurements_by_time(vector<pair<double, map<string, tuple<gtsam::Pose3, gtsam::Pose3>>>> &ado_data_grouped,
+                                        const map<string, object_est_gt_data_vec_t> &ado_data, double dt_thresh) {
     // first find the lowest time index
     map<string, int> ado_idxs;  // ado name, ado index, 
     double current_time = 1000000000;
@@ -117,7 +133,6 @@ namespace rslam_utils {
     } // done finding lowest time index
 
     // Next, step through the times grouping them if they fall within dt_thresh. Stop when all are grouped
-    vector<pair<double, map<string, tuple<gtsam::Pose3, gtsam::Pose3>>>> ado_data_grouped;
     bool b_finished = false;
     while(!b_finished) {
       map<string, tuple<gtsam::Pose3, gtsam::Pose3>> measurement;
@@ -151,24 +166,118 @@ namespace rslam_utils {
       ado_data_grouped.emplace_back( meas_time / ((double)measurement.size()), measurement );
       current_time = next_time;
     } // done grouping measurements
-
-
-
-
-
-    zip_data_by_ego(raptor_data, ego_data, ado_data, dt_thresh);
-    if (b_nocs_data) {
-      string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
-      write_batch_slam_inputs_csv(fn,raptor_data, obj_param_map);
-      convert_data_to_static_obstacles(raptor_data, num_ado_objs);
-
-      fn = "/mounted_folder/test_graphs_gtsam/batch_input2.csv";
-      write_batch_slam_inputs_csv(fn,raptor_data, obj_param_map);
-    }
-    return;
   }
 
-  void convert_data_to_static_obstacles(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, int num_ado_objs) {
+  
+  void zip_data_by_ego(vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
+                        object_est_gt_data_vec_t ego_data, const vector<pair<double, map<string, pair<gtsam::Pose3, gtsam::Pose3>>>> &ado_data_grouped,
+                        double dt_thresh) {
+    // Combine all data into a single data structure that can be looped over. Each element simulates a potential "measurement" from msl_raptor
+
+    int ego_idx = 0;
+    for (const auto & key_val : ado_data_grouped) {
+      double ado_time = key_val.first;
+      map<string, pair<gtsam::Pose3, gtsam::Pose3>> measurements = key_val.second;
+      
+      // get_interpolated_ego_pose(ado_time, ego_data, ego_idx);
+      double last_ego_time  = get<0>(ego_data[ego_idx]);
+      gtsam::Pose3 prev_gt  = get<2>(ego_data[ego_idx]);
+      gtsam::Pose3 prev_est = get<3>(ego_data[ego_idx]);
+
+      for(int i = ego_idx; i < ego_data.size(); i++) {
+        data_tuple ego_tuple = ego_data[i];
+        double ego_time = get<0>(ego_tuple);
+        if (last_ego_time <= ado_time && ado_time <= ego_time ) {
+          // found surounding ego times
+          double s = (ado_time - last_ego_time) / (ego_time - last_ego_time);
+          gtsam::Pose3 tf_ego_gt  = interp_pose(prev_gt,  get<2>(ego_data[i]), s);
+          gtsam::Pose3 tf_ego_est = interp_pose(prev_est, get<2>(ego_data[i]), s);
+          break; // return
+        }
+        // else...
+        last_ego_time  = ego_time;
+        prev_gt  = get<2>(ego_data[i]);
+        prev_est = get<3>(ego_data[i]);
+      }
+      raptor_data.emplace_back(ado_time, measurements);
+    }
+
+
+
+    // for (const auto & key_val : ado_data) {
+    //   string ado_name = key_val.first;
+    //   object_est_gt_data_vec_t ado_data_one_obj = key_val.second;
+    //   int ego_ind = 0;
+    //   for (const auto & ado_data_single : ado_data_one_obj) {
+    //     double t_est = get<0>(ado_data_single);
+    //     double t_gt1, t_gt2, s;
+    //     gtsam::Pose3 prev_gt, prev_est;
+    //     while (get<0>(ego_data[ego_ind]) < t_est) {
+    //       t_gt1 = get<0>(ego_data[ego_ind]);
+    //       prev_gt = get<2>(ego_data[ego_ind]);
+    //       prev_est = get<3>(ego_data[ego_ind]);
+    //       ego_ind++;
+    //       if(ego_ind >= ego_data.size()) {
+    //         break;
+    //       }
+    //     }
+    //     t_gt2 = get<0>(ego_data[ego_ind]);
+    //     s = (t_est - t_gt1) / (t_gt2 - t_gt1);
+    //     gtsam::Pose3 tf_ego_gt = interp_pose(prev_gt, get<2>(ego_data[ego_ind]), s);
+    //     gtsam::Pose3 tf_ego_est = interp_pose(prev_est, get<2>(ego_data[ego_ind]), s);
+    //     raptor_data.emplace_back(t_est, ado_name, tf_ego_gt, tf_ego_est, get<2>(ado_data_single), get<3>(ado_data_single));
+    //   }
+    // }
+    // object_est_gt_data_vec_t a;
+    // data_tuple b; 
+    // std::sort(raptor_data.begin(), raptor_data.end(), [](const tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3 >& lhs, const tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3 >& rhs) {
+    //   return get<0>(lhs) < get<0>(rhs); 
+    // });   // this should sort the vector by time (i.e. first element in each tuple).
+  }
+
+  gtsam::Pose3 ros_geo_pose_to_gtsam(geometry_msgs::Pose ros_pose) {
+    // Convert a ros pose structure to gtsam's Pose3 class
+    gtsam::Point3 t = gtsam::Point3(ros_pose.position.x, ros_pose.position.y, ros_pose.position.z);
+    gtsam::Rot3 R   = gtsam::Rot3( gtsam::Quaternion(ros_pose.orientation.w, 
+                                                    ros_pose.orientation.x, 
+                                                    ros_pose.orientation.y, 
+                                                    ros_pose.orientation.z) );
+    return gtsam::Pose3(R, t);
+  }
+
+  void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data, obj_param_t params, double dt_thresh) {
+    // for each ado datapoint (after gt data has begun), interpolate to gt poses to find where the ado was taken
+
+    bool b_verbose = true;
+    double t_gt, t_est, t_prev_gt = 0, t_prev_est = 0;
+    uint next_gt_time_ind = 0;
+    gtsam::Pose3 prev_gt, prev_est;
+    int gt_ind = 0;
+    double t_gt0 = get<0>(data_gt[gt_ind]);
+
+    for (uint i = 0; i < data_est.size()-1; i++) {
+      t_est = get<0>(data_est[i]);
+      if (t_est < t_gt0) {
+        continue;
+      }
+
+      double t_gt1, t_gt2, s;
+      while (get<0>(data_gt[gt_ind]) < t_est) {
+        t_gt1 = get<0>(data_gt[gt_ind]);
+        prev_gt = get<1>(data_gt[gt_ind]);
+        gt_ind++;
+        if(gt_ind >= data_gt.size()) {
+          break;
+        }
+      }
+      t_gt2 = get<0>(data_gt[gt_ind]);
+      s = (t_est - t_gt1) / (t_gt2 - t_gt1);
+      gtsam::Pose3 tf_gt = rslam_utils::interp_pose(prev_gt, get<1>(data_gt[gt_ind]), s);
+      data.push_back(make_tuple(t_est, params.obj_id, tf_gt, get<1>(data_est[i])));
+    }
+  }
+
+  void convert_data_to_static_obstacles(vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int num_ado_objs) {
     // assume all ado objects are static and calculate the world pose of ego
     vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > data_out;
     
@@ -212,7 +321,7 @@ namespace rslam_utils {
     raptor_data = data_out;
   }
 
-  int get_tf_w_ado_for_all_objects(const vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, 
+  int get_tf_w_ado_for_all_objects(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
                                     map<string, gtsam::Pose3> &tf_w_ado0_gt, map<string, gtsam::Pose3> &tf_w_ado0_est, int num_ado_objs) {
     // first get world frame poses of each ado object
     bool b_first_step = true;
@@ -275,84 +384,8 @@ namespace rslam_utils {
     return num_ado_obj_seen;
   }
 
-  void zip_data_by_ego(vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, 
-                        object_est_gt_data_vec_t ego_data, map<string, object_est_gt_data_vec_t> ado_data, double dt_thresh) {
-    // Combine all data into a single data structure that can be looped over. Each element simulates a potential "measurement" from msl_raptor
 
-    for (const auto & key_val : ado_data) {
-      string ado_name = key_val.first;
-      object_est_gt_data_vec_t ado_data_one_obj = key_val.second;
-      int ego_ind = 0;
-      for (const auto & ado_data_single : ado_data_one_obj) {
-        double t_est = get<0>(ado_data_single);
-        double t_gt1, t_gt2, s;
-        gtsam::Pose3 prev_gt, prev_est;
-        while (get<0>(ego_data[ego_ind]) < t_est) {
-          t_gt1 = get<0>(ego_data[ego_ind]);
-          prev_gt = get<2>(ego_data[ego_ind]);
-          prev_est = get<3>(ego_data[ego_ind]);
-          ego_ind++;
-          if(ego_ind >= ego_data.size()) {
-            break;
-          }
-        }
-        t_gt2 = get<0>(ego_data[ego_ind]);
-        s = (t_est - t_gt1) / (t_gt2 - t_gt1);
-        gtsam::Pose3 tf_ego_gt = interp_pose(prev_gt, get<2>(ego_data[ego_ind]), s);
-        gtsam::Pose3 tf_ego_est = interp_pose(prev_est, get<2>(ego_data[ego_ind]), s);
-        raptor_data.emplace_back(t_est, ado_name, tf_ego_gt, tf_ego_est, get<2>(ado_data_single), get<3>(ado_data_single));
-      }
-    }
-    object_est_gt_data_vec_t a;
-    data_tuple b; 
-    std::sort(raptor_data.begin(), raptor_data.end(), [](const tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3 >& lhs, const tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3 >& rhs) {
-      return get<0>(lhs) < get<0>(rhs); 
-    });   // this should sort the vector by time (i.e. first element in each tuple).
-  }
-
-  gtsam::Pose3 ros_geo_pose_to_gtsam(geometry_msgs::Pose ros_pose) {
-    // Convert a ros pose structure to gtsam's Pose3 class
-    gtsam::Point3 t = gtsam::Point3(ros_pose.position.x, ros_pose.position.y, ros_pose.position.z);
-    gtsam::Rot3 R   = gtsam::Rot3( gtsam::Quaternion(ros_pose.orientation.w, 
-                                                    ros_pose.orientation.x, 
-                                                    ros_pose.orientation.y, 
-                                                    ros_pose.orientation.z) );
-    return gtsam::Pose3(R, t);
-  }
-
-  void sync_est_and_gt(object_data_vec_t data_est, object_data_vec_t data_gt, object_est_gt_data_vec_t& data, obj_param_t params, double dt_thresh) {
-    // for each ado datapoint (after gt data has begun), interpolate to gt poses to find where the ado was taken
-
-    bool b_verbose = true;
-    double t_gt, t_est, t_prev_gt = 0, t_prev_est = 0;
-    uint next_gt_time_ind = 0;
-    gtsam::Pose3 prev_gt, prev_est;
-    int gt_ind = 0;
-    double t_gt0 = get<0>(data_gt[gt_ind]);
-
-    for (uint i = 0; i < data_est.size()-1; i++) {
-      t_est = get<0>(data_est[i]);
-      if (t_est < t_gt0) {
-        continue;
-      }
-
-      double t_gt1, t_gt2, s;
-      while (get<0>(data_gt[gt_ind]) < t_est) {
-        t_gt1 = get<0>(data_gt[gt_ind]);
-        prev_gt = get<1>(data_gt[gt_ind]);
-        gt_ind++;
-        if(gt_ind >= data_gt.size()) {
-          break;
-        }
-      }
-      t_gt2 = get<0>(data_gt[gt_ind]);
-      s = (t_est - t_gt1) / (t_gt2 - t_gt1);
-      gtsam::Pose3 tf_gt = rslam_utils::interp_pose(prev_gt, get<1>(data_gt[gt_ind]), s);
-      data.push_back(make_tuple(t_est, params.obj_id, tf_gt, get<1>(data_est[i])));
-    }
-  }
-
-  void write_batch_slam_inputs_csv(string fn, vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > &raptor_data, 
+  void write_batch_slam_inputs_csv(string fn, vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
                                     map<string, obj_param_t> obj_param_map) {
     ofstream myFile(fn);
     int t_ind = 0;
@@ -380,7 +413,7 @@ namespace rslam_utils {
     myFile.close();
   }
 
-  void write_results_csv(string fn, const vector<tuple<double, string, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3, gtsam::Pose3> > raptor_data, 
+  void write_results_csv(string fn, const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
                                     map<gtsam::Symbol, gtsam::Pose3> &tf_w_est_preslam_map, 
                                     map<gtsam::Symbol, gtsam::Pose3> &tf_w_est_postslam_map, 
                                     map<gtsam::Symbol, map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > &tf_ego_ado_maps,
