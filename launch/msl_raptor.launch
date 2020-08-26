@@ -77,7 +77,7 @@
 
   <!-- IF we should record a rosbag of results -->
   <group if="$(arg b_record)">
-    <group if="$(arg b_record)">
+    <group if="$(arg b_rosbag)">
       <!-- if FROM a rosbag (i.e. post-processed), then use the name of the source rosbag to name the newly output bag -->
       <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-O $(arg rb_path_out)/msl_raptor_output_from_bag_$(arg rb_name) -a"/>
     </group>
