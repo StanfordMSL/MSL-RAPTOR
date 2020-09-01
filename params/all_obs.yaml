@@ -362,3 +362,19 @@ bound_box_l: 0.067202
 bound_box_h: 0.112505
 bound_box_w: 0.103714
 b_enforce_0: []
+---
+id: 38
+ns: 'quad6'
+class_str: 'mslquad'
+bound_box_l: 0.27
+bound_box_w: 0.27
+bound_box_h: 0.13
+b_enforce_0: ['yaw']
+---
+id: 39
+ns: 'swell_bottle'
+class_str: 'bottle'
+bound_box_l: 0.07
+bound_box_h: 0.26
+bound_box_w: 0.07
+b_enforce_0: ['yaw']

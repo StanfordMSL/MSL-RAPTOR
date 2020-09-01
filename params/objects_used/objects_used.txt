@@ -1,4 +1,6 @@
 quad4
+quad6
+swell_bottle
 bottle3_scene5_norm
 bowl_blue_ikea_norm
 bowl_brown_ikea_norm
