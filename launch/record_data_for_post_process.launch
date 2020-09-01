@@ -28,11 +28,6 @@
     </include>
   </group>
 
-  <node pkg="rosbag" type="record" name="ocam_bag_rec" args="-o $(arg rb_out_path)$(arg rb_name_prefix) 
-      /tf /tf_static 
-      /quad7/camera/camera_info /quad7/camera/image_raw 
-      -e "(.*)/pose(.*)"/> 
-
-
+ <node pkg="rosbag" type="record" name="record_data_for_post_process" args="-o $(arg rb_out_path)$(arg rb_name_prefix) -e (.*)pose(.*) --topic /tf --topic /tf_static --topic /quad7/camera/camera_info --topic /quad7/camera/image_raw "/> <!-- the regex captures all topics with the word 'pose' in it which works for both quad-vrpn and default vrpn -->
 
 </launch>
