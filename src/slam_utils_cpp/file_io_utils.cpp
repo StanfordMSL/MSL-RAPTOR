@@ -15,7 +15,8 @@ namespace rslam_utils {
       {"camera", "camera_canon_len_norm"},
       {"can", "can_arizona_tea_norm"}, 
       {"laptop", "laptop_air_xin_norm"},
-      {"cup", "mug_daniel_norm"}
+      {"cup", "mug_daniel_norm"},
+      {"mslquad", "quad4"}
     };
 
     string gt_pose_topic  = "/mavros/vision_pose/pose";
