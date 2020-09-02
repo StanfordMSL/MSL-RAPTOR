@@ -16,7 +16,8 @@ namespace rslam_utils {
       {"can", "can_arizona_tea_norm"}, 
       {"laptop", "laptop_air_xin_norm"},
       {"cup", "mug_daniel_norm"},
-      {"mslquad", "quad4"}
+      {"mslquad", "quad4"},
+      {"mslquad", "quad6"}
     };
 
     string gt_pose_topic  = "/mavros/vision_pose/pose";
@@ -69,6 +70,9 @@ namespace rslam_utils {
           if (raptor_msg != nullptr) {
             for (const auto & tracked_obj : raptor_msg->tracked_objects) {
               geometry_msgs::PoseStamped tmp_pose_stamped = tracked_obj.pose;
+              if (tmp_pose_stamped.pose.position.y < 0) {
+                continue; // DEBUG ONLY - this is to eliminate the data from one of the quads
+              }
               geometry_msgs::Pose tmp_pose = tmp_pose_stamped.pose;
               gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tmp_pose);
               ado_data_est[class_to_ado_long_name[tracked_obj.class_str]].emplace_back(time, ros_geo_pose_to_gtsam(tracked_obj.pose.pose)); // tracked_obj.pose is a posestamped, which has a field called pose
@@ -500,7 +504,7 @@ namespace rslam_utils {
         gtsam::Pose3 tf_w_ego_est = tf_w_ado0_est[ado_name] * tf_ego_ado_est.inverse();
         myFile << ado_sym << ", " << time << ", " << pose_to_string_line(tf_w_ego_gt) << ", " 
                                                   << pose_to_string_line(tf_w_ego_est) << ", " 
-                                                  << pose_to_string_line((tf_w_ego_gt.inverse()) * tf_w_ego_est ) << "\n";
+                                                  << pose_to_string_line(tf_w_ego_gt * tf_ego_ado_est ) << "\n";
         one_traj[time] = make_pair(tf_w_ego_gt, tf_w_ego_est);
       }
       all_trajs[ado_sym] = one_traj;

@@ -16,7 +16,8 @@ class MSLRaptorSlamClass {
     {"can_arizona_tea_norm",  obj_param_t("can_arizona_tea_norm",  "can",    4, false, false, false)}, //true
     {"laptop_air_xin_norm",   obj_param_t("laptop_air_xin_norm",   "laptop", 5, false, false, false)},
     {"mug_daniel_norm",       obj_param_t("mug_daniel_norm",       "cup",    6, false, false, false)},
-    {"quad4",                 obj_param_t("quad4",                 "mslquad",   7, false, false, false)} //true
+    {"quad4",                 obj_param_t("quad4",                 "mslquad",   7, false, false, false)}, //true,
+    {"quad6",                 obj_param_t("quad6",                 "mslquad",   7, false, false, false)} //true
   };
 
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
