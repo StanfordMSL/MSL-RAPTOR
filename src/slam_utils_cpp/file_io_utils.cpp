@@ -1,5 +1,5 @@
 #include "file_io_utils.h"
-// #include "Hungarian.h"
+#include "Hungarian.h"
 
 using namespace std;
 namespace rslam_utils {
@@ -45,7 +45,7 @@ namespace rslam_utils {
     geometry_msgs::PoseStamped::ConstPtr geo_msg = nullptr;
     map<string, geometry_msgs::Pose> last_gt_pose;
     double last_gt_time = -100000000;
-    for(rosbag::MessageInstance const m: rosbag::View(bag)) {
+    for(rosbag::MessageInstance const m: rosbag::View(bag)) { // DUMMY FOR LOOP TO INITIALIZE THE GT POSES FOR HUNGARIAN ALGO
       if (m.getTopic() == ego_gt_topic_str || ("/" + m.getTopic() == ego_gt_topic_str)) {
           continue;
       }
@@ -93,10 +93,48 @@ namespace rslam_utils {
         else if (m.getTopic() == raptor_topic_str || ("/" + m.getTopic() == raptor_topic_str)) {
           msl_raptor::TrackedObjects::ConstPtr raptor_msg = m.instantiate<msl_raptor::TrackedObjects>();
           if (raptor_msg != nullptr) {
+            bool b_use_hungarian_algo = true;
+
+            if (b_use_hungarian_algo) {
+              vector< vector<double> > costMatrix; // rows: # ado quads seen this timestep, col: total # of possible ado quads
+              int num_quads = 0;
+              vector<string> quad_names;
+              vector<geometry_msgs::Pose> pose_vec;
+              for (const auto & tracked_obj : raptor_msg->tracked_objects) {
+                geometry_msgs::Pose tracked_pose = tracked_obj.pose.pose;
+                pose_vec.push_back(tracked_pose);
+                if (tracked_obj.class_str == "mslquad") {
+                  num_quads++;
+                  costMatrix.push_back({});
+                  for(const auto & ado_name_geo_pose : last_gt_pose) {
+                    quad_names.push_back(ado_name_geo_pose.first);
+                    geometry_msgs::Pose pose = ado_name_geo_pose.second;
+                    double dist = sqrt( (pose.position.x - tracked_pose.position.x) * (pose.position.x - tracked_pose.position.x) +
+                                        (pose.position.y - tracked_pose.position.y) * (pose.position.y - tracked_pose.position.y) +
+                                        (pose.position.z - tracked_pose.position.z) * (pose.position.z - tracked_pose.position.z) );
+                    costMatrix[num_quads-1].push_back(dist);
+                  }
+                }
+              }
+              if (num_quads > 1) {
+                HungarianAlgorithm HungAlgo;
+                vector<int> assignment;
+                double cost = HungAlgo.Solve(costMatrix, assignment);
+                for (unsigned int x = 0; x < costMatrix.size(); x++) {
+                  std::cout << quad_names[x] << "," << assignment[x] << "\t";
+                  ado_data_est[quad_names[x]].emplace_back(time, ros_geo_pose_to_gtsam(pose_vec[assignment[x]]));
+                }
+                std::cout << "\ncost: " << cost << std::endl;
+                cout << "" << endl;
+              }
+              continue;
+            }
+
+
             for (const auto & tracked_obj : raptor_msg->tracked_objects) {
               geometry_msgs::Pose tracked_pose = tracked_obj.pose.pose;
               string ado_long_name;
-              if (tracked_obj.class_str == "mslquad") {
+              if (!b_use_hungarian_algo && tracked_obj.class_str == "mslquad") {
                 // if (tracked_pose.position.y < 0) { // DEBUG ONLY - simulate us being able to distinguish the two quads
                 //   ado_long_name = "quad6";
                 // }
@@ -104,6 +142,7 @@ namespace rslam_utils {
                 //   ado_long_name = "quad4";
                 // }
 
+                // this should be replaced by hungarian algo
                 double min_dist = 10000000;
                 for(const auto & ado_name_geo_pose : last_gt_pose) {
                   geometry_msgs::Pose pose = ado_name_geo_pose.second;
@@ -115,22 +154,7 @@ namespace rslam_utils {
                     min_dist = edist;
                     ado_long_name = ado_name_geo_pose.first;
                   }
-
                 }
-
-                // vector< vector<double> > costMatrix = { { 10, 19, 8, 15, 0 }, 
-                //                                         { 10, 18, 7, 17, 0 }, 
-                //                                         { 13, 16, 9, 14, 0 }, 
-                //                                         { 12, 19, 8, 18, 0 } };
-                // HungarianAlgorithm HungAlgo;
-                // vector<int> assignment;
-                // double cost = HungAlgo.Solve(costMatrix, assignment);
-                // for (unsigned int x = 0; x < costMatrix.size(); x++) {
-                //   std::cout << x << "," << assignment[x] << "\t";
-                // }
-                // std::cout << "\ncost: " << cost << std::endl;
-                // cout << "" << endl;
-
               }
               else {
                 ado_long_name = class_to_ado_long_name[tracked_obj.class_str];

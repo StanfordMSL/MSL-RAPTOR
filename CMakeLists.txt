@@ -216,6 +216,6 @@ include_directories(
 # catkin_add_nosetests(test)
 
 
-add_executable(raptor_object_slam src/raptor_object_slam.cpp src/slam_utils_cpp/file_io_utils.cpp src/slam_utils_cpp/math_utils.cpp)
+add_executable(raptor_object_slam src/raptor_object_slam.cpp src/slam_utils_cpp/file_io_utils.cpp src/slam_utils_cpp/math_utils.cpp src/slam_utils_cpp/Hungarian.cpp)
 target_link_libraries(raptor_object_slam ${catkin_LIBRARIES} gtsam)
 # add_dependencies(talker beginner_tutorials_generate_messages_cpp)
