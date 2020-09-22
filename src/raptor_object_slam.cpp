@@ -78,7 +78,7 @@ class MSLRaptorSlamClass {
       bool b_landmarks_observed = false; // set to true if we observe at least 1 landmark (so we know if we should try to estimate a pose)
       Symbol ego_sym = Symbol('x', ego_pose_index);
       Pose3 first_pose = get<2>(raptor_data[0]);  // use gt value for first ego pose
-      graph.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose); // put a unary factor on first pose to "anchor" the whole graph
+      graph.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose, 1); // put a unary factor on first pose to "anchor" the whole graph
 
       // STEP 1) loop through ego poses, at each time do the following:
       //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
@@ -91,6 +91,11 @@ class MSLRaptorSlamClass {
       //    Add it to the graph here and initialized it. Also save values
       map<string, gtsam::Pose3> tf_w_ado0_gt, tf_w_ado0_est;
       rslam_utils::get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est, num_ado_objs);
+
+      for (auto const & key_val : tf_w_ado0_gt) {
+        cout << "ado_name : " << key_val.first << "\ntf_w_ado0_gt = " << key_val.second << "tf_w_ado0_est = " << tf_w_ado0_est[key_val.first] << endl;
+      }
+
       for (const auto & key_val : tf_w_ado0_gt) {
         string ado_name = key_val.first;
         Pose3 tf_w_ado_gt = key_val.second;
@@ -158,6 +163,7 @@ class MSLRaptorSlamClass {
           // Add measurement to graph
           if (b_use_gt) {
             graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_gt), constNoiseMatrix);
+            // cout << ego_sym << " <--> " << ado_sym << endl;
           }
           else {
             graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);

@@ -121,11 +121,14 @@ namespace rslam_utils {
                 vector<int> assignment;
                 double cost = HungAlgo.Solve(costMatrix, assignment);
                 for (unsigned int x = 0; x < costMatrix.size(); x++) {
-                  std::cout << quad_names[x] << "," << assignment[x] << "\t";
+                  // std::cout << quad_names[x] << "," << assignment[x] << "\t";
                   ado_data_est[quad_names[x]].emplace_back(time, ros_geo_pose_to_gtsam(pose_vec[assignment[x]]));
                 }
-                std::cout << "\ncost: " << cost << std::endl;
-                cout << "" << endl;
+                // std::cout << "\ncost: " << cost << std::endl;
+                // cout << "" << endl;
+              }
+              else {
+                cout << "NUM_QUADS = " << num_quads << " , t = " << time << endl;
               }
               continue;
             }
@@ -205,6 +208,8 @@ namespace rslam_utils {
     group_ado_measurements_by_time(ado_data_grouped, ado_data, dt_thresh);
 
     zip_data_by_ego(raptor_data, ego_data, ado_data_grouped, dt_thresh);
+
+    trim_data_range(raptor_data, 20, 40);
     if (b_nocs_data) {
       string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
       write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
@@ -217,6 +222,15 @@ namespace rslam_utils {
       // write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
     }
     return;
+  }
+
+  void trim_data_range(vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int start_ind, int end_ind) {
+    vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > raptor_data_new;
+    for (int i = start_ind; i < end_ind+1; i++) {
+      raptor_data_new.push_back(raptor_data[i]);
+    }
+    raptor_data.clear();
+    raptor_data = raptor_data_new;
   }
 
   void group_ado_measurements_by_time(vector<pair<double, map<string, pair<gtsam::Pose3, gtsam::Pose3>>>> &ado_data_grouped,

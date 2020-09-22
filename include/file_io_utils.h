@@ -54,4 +54,6 @@ namespace rslam_utils {
                             map<string, obj_param_t> &obj_param_map);
 
     string pose_to_string_line(gtsam::Pose3 p);
+
+    void trim_data_range(vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int start_ind, int end_ind);
 }
