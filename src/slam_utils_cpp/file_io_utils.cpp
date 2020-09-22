@@ -1,4 +1,5 @@
 #include "file_io_utils.h"
+// #include "Hungarian.h"
 
 using namespace std;
 namespace rslam_utils {
@@ -42,6 +43,30 @@ namespace rslam_utils {
     int num_msg_total = 0;
     double time = 0.0, time0 = -1, ave_dt = 0, last_time = 0;
     geometry_msgs::PoseStamped::ConstPtr geo_msg = nullptr;
+    map<string, geometry_msgs::Pose> last_gt_pose;
+    double last_gt_time = -100000000;
+    for(rosbag::MessageInstance const m: rosbag::View(bag)) {
+      if (m.getTopic() == ego_gt_topic_str || ("/" + m.getTopic() == ego_gt_topic_str)) {
+          continue;
+      }
+      else if (m.getTopic() == ego_est_topic_str || ("/" + m.getTopic() == ego_est_topic_str)) {
+          continue;
+      }
+      else if (m.getTopic() == raptor_topic_str || ("/" + m.getTopic() == raptor_topic_str)) {
+          continue;
+      }
+      else {
+        for (const auto &  topic_str : ado_gt_topic_strs) {
+          if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
+            geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
+            if (geo_msg != nullptr) {
+              last_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
+              break;
+            }
+          }
+        }
+      }
+    }
     for(rosbag::MessageInstance const m: rosbag::View(bag)) {
         if(time0 < 0) {
             time0 = m.getTime().toSec();
@@ -69,13 +94,49 @@ namespace rslam_utils {
           msl_raptor::TrackedObjects::ConstPtr raptor_msg = m.instantiate<msl_raptor::TrackedObjects>();
           if (raptor_msg != nullptr) {
             for (const auto & tracked_obj : raptor_msg->tracked_objects) {
-              geometry_msgs::PoseStamped tmp_pose_stamped = tracked_obj.pose;
-              if (tmp_pose_stamped.pose.position.y < 0) {
-                continue; // DEBUG ONLY - this is to eliminate the data from one of the quads
+              geometry_msgs::Pose tracked_pose = tracked_obj.pose.pose;
+              string ado_long_name;
+              if (tracked_obj.class_str == "mslquad") {
+                // if (tracked_pose.position.y < 0) { // DEBUG ONLY - simulate us being able to distinguish the two quads
+                //   ado_long_name = "quad6";
+                // }
+                // else {
+                //   ado_long_name = "quad4";
+                // }
+
+                double min_dist = 10000000;
+                for(const auto & ado_name_geo_pose : last_gt_pose) {
+                  geometry_msgs::Pose pose = ado_name_geo_pose.second;
+                  double edist = sqrt( (pose.position.x - tracked_pose.position.x) * (pose.position.x - tracked_pose.position.x) +
+                                       (pose.position.y - tracked_pose.position.y) * (pose.position.y - tracked_pose.position.y) +
+                                       (pose.position.z - tracked_pose.position.z) * (pose.position.z - tracked_pose.position.z) );
+                  
+                  if (edist < min_dist) {
+                    min_dist = edist;
+                    ado_long_name = ado_name_geo_pose.first;
+                  }
+
+                }
+
+                // vector< vector<double> > costMatrix = { { 10, 19, 8, 15, 0 }, 
+                //                                         { 10, 18, 7, 17, 0 }, 
+                //                                         { 13, 16, 9, 14, 0 }, 
+                //                                         { 12, 19, 8, 18, 0 } };
+                // HungarianAlgorithm HungAlgo;
+                // vector<int> assignment;
+                // double cost = HungAlgo.Solve(costMatrix, assignment);
+                // for (unsigned int x = 0; x < costMatrix.size(); x++) {
+                //   std::cout << x << "," << assignment[x] << "\t";
+                // }
+                // std::cout << "\ncost: " << cost << std::endl;
+                // cout << "" << endl;
+
               }
-              geometry_msgs::Pose tmp_pose = tmp_pose_stamped.pose;
-              gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tmp_pose);
-              ado_data_est[class_to_ado_long_name[tracked_obj.class_str]].emplace_back(time, ros_geo_pose_to_gtsam(tracked_obj.pose.pose)); // tracked_obj.pose is a posestamped, which has a field called pose
+              else {
+                ado_long_name = class_to_ado_long_name[tracked_obj.class_str];
+              }
+              gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tracked_pose);
+              ado_data_est[ado_long_name].emplace_back(time, ros_geo_pose_to_gtsam(tracked_pose)); // tracked_obj.pose is a posestamped, which has a field called pose
             }
           }
         }
@@ -84,7 +145,13 @@ namespace rslam_utils {
             if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
               geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
               if (geo_msg != nullptr) {
+
+                // if (time > last_gt_time) {
+                //   last_gt_pose.clear();
+                //   last_gt_time = time;
+                // }
                 ado_data_gt[ado_topic_to_name[topic_str]].emplace_back(time, ros_geo_pose_to_gtsam(geo_msg->pose));
+                last_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
                 break;
               }
             }
@@ -120,10 +187,10 @@ namespace rslam_utils {
       fn = "/mounted_folder/test_graphs_gtsam/all_trajs.csv";
       map<gtsam::Symbol, map<double, pair<gtsam::Pose3, gtsam::Pose3> > > all_trajs;
       write_all_traj_csv(fn, raptor_data, all_trajs, obj_param_map, num_ado_objs);
-      convert_data_to_static_obstacles(raptor_data, num_ado_objs);
+      // convert_data_to_static_obstacles(raptor_data, num_ado_objs);
 
-      fn = "/mounted_folder/test_graphs_gtsam/batch_input2.csv";
-      write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
+      // fn = "/mounted_folder/test_graphs_gtsam/batch_input2.csv";
+      // write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
     }
     return;
   }
