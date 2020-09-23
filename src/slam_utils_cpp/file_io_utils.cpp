@@ -127,9 +127,9 @@ namespace rslam_utils {
                 // std::cout << "\ncost: " << cost << std::endl;
                 // cout << "" << endl;
               }
-              else {
-                cout << "NUM_QUADS = " << num_quads << " , t = " << time << endl;
-              }
+              // else {
+              //   cout << "NUM_QUADS = " << num_quads << " , t = " << time << endl;
+              // }
               continue;
             }
 

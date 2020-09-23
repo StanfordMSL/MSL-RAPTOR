@@ -8,7 +8,7 @@
 
 namespace rslam_utils {
     gtsam::Pose3 interp_pose(gtsam::Pose3 tf1, gtsam::Pose3 tf2, double s);
-    gtsam::Pose3 add_init_est_noise(const gtsam::Pose3 &ego_pose_est);
+    gtsam::Pose3 add_init_est_noise(const gtsam::Pose3 &ego_pose_est, double dt);
     gtsam::Pose3 add_noise_to_pose3(const gtsam::Pose3 &pose_in, double dt, double dang);
     gtsam::Pose3 remove_yaw(gtsam::Pose3 P);
     gtsam::Rot3 remove_yaw(gtsam::Rot3 R);
