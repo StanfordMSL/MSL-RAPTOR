@@ -135,6 +135,8 @@ RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \
     git pull --recurse-submodules && \
     git checkout slam_test && \
+    cd /root/msl_raptor_ws/src/ocam_msl && \
+    git pull && \
     catkin build
 
 # Set GIT config based on local env vars
