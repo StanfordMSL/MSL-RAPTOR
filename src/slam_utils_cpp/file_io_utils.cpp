@@ -177,7 +177,7 @@ namespace rslam_utils {
                 //   last_gt_pose.clear();
                 //   last_gt_time = time;
                 // }
-                ado_data_gt[ado_topic_to_name[topic_str]].emplace_back(time, ros_geo_pose_to_gtsam(geo_msg->pose));
+                ado_data_gt[ado_topic_to_name[topic_str]].emplace_back(time, remove_yaw(ros_geo_pose_to_gtsam(geo_msg->pose)));
                 last_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
                 break;
               }
@@ -209,7 +209,7 @@ namespace rslam_utils {
 
     zip_data_by_ego(raptor_data, ego_data, ado_data_grouped, dt_thresh);
 
-    trim_data_range(raptor_data, 20, 40);
+    // trim_data_range(raptor_data, 20, 40);
     if (b_nocs_data) {
       string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
       write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
