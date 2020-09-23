@@ -114,7 +114,7 @@ class MSLRaptorSlamClass {
           }
           else {
             tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_est); 
-            initial_estimate.insert(ado_sym, Pose3(tf_w_ado_est)); 
+            initial_estimate.insert(ado_sym, rslam_utils::add_noise_to_pose3(tf_w_ado_est, 0.05, 0)); 
           }
         }
       }
@@ -139,7 +139,7 @@ class MSLRaptorSlamClass {
           }
           else {
             initial_estimate.insert(ego_sym, Pose3(tf_w_ego_est));
-            tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_est);
+            tf_w_est_preslam_map[ego_sym] = rslam_utils::add_noise_to_pose3(tf_w_ego_est, 0.1, 0);
           }
         }
 

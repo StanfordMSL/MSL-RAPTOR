@@ -17,15 +17,15 @@ gtsam::Pose3 interp_pose(gtsam::Pose3 tf1, gtsam::Pose3 tf2, double s) {
   return gtsam::Pose3(Rout, pout);
 }
 
-gtsam::Pose3 add_init_est_noise(const gtsam::Pose3 &ego_pose_est) {
+gtsam::Pose3 add_init_est_noise(const gtsam::Pose3 &ego_pose_est, double dt) {
   // https://github.com/borglab/gtsam/blob/b1bb0c9ed58f62638c068d7b5332fe7e0e49a29b/examples/SFMExample.cpp
   // noise = np.array([random.uniform(-0.02, 0.02) for i in range(3)]) 
   std::random_device rd;  //Will be used to obtain a seed for the random number engine
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
-  std::uniform_real_distribution<> dis(-0.00005, 0.00005);
-  // gtsam::Pose3 delta(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(dis(gen), dis(gen), dis(gen)));
-  gtsam::Pose3 delta(gtsam::Rot3::Rodrigues(0.0, 0.0, 0.0), gtsam::Point3(0.00,0.00,0.00));
-  cout << "noise:" << delta << "tf before noise: " << ego_pose_est << endl;
+  std::uniform_real_distribution<> dis(-abs(dt), abs(dt));
+  gtsam::Pose3 delta(gtsam::Rot3::Rodrigues(0.0, 0.0, 0.0), gtsam::Point3(dis(gen), dis(gen), dis(gen)));
+  // gtsam::Pose3 delta(gtsam::Rot3::Rodrigues(0.0, 0.0, 0.0), gtsam::Point3(0.00,0.00,0.00));
+  // cout << "noise:" << delta << "tf before noise: " << ego_pose_est << endl;
   return ego_pose_est * delta;
   // ego_pose_est = ego_pose_est.compose(delta);
   
@@ -39,7 +39,7 @@ gtsam::Pose3 add_noise_to_pose3(const gtsam::Pose3 &pose_in, double dt, double d
   std::uniform_real_distribution<> dis(-abs(dt), abs(dt));
   std::uniform_real_distribution<> dis2(-abs(dang), abs(dang));
   gtsam::Pose3 pose_out = pose_in.compose( gtsam::Pose3(gtsam::Rot3::Rodrigues(dis(gen), dis(gen), dis(gen)), 
-                                          gtsam::Point3(dis2(gen), dis2(gen), dis2(gen))) );
+                                           gtsam::Point3(dis2(gen), dis2(gen), dis2(gen))) );
   return pose_out;
 }
 
