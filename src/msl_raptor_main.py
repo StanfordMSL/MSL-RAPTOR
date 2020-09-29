@@ -31,8 +31,8 @@ def run_execution_loop():
     objects_used_path = rospy.get_param('~object_used_file')
     classes_names_file = rospy.get_param('~classes_names_file')
     b_pub_3d_bb_proj = rospy.get_param('~b_pub_3d_bb_proj')
-    detector_weights = rospy.get_param('detector_weights')
-    detector_cfg = rospy.get_param('detector_cfg')
+    detector_weights = rospy.get_param('~detector_weights')
+    detector_cfg = rospy.get_param('~detector_cfg')
     b_filter_meas = True
     
     ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb,b_pub_3d_bb_proj)  # create a ros interface object
