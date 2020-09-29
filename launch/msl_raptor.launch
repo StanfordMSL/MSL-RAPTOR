@@ -11,6 +11,8 @@
   <arg name="b_use_tensorrt"      default="true" />
   <arg name="b_verbose"           default="false" />
   <arg name="detection_period"    default="5" /> <!-- period to use to redo safety detection in seconds -->
+  <arg name="detector_cfg"        default="yolov3/cfg/yolov3.cfg" /> <!-- yolov3/cfg/yolov3.cfg   yolov3/cfg/yolov3-infer.cfg -->
+  <arg name="detector_weights"    default="yolov3/weights/yolov3.weights" /> <!--yolov3/weights/yolov3.weights  yolov3/weights/yolov3-coco-quad.weights -->
   <arg name="b_rosbag"            default="false" />  <!-- boolean if we are reading data from a rosbag -->
   <arg name="shared_folder"       default="/mounted_folder" />  <!-- path to the mounted folder -->
   <arg name="rb_path_in"          default="$(arg shared_folder)/rosbags_for_post_process" />  <!-- path to the rosbag -->
@@ -50,6 +52,8 @@
     <param name="object_sizes_file"  value="$(arg object_sizes_file)"/>
     <param name="object_used_file"  value="$(arg object_used_filepath)$(arg object_used_file)"/>
     <param name="classes_names_file"  value="$(arg classes_names_file)"/>
+    <param name="detector_cfg"      value="$(arg detector_cfg)" />
+    <param name="detector_weights"  value="$(arg detector_weights)"  />
     <param name="b_pub_3d_bb_proj"  value="$(arg b_pub_3d_bb_proj)"/>
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
 

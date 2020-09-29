@@ -31,6 +31,8 @@ def run_execution_loop():
     objects_used_path = rospy.get_param('~object_used_file')
     classes_names_file = rospy.get_param('~classes_names_file')
     b_pub_3d_bb_proj = rospy.get_param('~b_pub_3d_bb_proj')
+    detector_weights = rospy.get_param('detector_weights')
+    detector_cfg = rospy.get_param('detector_cfg')
     b_filter_meas = True
     
     ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb,b_pub_3d_bb_proj)  # create a ros interface object
@@ -52,7 +54,7 @@ def run_execution_loop():
         print('Waiting for first image')
         im = ros.get_first_image()
         print('initializing image segmentor!!!!!!')
-        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose,detect_classes_ids=classes_ids,detect_classes_names=classes_names, use_track_checks=b_use_track_checks, use_gt_detect_bb=b_use_gt_detect_bb)
+        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose,detect_classes_ids=classes_ids,detect_classes_names=classes_names, use_track_checks=b_use_track_checks, use_gt_detect_bb=b_use_gt_detect_bb, detector_cfg=detector_cfg, detector_weights=detector_weights)
         print('initializing DONE - PLAY BAG NOW!!!!!!')
         time.sleep(0.5)
     

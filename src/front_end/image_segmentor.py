@@ -14,11 +14,11 @@ class TrackedObject:
         self.latest_tracked_state = None
 
 class ImageSegmentor:
-    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_classes_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5,verbose=False, use_track_checks=True, use_gt_detect_bb=False):
+    def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_classes_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5,verbose=False, use_track_checks=True, use_gt_detect_bb=False, detector_cfg='yolov3/cfg/yolov3.cfg', detector_weights='yolov3/weights/yolov3.weights'):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         print('Using classes '+str(detect_classes_names))
         if detector_name == 'yolov3':
-            self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_classes_ids)
+            self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_classes_ids, cfg=detector_cfg, weights=detector_weights)
         else:
             raise RuntimeError("Detector chosen not implemented")
 
