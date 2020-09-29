@@ -63,8 +63,10 @@ RUN apt-get update && \
     pip3 install gdown && \
     cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/weights && \
     gdown https://drive.google.com/uc?id=1ZkK8AwVH1_MWo4tP6L4uGl9NxCf_SzrG && \
+    gdown https://drive.google.com/uc?id=1eIuFLNKjBT1zu3D6wNklrQ1PJ31N-ScV && \
     cd ~/msl_raptor_ws/src/msl_raptor/src/front_end/yolov3/cfg && \
     gdown https://drive.google.com/uc?id=1k8SvfBfU3YZk-Ogb8VjJ8OWcTkFfL0ab && \
+    gdown https://drive.google.com/uc?id=10F2IS2qRmOuAbkooLeY58-wpJ-tgEKvh && \
     pip3 uninstall -y gdown && \
     rm -rf /var/lib/apt/lists/*
 
