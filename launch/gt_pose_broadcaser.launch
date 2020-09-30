@@ -1,9 +1,0 @@
-<launch>
-  <arg name="gt_poses_to_broadcast_yaml" default="gt_poses_to_broadcase.yaml" />
-
-  <!-- Launch our main node -->
-  <node name="MSL_RAPTOR" pkg="msl_raptor" type="gt_pose_broadcaser.py" output="screen">
-    <arg name="gt_poses_to_broadcast_yaml" default="gt_poses_to_broadcase.yaml" />
-  </node>
-
-</launch>
