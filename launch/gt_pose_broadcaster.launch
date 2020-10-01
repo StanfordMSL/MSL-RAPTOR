@@ -1,13 +1,14 @@
 <launch>
-  <arg name="id"                  default="7" />
-  <arg name="robot_type"          default="quad" />
-  <arg name="ns"                  value="/$(arg robot_type)$(arg id)" />
-  <arg name="gt_poses_to_broadcast_yaml" default="gt_poses_to_broadcase.yaml" />
+  <arg name="id"                         default="7" />
+  <arg name="robot_type"                 default="quad" />
+  <arg name="ns"                         value="/$(arg robot_type)$(arg id)" />
+  <arg name="gt_yaml_path"               default="$(find msl_raptor)/params/" />
+  <arg name="gt_poses_to_broadcast_yaml" default="gt_poses_to_broadcast.yaml" />
 
   <!-- Launch our main node -->
   <node name="MSL_RAPTOR" pkg="msl_raptor" type="gt_pose_broadcaster.py" output="screen">
     <param name="ns"                         value="$(arg ns)"/> 
-    <param name="gt_poses_to_broadcast_yaml" value="gt_poses_to_broadcase.yaml" />
+    <param name="gt_poses_to_broadcast_yaml" value="$(arg gt_yaml_path)$(arg gt_poses_to_broadcast_yaml)" />
   </node>
 
 </launch>

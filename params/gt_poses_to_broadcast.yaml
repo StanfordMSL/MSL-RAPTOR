@@ -1,19 +1,19 @@
 ---
 ns: 'msl_green_bowl'
 class_str: 'bowl'
-x: 0.35
-y: 0.5
-z: 1.8
-qw: 0.5
+x: 2.438
+y: 0.61
+z: 0.0033
+qw: 1.0
 qx: 0.0
 qy: 0.0
 qz: 0.5
 ---
-ns: 'msl_white_bowl'
+ns: 'msl_grey_bowl'
 class_str: 'mslquad'
-x: 2.35
-y: 40.5
-z: 3.8
+x: 1.829
+y: -1.219
+z: 0.0033
 qw: 1.0
 qx: 0.0
 qy: 0.0
