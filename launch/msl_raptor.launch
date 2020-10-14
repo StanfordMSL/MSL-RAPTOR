@@ -20,6 +20,7 @@
   <arg name="rb_name"             default="rosbag_for_post_process_2019-12-18-15-19-48" /> <!-- name of the rosbag -->
   <arg name="b_record"            default="false" />  <!-- boolean if we are recording data in rosbag -->
   <arg name="rb_start_delay"      default="2.0" /> <!-- how long to delay the start of the rosbag -->
+  <arg name="rb_rate"             default="1.0" /> <!-- speed of rosbag playback -->
   <arg name="classes_names_file"  default="$(find msl_raptor)/params/classes.names" /> <!-- yaml file containing all the object sizes -->
   <arg name="object_sizes_file"   default="$(find msl_raptor)/params/all_obs.yaml" /> <!-- yaml file containing all the object sizes -->
   <arg name="object_used_filepath" default="$(find msl_raptor)/params/objects_used/" /> <!-- yaml file containing the names of objects used -->
@@ -76,7 +77,7 @@
 
   <!-- IF using rosbag, launch our node then play the rosbag (using a delay to ensure msl_raptor starts first) -->
   <group if="$(arg b_rosbag)">
-    <node pkg="rosbag" type="play" name="player" args="--clock $(arg rb_path_in)/$(arg rb_name).bag" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
+    <node pkg="rosbag" type="play" name="player" args="-r $(arg rb_rate) --clock $(arg rb_path_in)/$(arg rb_name).bag" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
   </group>
 
   <!-- IF we should record a rosbag of results -->
