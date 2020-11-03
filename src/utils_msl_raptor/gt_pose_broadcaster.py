@@ -11,6 +11,7 @@ import cv2
 import rospy
 import tf
 import tf2_ros
+import std_msgs
 from geometry_msgs.msg import PoseStamped, Twist, Pose
 from std_msgs.msg import Header
 # other
@@ -20,7 +21,7 @@ import yaml
 class gt_pose_broadcaster:
     def __init__(self):
         rospy.init_node('gt_pose_broadcaster', anonymous=True)
-
+        rate = rospy.Rate(100)
         ns = rospy.get_param('~ns')
         gt_poses_to_broadcast_yaml = rospy.get_param('~gt_poses_to_broadcast_yaml')
 
@@ -32,9 +33,9 @@ class gt_pose_broadcaster:
                 gt_poses = list(yaml.load_all(stream))
                 print("broadcasting gt pose for {} objects".format(len(gt_poses)))
                 for gt_object_dict in gt_poses:
-                    pdb.set_trace()
+                    # pdb.set_trace()
                     obj_ns = gt_object_dict["ns"]
-                    topic = "{}/mavros/vision_pose/pose".format(obj_ns)
+                    topic = "/{}/mavros/vision_pose/pose".format(obj_ns)
                     p = Pose()
                     p.position.x = gt_object_dict["x"]
                     p.position.y = gt_object_dict["y"]
@@ -51,7 +52,7 @@ class gt_pose_broadcaster:
                     ps.pose = p
                     publisher = rospy.Publisher(topic, PoseStamped, queue_size=1)
                     self.gt_obs.append((p, ps, frame, publisher))
-                    pdb.set_trace()
+                    # pdb.set_trace()
             except yaml.YAMLError as exc:
                 print(exc)
         
@@ -59,9 +60,9 @@ class gt_pose_broadcaster:
             self.publish_gts()
             rate.sleep()
 
-    def publish_gts(self, msg):
-        for pose, frame in self.gt_obs:
-            pass
+    def publish_gts(self):
+        for p, ps, frame, publisher in self.gt_obs:
+            publisher.publish(ps)
         
         # new_tf = tf2_ros.TransformStamped()
         # new_tf.header.frame_id = 'world'
