@@ -18,7 +18,13 @@ namespace rslam_utils {
       {"laptop", "laptop_air_xin_norm"},
       {"cup", "mug_daniel_norm"},
       {"mslquad", "quad4"},
-      {"mslquad", "quad6"}
+      {"mslquad", "quad6"},
+      {"bottle", "swell_bottle"},
+      {"bowl", "bowl_white_msl"},
+      {"bowl", "bowl_green_msl"},
+      {"cup", "mug_duke"},
+      {"cup", "mug_black"},
+      {"cup", "mug_yellow_black"}
     };
 
     string gt_pose_topic  = "/mavros/vision_pose/pose";

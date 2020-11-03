@@ -1,10 +1,11 @@
 <!-- Core launch file to run MSL-RAPTOR node -->
 <launch>
   <arg name="b_batch_slam"     default="1" /> <!--  MUST BE 1 / 0 (not true / false) -->
-  <arg name="b_nocs_data"      default="1" /> <!--  MUST BE 1 / 0 (not true / false) -->
+  <arg name="b_nocs_data"      default="0" /> <!--  MUST BE 1 / 0 (not true / false) -->
   <arg name="ego_ns"           default="quad7" />
-  <arg name="input_rosbag"     default="/mounted_folder/nocs/test/scene_1.bag" />
-  <arg name="processed_rosbag" default="/mounted_folder/raptor_processed_bags/msl_raptor_output_from_bag_rosbag_for_post_process_2020-09-01-13-11-13.bag" />
+  <!-- <arg name="input_rosbag"     default="/mounted_folder/nocs/test/scene_1.bag" /> -->
+  <arg name="processed_rosbag" default="/mounted_folder/raptor_processed_bags/msl_raptor_output_from_bag_rosbag_for_post_process_2020-09-29-16-32-38.bag" />
+  <!-- <arg name="processed_rosbag" default="/mounted_folder/raptor_processed_bags/msl_raptor_output_from_bag_rosbag_for_post_process_2020-09-01-13-11-13.bag" /> -->
   <!-- <arg name="processed_rosbag" default="/mounted_folder/raptor_processed_bags/nocs_test/msl_raptor_output_from_bag_scene_1_merged.bag" /> -->
   <!-- <arg name="processed_rosbag" default="/mounted_folder/raptor_processed_bags/nocs_test/msl_raptor_output_from_bag_scene_1_laptop_air_xin_norm.bag" /> -->
 
@@ -13,7 +14,7 @@
     <param name="b_batch_slam"     value="$(arg b_batch_slam)"/> 
     <param name="b_nocs_data"      value="$(arg b_nocs_data)"/> 
     <param name="ego_ns"           value="$(arg ego_ns)"/> 
-    <param name="input_rosbag"     value="$(arg input_rosbag)"/> 
+    <!-- <param name="input_rosbag"     value="$(arg input_rosbag)"/>  -->
     <param name="processed_rosbag" value="$(arg processed_rosbag)"/> 
   </node>
 

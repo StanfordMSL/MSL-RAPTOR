@@ -11,13 +11,19 @@ class MSLRaptorSlamClass {
   bool b_nocs_data;
   string ego_ns;
   map<string, obj_param_t> obj_param_map = {
-    {"bowl_white_small_norm", obj_param_t("bowl_white_small_norm", "bowl",    2, false, false, false)}, //true
-    {"camera_canon_len_norm", obj_param_t("camera_canon_len_norm", "camera",  3, false, false, false)},
-    {"can_arizona_tea_norm",  obj_param_t("can_arizona_tea_norm",  "can",     4, false, false, false)}, //true
-    {"laptop_air_xin_norm",   obj_param_t("laptop_air_xin_norm",   "laptop",  5, false, false, false)},
-    {"mug_daniel_norm",       obj_param_t("mug_daniel_norm",       "cup",     6, false, false, false)},
-    {"quad4",                 obj_param_t("quad4",                 "mslquad", 7, false, false, true)}, //true,
-    {"quad6",                 obj_param_t("quad6",                 "mslquad", 8, false, false, true)} //true
+    {"bowl_white_small_norm", obj_param_t("bowl_white_small_norm", "bowl",    2,  false, false, false)}, //true
+    {"camera_canon_len_norm", obj_param_t("camera_canon_len_norm", "camera",  3,  false, false, false)},
+    {"can_arizona_tea_norm",  obj_param_t("can_arizona_tea_norm",  "can",     4,  false, false, false)}, //true
+    {"laptop_air_xin_norm",   obj_param_t("laptop_air_xin_norm",   "laptop",  5,  false, false, false)},
+    {"mug_daniel_norm",       obj_param_t("mug_daniel_norm",       "cup",     6,  false, false, false)},
+    {"quad4",                 obj_param_t("quad4",                 "mslquad", 7,  false, false, true )}, //true
+    {"quad6",                 obj_param_t("quad6",                 "mslquad", 8,  false, false, true )}, //true
+    {"swell_bottle",          obj_param_t("swell_bottle",          "bottle",  9,  false, false, false)}, //true
+    {"bowl_white_msl",        obj_param_t("bowl_white_msl",        "bowl",    10, false, false, false)}, //true
+    {"bowl_green_msl",        obj_param_t("bowl_green_msl",        "bowl",    11, false, false, false)}, //true
+    {"mug_duke",              obj_param_t("mug_duke",              "cup",     12, false, false, false)},
+    {"mug_black",             obj_param_t("mug_black",             "cup",     13, false, false, false)},
+    {"mug_yellow_black",      obj_param_t("mug_yellow_black",      "cup",     14, false, false, false)}  
   };
 
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
@@ -292,8 +298,8 @@ int main(int argc, char **argv)
 
   string ego_ns;
   nh.param<string>("ego_ns", ego_ns, "quad7");
-  string input_rosbag, processed_rosbag;
-  nh.param<string>("input_rosbag", input_rosbag, "");
+  string processed_rosbag; // input_rosbag
+  // nh.param<string>("input_rosbag", input_rosbag, "");
   nh.param<string>("processed_rosbag", processed_rosbag, "");
 
   MSLRaptorSlamClass rslam = MSLRaptorSlamClass(b_batch_slam, ego_ns, b_nocs_data);
