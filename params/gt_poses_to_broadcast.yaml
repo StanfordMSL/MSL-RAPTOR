@@ -1,19 +1,59 @@
 ---
-ns: 'msl_green_bowl'
+ns: 'bowl_green_msl'
 class_str: 'bowl'
-x: 2.438
-y: 0.61
-z: 0.0033
+x: 1.829
+y: 0.6096
+z: 0.033
 qw: 1.0
 qx: 0.0
 qy: 0.0
-qz: 0.5
+qz: 0.0
 ---
-ns: 'msl_grey_bowl'
-class_str: 'mslquad'
+ns: 'bowl_white_msl'
+class_str: 'bowl'
+x: 2.1336
+y: -0.3048
+z: 0.033
+qw: 1.0
+qx: 0.0
+qy: 0.0
+qz: 0.0
+---
+ns: 'swell_bottle'
+class_str: 'bottle'
 x: 1.829
-y: -1.219
-z: 0.0033
+y: 0.0
+z: 0.13
+qw: 1.0
+qx: 0.0
+qy: 0.0
+qz: 0.0
+---
+ns: 'mug_duke'
+class_str: 'cup'
+x: 1.829
+y: -0.6096
+z: 0.048
+qw: 1.0
+qx: 0.0
+qy: 0.0
+qz: 0.0
+---
+ns: 'mug_black'
+class_str: 'cup'
+x: 1.2192
+y: -0.6096
+z: 0.048
+qw: 1.0
+qx: 0.0
+qy: 0.0
+qz: 0.0
+---
+ns: 'mug_yellow_black'
+class_str: 'cup'
+x: 0.6096
+y: -0.6096
+z: 0.048
 qw: 1.0
 qx: 0.0
 qy: 0.0
