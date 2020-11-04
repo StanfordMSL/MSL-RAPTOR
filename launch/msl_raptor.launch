@@ -62,14 +62,6 @@
 
   </node>
 
-  <!-- IF faking optitrack data from a yaml file... gt_pose_broadcaster -->
-  <group if="$(arg b_pub_gt_poses)">
-    <node name="gt_pose_broadcaster" pkg="msl_raptor" type="gt_pose_broadcaster.py" output="screen">
-      <param name="ns"  value="$(arg ns)"/> 
-      <param name="gt_poses_to_broadcast_yaml"  value="$(arg gt_poses_to_broadcast_yaml)"/> 
-    </node>
-  </group>
-
   <!-- IF using camera, launch our node -->
   <group unless="$(arg b_rosbag)">
     <group if="$(arg b_camera)">
@@ -98,9 +90,20 @@
     </group>
     <group unless="$(arg b_rosbag)">
       <!-- if NOT from a rosbag (i.e. live), then use the current timestamp to name the bag -->
-     <!-- <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ /clock /tf ns/mavros/vision_pose/pose ns/mavros/local_position/pose ns/bb_data ns/msl_raptor_state ns/tracked_objects_poses ns/camera/camera_info /ns/camera/image_raw"/> -->
-     <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ /clock /tf ns/mavros/vision_pose/pose ns/mavros/local_position/pose ns/bb_data ns/msl_raptor_state ns/tracked_objects_poses ns/camera/camera_info /camera/image_raw"/>
+      <!-- <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ /clock /tf ns/mavros/vision_pose/pose ns/mavros/local_position/pose ns/bb_data ns/msl_raptor_state ns/tracked_objects_poses ns/camera/camera_info /ns/camera/image_raw"/> -->
+      <node pkg="rosbag" type="record" name="msl_raptor_recording" args="-o $(arg rb_path_out)/msl_raptor_output_live_ /clock /tf ns/mavros/vision_pose/pose ns/mavros/local_position/pose ns/bb_data ns/msl_raptor_state ns/tracked_objects_poses ns/camera/camera_info /camera/image_raw"/>
+    </group>
+  </group>
 
-  </group>
-  </group>
+
+
+  <!-- IF faking optitrack data from a yaml file... gt_pose_broadcaster -->
+  <!-- <group if="$(arg b_pub_gt_poses)">
+    <node name="gt_pose_broadcaster" pkg="msl_raptor" type="gt_pose_broadcaster.py" output="screen" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " >
+      <param name="ns"  value="$(arg ns)"/> 
+      <param name="gt_poses_to_broadcast_yaml"  value="$(arg gt_poses_to_broadcast_yaml)"/> 
+    </node>
+  </group> -->
+
+
 </launch>
