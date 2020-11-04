@@ -6,7 +6,7 @@
   <arg name="gt_poses_to_broadcast_yaml" default="gt_poses_to_broadcast.yaml" />
 
   <!-- Launch our main node -->
-  <node name="MSL_RAPTOR" pkg="msl_raptor" type="gt_pose_broadcaster.py" output="screen">
+  <node name="gt_pose_broadcaster" pkg="msl_raptor" type="gt_pose_broadcaster.py" output="screen">
     <param name="ns"                         value="$(arg ns)"/> 
     <param name="gt_poses_to_broadcast_yaml" value="$(arg gt_yaml_path)$(arg gt_poses_to_broadcast_yaml)" />
   </node>
