@@ -21,7 +21,7 @@ import yaml
 class gt_pose_broadcaster:
     def __init__(self):
         rospy.init_node('gt_pose_broadcaster', anonymous=True)
-        rate = rospy.Rate(100)
+        rate = rospy.Rate(60)
         ns = rospy.get_param('~ns')
         gt_poses_to_broadcast_yaml = rospy.get_param('~gt_poses_to_broadcast_yaml')
 
@@ -33,7 +33,6 @@ class gt_pose_broadcaster:
                 gt_poses = list(yaml.load_all(stream))
                 print("broadcasting gt pose for {} objects".format(len(gt_poses)))
                 for gt_object_dict in gt_poses:
-                    # pdb.set_trace()
                     obj_ns = gt_object_dict["ns"]
                     topic = "/{}/mavros/vision_pose/pose".format(obj_ns)
                     p = Pose()
@@ -47,14 +46,17 @@ class gt_pose_broadcaster:
                     frame = self.frame_from_pose(p, child_frame_id=obj_ns)
                     h = std_msgs.msg.Header()
                     h.stamp = rospy.Time.now()
+                    # print(h.stamp)
+                    h.frame_id = "world"
                     ps = PoseStamped()
                     ps.header = h
                     ps.pose = p
                     publisher = rospy.Publisher(topic, PoseStamped, queue_size=1)
                     self.gt_obs.append((p, ps, frame, publisher))
-                    # pdb.set_trace()
             except yaml.YAMLError as exc:
                 print(exc)
+
+        # pdb.set_trace()
         
         while not rospy.is_shutdown():
             self.publish_gts()
@@ -63,25 +65,8 @@ class gt_pose_broadcaster:
     def publish_gts(self):
         for p, ps, frame, publisher in self.gt_obs:
             publisher.publish(ps)
-        
-        # new_tf = tf2_ros.TransformStamped()
-        # new_tf.header.frame_id = 'world'
-        # for ind, botname in enumerate(msg.name):
-        #     if botname.find("ouijabot") < 0:
-        #         continue
-        #     botnum = re.sub("[^0-9]", "", botname)
+            # print(ps)
 
-        #     new_tf.child_frame_id  = 'ouijabot' + botnum + '/ground_truth'
-        #     new_tf.header.stamp  = rospy.Time.now()
-
-        #     new_tf.transform.translation.x = msg.pose[ind].position.x
-        #     new_tf.transform.translation.y = msg.pose[ind].position.y
-        #     new_tf.transform.translation.z = msg.pose[ind].position.z
-        #     new_tf.transform.rotation.x    = msg.pose[ind].orientation.x
-        #     new_tf.transform.rotation.y    = msg.pose[ind].orientation.y
-        #     new_tf.transform.rotation.z    = msg.pose[ind].orientation.z
-        #     new_tf.transform.rotation.w    = msg.pose[ind].orientation.w
-        #     # self.wfb.sendTransform(new_tf)
 
     def frame_from_pose(self, pose, child_frame_id, parent_frame_id='world'):
         frame = tf2_ros.TransformStamped()
@@ -108,21 +93,3 @@ if __name__ == '__main__':
     print("--------------- FINISHED gt pose broadcaster---------------")
 
 
-
-
-
-
-
-
-    #     self.run()
-
-    # def run(self):
-    #     rate = rospy.Rate(100)
-    #     while not rospy.is_shutdown():
-    #         self.publish_custom_frames()
-    #         rate.sleep()
-
-    # def publish_custom_frames(self, event=None):
-    #     if self.odom_frame:
-    #         # publish frame connecting world to the odom frame
-    #         self.wfb.sendTransform(self.odom_frame)
