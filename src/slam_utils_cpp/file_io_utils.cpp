@@ -97,8 +97,29 @@ namespace rslam_utils {
             }
         }
         else if (m.getTopic() == raptor_topic_str || ("/" + m.getTopic() == raptor_topic_str)) {
+          // THIS IS MSL-RAPTOR data for estimates of the tracked object poses
+          //     Note: we dont know the object name, just the class at this point
           msl_raptor::TrackedObjects::ConstPtr raptor_msg = m.instantiate<msl_raptor::TrackedObjects>();
+          map<string, int> class_duplicates_tracked;
           if (raptor_msg != nullptr) {
+
+            // Count the number of times we see each class
+            for (const auto & tracked_obj : raptor_msg->tracked_objects) {
+              string cls = tracked_obj.class_str;
+              if( class_duplicates_tracked.find(cls) == class_duplicates_tracked.end() ) {
+                class_duplicates_tracked[cls] = 1;
+              }
+              else {
+                class_duplicates_tracked[cls]++;
+              }
+            }
+            if (class_duplicates_tracked.size() > 0) { // print out this info
+              cout << class_duplicates_tracked.size() << " unique classes seen" << endl;
+              for (const auto & key_val : class_duplicates_tracked) {
+                cout << "\t we see class " << key_val.first << " " << key_val.second << " time(s)" << endl;
+              }
+            }
+
             bool b_use_hungarian_algo = true;
 
             if (b_use_hungarian_algo) {
@@ -216,7 +237,7 @@ namespace rslam_utils {
     zip_data_by_ego(raptor_data, ego_data, ado_data_grouped, dt_thresh);
 
     // trim_data_range(raptor_data, 20, 40);
-    if (b_nocs_data) {
+    if (1 || b_nocs_data) {
       string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
       write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
       fn = "/mounted_folder/test_graphs_gtsam/all_trajs.csv";
