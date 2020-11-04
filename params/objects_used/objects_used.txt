@@ -1,1 +1,3 @@
-mug_vignesh_norm
+swell_bottle
+mug2_scene3_norm
+bowl_white_small_norm
