@@ -144,12 +144,33 @@ namespace rslam_utils {
               // For each class seen, if more than 1 object use hungarian algo with the gt data
               //    hungarian algo: 1) build cost matrix 2) solve assignment
                 vector< vector<double> > costMatrix; // rows: # object instances seen this timestep, col: total # of possible instances of this class
+                bool b_print_out_hungarian_algo_details = true;
                 int row_index = 0; // index of currently seen object instances i.e. est_pose_vec
+
+                // if(est_pose_vec.size() > instance_gt_pose_vec.size()) {
+                //   cout << "ERROR!!! THIS CANT HAPPEN!" << endl;
+                //   cout << "class: " << cls << endl;
+                //   cout << "total number of tracked objects this timestep (all classes) = " << (raptor_msg->tracked_objects).size() << endl;
+                //   cout << "gt instances seen this step:   ";
+                //   for (const auto & instance_str_pose_pair : instance_gt_pose_vec) {
+                //     cout << instance_str_pose_pair.first << ", ";
+                //   }
+                //   cout << endl;
+
+                //   for (const auto & class_pose_vec : observed_poses_by_class) {
+                //     cout << "raptor has " << class_pose_vec.second.size() << " estimates for class " << class_pose_vec.first << endl;
+                //   }
+                //   cout << endl;
+                // }
+
                 vector<string> candidate_ado_names;
                 for (const auto & tracked_pose : est_pose_vec) {
-                  for(const auto & instance_sts_pose_pair : instance_gt_pose_vec) {
-                    candidate_ado_names.push_back(instance_sts_pose_pair.first);
-                    geometry_msgs::Pose gt_pose = instance_sts_pose_pair.second;
+                  costMatrix.push_back({});
+                  for(const auto & instance_str_pose_pair : instance_gt_pose_vec) {
+                    if(row_index == 0) {
+                      candidate_ado_names.push_back(instance_str_pose_pair.first); // only fill this once
+                    }
+                    geometry_msgs::Pose gt_pose = instance_str_pose_pair.second;
                     double dist = sqrt( (gt_pose.position.x - tracked_pose.position.x) * (gt_pose.position.x - tracked_pose.position.x) +
                                         (gt_pose.position.y - tracked_pose.position.y) * (gt_pose.position.y - tracked_pose.position.y) +
                                         (gt_pose.position.z - tracked_pose.position.z) * (gt_pose.position.z - tracked_pose.position.z) );
@@ -158,14 +179,45 @@ namespace rslam_utils {
                   row_index++;
                 }
                 HungarianAlgorithm HungAlgo;
-                vector<int> assignment;
+                vector<int> assignment;  // values here range from 0 to num_cols - 1 (the length of this variable will = num rows)
                 double cost = HungAlgo.Solve(costMatrix, assignment);
-                for (unsigned int x = 0; x < costMatrix.size(); x++) {
-                  // std::cout << candidate_ado_names[x] << "," << assignment[x] << "\t";
-                  ado_data_est[candidate_ado_names[x]].emplace_back(time, ros_geo_pose_to_gtsam(est_pose_vec[assignment[x]]));
+
+                // Show full assignemnts cost matrix:
+                if(b_print_out_hungarian_algo_details) {
+                  cout << "assignements:  ";
+                  for (int i = 0; i < assignment.size(); i++) {
+                    cout << assignment[i] << ", ";
+                  }
+                  cout << endl;
+                  for (unsigned int x = 0; x < costMatrix.size(); x++) {
+                    // cout << "\nrow: " << x << ", candidate_ado_names[row] = " << endl;
+                    cout << "class pose est " << x << ": ";
+                    for(int c = 0; c < costMatrix[x].size(); c++) {
+                      cout << costMatrix[x][c] << " (" << candidate_ado_names[c] << ")";
+                      if ( c < costMatrix[x].size() - 1) {
+                        cout << ", ";
+                      }
+                    }
+                    cout << endl;
+                  }
                 }
-                // std::cout << "\ncost: " << cost << std::endl;
-                // cout << "" << endl;
+                for (unsigned int x = 0; x < costMatrix.size(); x++) {
+                  if(assignment[x] >= 0) { // costMatrix.size(); = # of rows = length(est_pose_vec)
+                    if(b_print_out_hungarian_algo_details) {// show info for chosen value:
+                      cout << "class pose est " << x << " assigned to: " << candidate_ado_names[assignment[x]] << " (column # " << assignment[x] << ") for row cost = " << costMatrix[x][assignment[x]] << " ||| ";
+                    }
+                    ado_data_est[candidate_ado_names[assignment[x]]].emplace_back(time, ros_geo_pose_to_gtsam(est_pose_vec[x]));
+                  }
+                  else {
+                    if(b_print_out_hungarian_algo_details) {
+                      cout << "class pose est " << x << " NOT ASSIGNED (designated as noise)" << " ||| ";
+                    }
+                  }
+                }
+                if(b_print_out_hungarian_algo_details) {
+                  std::cout << "\n total cost: " << cost << std::endl;
+                  cout << "" << endl;
+                }
               }
             }            
           }
@@ -175,11 +227,6 @@ namespace rslam_utils {
             if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
               geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
               if (geo_msg != nullptr) {
-
-                // if (time > prev_gt_time) {
-                //   prev_gt_pose.clear();
-                //   prev_gt_time = time;
-                // }
                 ado_data_gt[ado_topic_to_name[topic_str]].emplace_back(time, remove_yaw(ros_geo_pose_to_gtsam(geo_msg->pose)));
                 prev_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
                 break;
