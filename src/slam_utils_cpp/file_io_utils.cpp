@@ -32,16 +32,18 @@ namespace rslam_utils {
     int num_msg_total = 0;
     double time = 0.0, time0 = -1, ave_dt = 0, last_time = 0;
     geometry_msgs::PoseStamped::ConstPtr geo_msg = nullptr;
-    map<string, geometry_msgs::Pose> last_gt_pose;
-    double last_gt_time = -100000000;
-    map<string, map<string, geometry_msgs::Pose>> instances_and_poses_by_class_map; 
+    map<string, geometry_msgs::Pose> prev_gt_pose;
+    double prev_gt_time = -100000000;
+    map<string, vector<pair<string, geometry_msgs::Pose>>> instances_and_poses_by_class_map; 
+    // map<string, map<string, geometry_msgs::Pose>> instances_and_poses_by_class_map; 
     ///////
-    // loop through all the gt data to find how many of each class type we see (and also what their last pose was)
+    // loop through all the gt data to find how many of each class type we see (and also what their FIRST pose is)
 
     // WHY LAST POSE? NOT FIRST????
     cout << endl;
 
     cout << "WARNING!!! Using the gt data to get perfect gt's for corespondence. In realtime, will need to build structure of seen objects and poses iteratively!" << endl;
+    set<string> seen_instances;
     for(rosbag::MessageInstance const m: rosbag::View(bag)) { // DUMMY FOR LOOP TO INITIALIZE THE GT POSES FOR HUNGARIAN ALGO
       if (m.getTopic() == ego_gt_topic_str || ("/" + m.getTopic() == ego_gt_topic_str)) {
           continue;
@@ -57,15 +59,22 @@ namespace rslam_utils {
           if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
             geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
             if (geo_msg != nullptr) {
-              last_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
-              string cls_str = obj_param_map[ado_topic_to_name[topic_str]].class_name;
-              if( instances_and_poses_by_class_map.find(cls_str) == instances_and_poses_by_class_map.end() ) {
-                map<string, geometry_msgs::Pose> tmp_map;
-                tmp_map[obj_param_map[ado_topic_to_name[topic_str]].instance_name] = geo_msg->pose;
-                instances_and_poses_by_class_map[cls_str] = tmp_map; // first time, need to initialize vector
-              }
-              else {
-                instances_and_poses_by_class_map[cls_str][obj_param_map[ado_topic_to_name[topic_str]].instance_name] = geo_msg->pose; // save last pose
+              prev_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
+              string instance_str = ado_topic_to_name[topic_str];
+              if( !seen_instances.count(instance_str) ) { // we have not seen this specific object before
+                string cls_str = obj_param_map[instance_str].class_name;
+                // if( instances_and_poses_by_class_map.find(cls_str) == instances_and_poses_by_class_map.end() ) {
+                if( !instances_and_poses_by_class_map.count(cls_str) ) { // first time seeing this class - make new vector
+                  // map<string, geometry_msgs::Pose> tmp_map;
+                  // tmp_map[obj_param_map[ado_topic_to_name[topic_str]].instance_name] = geo_msg->pose;
+                  vector<pair<string, geometry_msgs::Pose>> tmp_vec;
+                  tmp_vec.emplace_back(instance_str, geo_msg->pose);
+                  instances_and_poses_by_class_map[cls_str] = tmp_vec; // first time, need to initialize vector
+                }
+                else { 
+                  instances_and_poses_by_class_map[cls_str].emplace_back(instance_str, geo_msg->pose); // save last pose
+                }
+                seen_instances.insert(instance_str);
               }
               break;
             }
@@ -73,7 +82,7 @@ namespace rslam_utils {
         }
       }
     }
-    for (const auto & key_val : last_gt_pose) {
+    for (const auto & key_val : prev_gt_pose) {
       cout << "obj instance: " << key_val.first << endl;
     }
 
@@ -102,114 +111,63 @@ namespace rslam_utils {
         }
         else if (m.getTopic() == raptor_topic_str || ("/" + m.getTopic() == raptor_topic_str)) {
           // THIS IS MSL-RAPTOR data for estimates of the tracked object poses
-          //     Note: we dont know the object name, just the class at this point
+          //     Note: we dont know the object's instance name, just the class at this point
           msl_raptor::TrackedObjects::ConstPtr raptor_msg = m.instantiate<msl_raptor::TrackedObjects>();
           
-          if (raptor_msg != nullptr) {
+          if (raptor_msg != nullptr && (raptor_msg->tracked_objects).size() > 0) {
 
-            // Count the number of times we see each class - NO LONGER NEED THIS HERE - we need to count in all GT data not just whats seen in this frame
-            // for (const auto & tracked_obj : raptor_msg->tracked_objects) {
-            //   string cls = tracked_obj.class_str;
-            //   if( instances_and_poses_by_class_map.find(cls) == instances_and_poses_by_class_map.end() ) {
-            //     instances_and_poses_by_class_map[cls] = 1;
-            //   }
-            //   else {
-            //     instances_and_poses_by_class_map[cls]++;
-            //   }
-            // }
-            // if (instances_and_poses_by_class_map.size() > 0) { // print out this info
-            //   cout << instances_and_poses_by_class_map.size() << " unique class instances seen" << endl;
-            //   for (const auto & key_val : instances_and_poses_by_class_map) {
-            //     string cls = key_val.first;
-            //     int num_repeates = key_val.second;
-            //     cout << "\t we see class " << cls << " " << num_repeates << " time(s)" << endl;
-            //     if (num_repeates > 1) {
-            //       // do hungarian algo here
-            //     }
-            //     else {
-            //       // there is just one of this object
-            //     }
-            //   }
-            // }
-            
-
-            bool b_use_hungarian_algo = true;
-
-            // loop over each seen object. if our GT data tells us we expect more than one of these objects, the use the hungarian algo with the gt data to figure out 
-            // which one it is. 
-            if (b_use_hungarian_algo) {
-              vector< vector<double> > costMatrix; // rows: # ado quads seen this timestep, col: total # of possible ado quads
-              // map<string, vector< vector<double> > > cost_matrix_map;
-              int num_repeated_instance = 0;
-              vector<string> candidate_ado_names;
-              vector<geometry_msgs::Pose> pose_vec;
-              for (const auto & tracked_obj : raptor_msg->tracked_objects) {
-                geometry_msgs::Pose tracked_pose = tracked_obj.pose.pose;
-                pose_vec.push_back(tracked_pose);
-                // if (tracked_obj.class_str == "mslquad") {
-                map<string, geometry_msgs::Pose> candidate_instances = instances_and_poses_by_class_map[tracked_obj.class_str];
-                if (candidate_instances.size() > 1 ) {
-                  num_repeated_instance++;
-                  costMatrix.push_back({});
-                  for(const auto & ado_name_geo_pose : candidate_instances) {
-                    candidate_ado_names.push_back(ado_name_geo_pose.first);
-                    geometry_msgs::Pose pose = ado_name_geo_pose.second;
-                    double dist = sqrt( (pose.position.x - tracked_pose.position.x) * (pose.position.x - tracked_pose.position.x) +
-                                        (pose.position.y - tracked_pose.position.y) * (pose.position.y - tracked_pose.position.y) +
-                                        (pose.position.z - tracked_pose.position.z) * (pose.position.z - tracked_pose.position.z) );
-                    costMatrix[num_repeated_instance-1].push_back(dist);
-                  }
-                }
+            // Seperate observed poses by class
+            map<string, vector<geometry_msgs::Pose>> observed_poses_by_class;
+            for (const auto & tracked_obj : raptor_msg->tracked_objects) {
+              geometry_msgs::Pose tracked_pose = tracked_obj.pose.pose;
+              if( observed_poses_by_class.find(tracked_obj.class_str) == observed_poses_by_class.end() ) { 
+                // first oservance of this object, need to initialize vector
+                vector<geometry_msgs::Pose> pose_vec{tracked_pose};
+                observed_poses_by_class[tracked_obj.class_str] = pose_vec; 
               }
-              if (num_repeated_instance > 1) {
+              else {
+                observed_poses_by_class[tracked_obj.class_str].push_back(tracked_pose); // save last pose
+              }
+            }
+            for (const auto & class_pose_vec : observed_poses_by_class) {
+              string cls = class_pose_vec.first;
+              vector<geometry_msgs::Pose> est_pose_vec = class_pose_vec.second;
+              vector<pair<string, geometry_msgs::Pose>> instance_gt_pose_vec = instances_and_poses_by_class_map[cls];
+
+              if (instance_gt_pose_vec.size() == 1) {
+                // No need for hungarian algo, just 1 object of this class in our environment!
+                string instance_name = instance_gt_pose_vec[0].first;
+                geometry_msgs::Pose pose = instance_gt_pose_vec[0].second;
+                ado_data_est[instance_name].emplace_back(time, ros_geo_pose_to_gtsam(pose));
+              }
+              else { // use Hungarian algo!
+              // For each class seen, if more than 1 object use hungarian algo with the gt data
+              //    hungarian algo: 1) build cost matrix 2) solve assignment
+                vector< vector<double> > costMatrix; // rows: # object instances seen this timestep, col: total # of possible instances of this class
+                int row_index = 0; // index of currently seen object instances i.e. est_pose_vec
+                vector<string> candidate_ado_names;
+                for (const auto & tracked_pose : est_pose_vec) {
+                  for(const auto & instance_sts_pose_pair : instance_gt_pose_vec) {
+                    candidate_ado_names.push_back(instance_sts_pose_pair.first);
+                    geometry_msgs::Pose gt_pose = instance_sts_pose_pair.second;
+                    double dist = sqrt( (gt_pose.position.x - tracked_pose.position.x) * (gt_pose.position.x - tracked_pose.position.x) +
+                                        (gt_pose.position.y - tracked_pose.position.y) * (gt_pose.position.y - tracked_pose.position.y) +
+                                        (gt_pose.position.z - tracked_pose.position.z) * (gt_pose.position.z - tracked_pose.position.z) );
+                    costMatrix[row_index].push_back(dist);
+                  }
+                  row_index++;
+                }
                 HungarianAlgorithm HungAlgo;
                 vector<int> assignment;
                 double cost = HungAlgo.Solve(costMatrix, assignment);
                 for (unsigned int x = 0; x < costMatrix.size(); x++) {
                   // std::cout << candidate_ado_names[x] << "," << assignment[x] << "\t";
-                  ado_data_est[candidate_ado_names[x]].emplace_back(time, ros_geo_pose_to_gtsam(pose_vec[assignment[x]]));
+                  ado_data_est[candidate_ado_names[x]].emplace_back(time, ros_geo_pose_to_gtsam(est_pose_vec[assignment[x]]));
                 }
                 // std::cout << "\ncost: " << cost << std::endl;
                 // cout << "" << endl;
               }
-              // else {
-              //   cout << "num_repeated_instance = " << num_repeated_instance << " , t = " << time << endl;
-              // }
-              continue;
-            }
-
-
-            // for (const auto & tracked_obj : raptor_msg->tracked_objects) {
-            //   geometry_msgs::Pose tracked_pose = tracked_obj.pose.pose;
-            //   string ado_instance_name;
-            //   if (!b_use_hungarian_algo && tracked_obj.class_str == "mslquad") {
-            //     // if (tracked_pose.position.y < 0) { // DEBUG ONLY - simulate us being able to distinguish the two quads
-            //     //   ado_instance_name = "quad6";
-            //     // }
-            //     // else {
-            //     //   ado_instance_name = "quad4";
-            //     // }
-
-            //     // this should be replaced by hungarian algo
-            //     double min_dist = 10000000;
-            //     for(const auto & ado_name_geo_pose : last_gt_pose) {
-            //       geometry_msgs::Pose pose = ado_name_geo_pose.second;
-            //       double edist = sqrt( (pose.position.x - tracked_pose.position.x) * (pose.position.x - tracked_pose.position.x) +
-            //                            (pose.position.y - tracked_pose.position.y) * (pose.position.y - tracked_pose.position.y) +
-            //                            (pose.position.z - tracked_pose.position.z) * (pose.position.z - tracked_pose.position.z) );
-                  
-            //       if (edist < min_dist) {
-            //         min_dist = edist;
-            //         ado_instance_name = ado_name_geo_pose.first;
-            //       }
-            //     }
-            //   }
-            //   else {
-            //     ado_instance_name = class_to_ado_instance_name[tracked_obj.class_str];
-            //   }
-            //   gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tracked_pose);
-            //   ado_data_est[ado_instance_name].emplace_back(time, ros_geo_pose_to_gtsam(tracked_pose)); // tracked_obj.pose is a posestamped, which has a field called pose
-            // }
+            }            
           }
         }
         else {
@@ -218,12 +176,12 @@ namespace rslam_utils {
               geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
               if (geo_msg != nullptr) {
 
-                // if (time > last_gt_time) {
-                //   last_gt_pose.clear();
-                //   last_gt_time = time;
+                // if (time > prev_gt_time) {
+                //   prev_gt_pose.clear();
+                //   prev_gt_time = time;
                 // }
                 ado_data_gt[ado_topic_to_name[topic_str]].emplace_back(time, remove_yaw(ros_geo_pose_to_gtsam(geo_msg->pose)));
-                last_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
+                prev_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
                 break;
               }
             }
@@ -269,7 +227,7 @@ namespace rslam_utils {
     return;
   }
 
-  void process_raptor_estimates(msl_raptor::TrackedObjects::ConstPtr & raptor_msg, map<string, object_data_vec_t> & ado_data_est, const map<string, geometry_msgs::Pose> & last_gt_pose) {
+  void process_raptor_estimates(msl_raptor::TrackedObjects::ConstPtr & raptor_msg, map<string, object_data_vec_t> & ado_data_est, const map<string, geometry_msgs::Pose> & prev_gt_pose) {
     return;
   }
 

@@ -485,6 +485,7 @@ void calc_pose_delta(const Pose3 & p1, const Pose3 &p2, double *trans_diff, doub
 }
 
 
+
 // bool areQuaternionsClose(Quaternion q1, Quaternion q2){
 // 	float dot = q1.dot(22); // cos(theta / 2)
 // 	if(dot < 0.0f){
