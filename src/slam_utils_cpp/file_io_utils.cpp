@@ -10,35 +10,18 @@ namespace rslam_utils {
     // OUTPUT:  set<double> times; map<string, object_est_gt_data_vec_t> obj_data  [string is name, object_est_gt_data_vec_t is vector of <time, pose gt, pose est>]
     ROS_INFO("loading rosbag: %s", rosbag_fn.c_str());
 
-    cout << "WARNING!!! USING HARDCODED Class-to-object_str map! This is for debug only!" << endl;
-    map<string, string> class_to_ado_long_name = {
-      {"bowl", "bowl_white_small_norm"},
-      {"camera", "camera_canon_len_norm"},
-      {"can", "can_arizona_tea_norm"}, 
-      {"laptop", "laptop_air_xin_norm"},
-      {"cup", "mug_daniel_norm"},
-      {"mslquad", "quad4"},
-      {"mslquad", "quad6"},
-      {"bottle", "swell_bottle"},
-      {"bowl", "bowl_white_msl"},
-      {"bowl", "bowl_green_msl"},
-      {"cup", "mug_duke"},
-      {"cup", "mug_black"},
-      {"cup", "mug_yellow_black"}
-    };
-
     string gt_pose_topic  = "/mavros/vision_pose/pose";
     string est_pose_topic  = "/mavros/local_position/pose";
     string ego_gt_topic_str = "/" + ego_ns + gt_pose_topic;
     string ego_est_topic_str = "/" + ego_ns + est_pose_topic;
     string raptor_topic_str = "/" + ego_ns + "/msl_raptor_state";
-    vector<string> ado_long_names, ado_gt_topic_strs;
+    vector<string> ado_instance_names, ado_gt_topic_strs;
     map<string, string> ado_topic_to_name;
     for (const auto & key_val : obj_param_map) {
-        string ado_long_name = key_val.first;
-        ado_long_names.push_back(ado_long_name);
-        ado_gt_topic_strs.push_back("/" + ado_long_name + gt_pose_topic);
-        ado_topic_to_name["/" + ado_long_name + gt_pose_topic] = ado_long_name;
+        string ado_instance_name = key_val.first;
+        ado_instance_names.push_back(ado_instance_name);
+        ado_gt_topic_strs.push_back("/" + ado_instance_name + gt_pose_topic);
+        ado_topic_to_name["/" + ado_instance_name + gt_pose_topic] = ado_instance_name;
     }
 
     object_data_vec_t ego_data_gt, ego_data_est;   
@@ -51,6 +34,14 @@ namespace rslam_utils {
     geometry_msgs::PoseStamped::ConstPtr geo_msg = nullptr;
     map<string, geometry_msgs::Pose> last_gt_pose;
     double last_gt_time = -100000000;
+    map<string, map<string, geometry_msgs::Pose>> instances_and_poses_by_class_map; 
+    ///////
+    // loop through all the gt data to find how many of each class type we see (and also what their last pose was)
+
+    // WHY LAST POSE? NOT FIRST????
+    cout << endl;
+
+    cout << "WARNING!!! Using the gt data to get perfect gt's for corespondence. In realtime, will need to build structure of seen objects and poses iteratively!" << endl;
     for(rosbag::MessageInstance const m: rosbag::View(bag)) { // DUMMY FOR LOOP TO INITIALIZE THE GT POSES FOR HUNGARIAN ALGO
       if (m.getTopic() == ego_gt_topic_str || ("/" + m.getTopic() == ego_gt_topic_str)) {
           continue;
@@ -67,12 +58,25 @@ namespace rslam_utils {
             geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
             if (geo_msg != nullptr) {
               last_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
+              string cls_str = obj_param_map[ado_topic_to_name[topic_str]].class_name;
+              if( instances_and_poses_by_class_map.find(cls_str) == instances_and_poses_by_class_map.end() ) {
+                map<string, geometry_msgs::Pose> tmp_map;
+                tmp_map[obj_param_map[ado_topic_to_name[topic_str]].instance_name] = geo_msg->pose;
+                instances_and_poses_by_class_map[cls_str] = tmp_map; // first time, need to initialize vector
+              }
+              else {
+                instances_and_poses_by_class_map[cls_str][obj_param_map[ado_topic_to_name[topic_str]].instance_name] = geo_msg->pose; // save last pose
+              }
               break;
             }
           }
         }
       }
     }
+    for (const auto & key_val : last_gt_pose) {
+      cout << "obj instance: " << key_val.first << endl;
+    }
+
     for(rosbag::MessageInstance const m: rosbag::View(bag)) {
         if(time0 < 0) {
             time0 = m.getTime().toSec();
@@ -100,98 +104,112 @@ namespace rslam_utils {
           // THIS IS MSL-RAPTOR data for estimates of the tracked object poses
           //     Note: we dont know the object name, just the class at this point
           msl_raptor::TrackedObjects::ConstPtr raptor_msg = m.instantiate<msl_raptor::TrackedObjects>();
-          map<string, int> class_duplicates_tracked;
+          
           if (raptor_msg != nullptr) {
 
-            // Count the number of times we see each class
-            for (const auto & tracked_obj : raptor_msg->tracked_objects) {
-              string cls = tracked_obj.class_str;
-              if( class_duplicates_tracked.find(cls) == class_duplicates_tracked.end() ) {
-                class_duplicates_tracked[cls] = 1;
-              }
-              else {
-                class_duplicates_tracked[cls]++;
-              }
-            }
-            if (class_duplicates_tracked.size() > 0) { // print out this info
-              cout << class_duplicates_tracked.size() << " unique classes seen" << endl;
-              for (const auto & key_val : class_duplicates_tracked) {
-                cout << "\t we see class " << key_val.first << " " << key_val.second << " time(s)" << endl;
-              }
-            }
+            // Count the number of times we see each class - NO LONGER NEED THIS HERE - we need to count in all GT data not just whats seen in this frame
+            // for (const auto & tracked_obj : raptor_msg->tracked_objects) {
+            //   string cls = tracked_obj.class_str;
+            //   if( instances_and_poses_by_class_map.find(cls) == instances_and_poses_by_class_map.end() ) {
+            //     instances_and_poses_by_class_map[cls] = 1;
+            //   }
+            //   else {
+            //     instances_and_poses_by_class_map[cls]++;
+            //   }
+            // }
+            // if (instances_and_poses_by_class_map.size() > 0) { // print out this info
+            //   cout << instances_and_poses_by_class_map.size() << " unique class instances seen" << endl;
+            //   for (const auto & key_val : instances_and_poses_by_class_map) {
+            //     string cls = key_val.first;
+            //     int num_repeates = key_val.second;
+            //     cout << "\t we see class " << cls << " " << num_repeates << " time(s)" << endl;
+            //     if (num_repeates > 1) {
+            //       // do hungarian algo here
+            //     }
+            //     else {
+            //       // there is just one of this object
+            //     }
+            //   }
+            // }
+            
 
             bool b_use_hungarian_algo = true;
 
+            // loop over each seen object. if our GT data tells us we expect more than one of these objects, the use the hungarian algo with the gt data to figure out 
+            // which one it is. 
             if (b_use_hungarian_algo) {
               vector< vector<double> > costMatrix; // rows: # ado quads seen this timestep, col: total # of possible ado quads
-              int num_quads = 0;
-              vector<string> quad_names;
+              // map<string, vector< vector<double> > > cost_matrix_map;
+              int num_repeated_instance = 0;
+              vector<string> candidate_ado_names;
               vector<geometry_msgs::Pose> pose_vec;
               for (const auto & tracked_obj : raptor_msg->tracked_objects) {
                 geometry_msgs::Pose tracked_pose = tracked_obj.pose.pose;
                 pose_vec.push_back(tracked_pose);
-                if (tracked_obj.class_str == "mslquad") {
-                  num_quads++;
+                // if (tracked_obj.class_str == "mslquad") {
+                map<string, geometry_msgs::Pose> candidate_instances = instances_and_poses_by_class_map[tracked_obj.class_str];
+                if (candidate_instances.size() > 1 ) {
+                  num_repeated_instance++;
                   costMatrix.push_back({});
-                  for(const auto & ado_name_geo_pose : last_gt_pose) {
-                    quad_names.push_back(ado_name_geo_pose.first);
+                  for(const auto & ado_name_geo_pose : candidate_instances) {
+                    candidate_ado_names.push_back(ado_name_geo_pose.first);
                     geometry_msgs::Pose pose = ado_name_geo_pose.second;
                     double dist = sqrt( (pose.position.x - tracked_pose.position.x) * (pose.position.x - tracked_pose.position.x) +
                                         (pose.position.y - tracked_pose.position.y) * (pose.position.y - tracked_pose.position.y) +
                                         (pose.position.z - tracked_pose.position.z) * (pose.position.z - tracked_pose.position.z) );
-                    costMatrix[num_quads-1].push_back(dist);
+                    costMatrix[num_repeated_instance-1].push_back(dist);
                   }
                 }
               }
-              if (num_quads > 1) {
+              if (num_repeated_instance > 1) {
                 HungarianAlgorithm HungAlgo;
                 vector<int> assignment;
                 double cost = HungAlgo.Solve(costMatrix, assignment);
                 for (unsigned int x = 0; x < costMatrix.size(); x++) {
-                  // std::cout << quad_names[x] << "," << assignment[x] << "\t";
-                  ado_data_est[quad_names[x]].emplace_back(time, ros_geo_pose_to_gtsam(pose_vec[assignment[x]]));
+                  // std::cout << candidate_ado_names[x] << "," << assignment[x] << "\t";
+                  ado_data_est[candidate_ado_names[x]].emplace_back(time, ros_geo_pose_to_gtsam(pose_vec[assignment[x]]));
                 }
                 // std::cout << "\ncost: " << cost << std::endl;
                 // cout << "" << endl;
               }
               // else {
-              //   cout << "NUM_QUADS = " << num_quads << " , t = " << time << endl;
+              //   cout << "num_repeated_instance = " << num_repeated_instance << " , t = " << time << endl;
               // }
               continue;
             }
 
 
-            for (const auto & tracked_obj : raptor_msg->tracked_objects) {
-              geometry_msgs::Pose tracked_pose = tracked_obj.pose.pose;
-              string ado_long_name;
-              if (!b_use_hungarian_algo && tracked_obj.class_str == "mslquad") {
-                // if (tracked_pose.position.y < 0) { // DEBUG ONLY - simulate us being able to distinguish the two quads
-                //   ado_long_name = "quad6";
-                // }
-                // else {
-                //   ado_long_name = "quad4";
-                // }
+            // for (const auto & tracked_obj : raptor_msg->tracked_objects) {
+            //   geometry_msgs::Pose tracked_pose = tracked_obj.pose.pose;
+            //   string ado_instance_name;
+            //   if (!b_use_hungarian_algo && tracked_obj.class_str == "mslquad") {
+            //     // if (tracked_pose.position.y < 0) { // DEBUG ONLY - simulate us being able to distinguish the two quads
+            //     //   ado_instance_name = "quad6";
+            //     // }
+            //     // else {
+            //     //   ado_instance_name = "quad4";
+            //     // }
 
-                // this should be replaced by hungarian algo
-                double min_dist = 10000000;
-                for(const auto & ado_name_geo_pose : last_gt_pose) {
-                  geometry_msgs::Pose pose = ado_name_geo_pose.second;
-                  double edist = sqrt( (pose.position.x - tracked_pose.position.x) * (pose.position.x - tracked_pose.position.x) +
-                                       (pose.position.y - tracked_pose.position.y) * (pose.position.y - tracked_pose.position.y) +
-                                       (pose.position.z - tracked_pose.position.z) * (pose.position.z - tracked_pose.position.z) );
+            //     // this should be replaced by hungarian algo
+            //     double min_dist = 10000000;
+            //     for(const auto & ado_name_geo_pose : last_gt_pose) {
+            //       geometry_msgs::Pose pose = ado_name_geo_pose.second;
+            //       double edist = sqrt( (pose.position.x - tracked_pose.position.x) * (pose.position.x - tracked_pose.position.x) +
+            //                            (pose.position.y - tracked_pose.position.y) * (pose.position.y - tracked_pose.position.y) +
+            //                            (pose.position.z - tracked_pose.position.z) * (pose.position.z - tracked_pose.position.z) );
                   
-                  if (edist < min_dist) {
-                    min_dist = edist;
-                    ado_long_name = ado_name_geo_pose.first;
-                  }
-                }
-              }
-              else {
-                ado_long_name = class_to_ado_long_name[tracked_obj.class_str];
-              }
-              gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tracked_pose);
-              ado_data_est[ado_long_name].emplace_back(time, ros_geo_pose_to_gtsam(tracked_pose)); // tracked_obj.pose is a posestamped, which has a field called pose
-            }
+            //       if (edist < min_dist) {
+            //         min_dist = edist;
+            //         ado_instance_name = ado_name_geo_pose.first;
+            //       }
+            //     }
+            //   }
+            //   else {
+            //     ado_instance_name = class_to_ado_instance_name[tracked_obj.class_str];
+            //   }
+            //   gtsam::Pose3 tmp = ros_geo_pose_to_gtsam(tracked_pose);
+            //   ado_data_est[ado_instance_name].emplace_back(time, ros_geo_pose_to_gtsam(tracked_pose)); // tracked_obj.pose is a posestamped, which has a field called pose
+            // }
           }
         }
         else {
@@ -248,6 +266,10 @@ namespace rslam_utils {
       // fn = "/mounted_folder/test_graphs_gtsam/batch_input2.csv";
       // write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
     }
+    return;
+  }
+
+  void process_raptor_estimates(msl_raptor::TrackedObjects::ConstPtr & raptor_msg, map<string, object_data_vec_t> & ado_data_est, const map<string, geometry_msgs::Pose> & last_gt_pose) {
     return;
   }
 

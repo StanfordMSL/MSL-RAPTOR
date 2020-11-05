@@ -94,7 +94,7 @@ void load_all_trajectories(map<Symbol, map<double, pair<Pose3, Pose3> > > & all_
     Symbol sym = Symbol('l', obj_id);
 
     map<double, pair<Pose3, Pose3> > time_tf_w_ego_map;
-    read_gt_datafiles(path + "gt_pose_data_scene_1_" + params.long_name + ".txt", time_tf_w_ego_map, times);
+    read_gt_datafiles(path + "gt_pose_data_scene_1_" + params.instance_name + ".txt", time_tf_w_ego_map, times);
     all_trajs[sym] = time_tf_w_ego_map;
   }
 }
@@ -105,13 +105,13 @@ void load_log_files(set<double> &times, object_est_gt_data_vec_t & ado_data, con
     object_data_vec_t ado_data_gt, ado_data_est, ego_data_gt;
     object_est_gt_data_vec_t ado_data_single;
     obj_param_t params = key_value_pair.second;
-    // string obj_long_name = params.long_name; //key_value_pair.first;
+    // string obj_instance_name = params.instance_name; //key_value_pair.first;
     // int obj_id = params.obj_id; //object_id_map[key_value_pair.second];
-    cout << "Processing " << params.long_name << " (id = " << params.obj_id << ")" << endl;
+    cout << "Processing " << params.instance_name << " (id = " << params.obj_id << ")" << endl;
 
-    // read_gt_datafiles(path + "gt_pose_data_scene_1_" + params.long_name + ".txt", ego_data_gt, times);
-    read_data_from_one_log(path + file_base + params.long_name + "_gt.log", ado_data_gt, times);
-    read_data_from_one_log(path + file_base + params.long_name + "_est.log", ado_data_est, times);
+    // read_gt_datafiles(path + "gt_pose_data_scene_1_" + params.instance_name + ".txt", ego_data_gt, times);
+    read_data_from_one_log(path + file_base + params.instance_name + "_gt.log", ado_data_gt, times);
+    read_data_from_one_log(path + file_base + params.instance_name + "_est.log", ado_data_est, times);
     sync_est_and_gt(ado_data_est, ado_data_gt, ado_data_single, params, dt_thresh);
     ado_data.insert( ado_data.end(), ado_data_single.begin(), ado_data_single.end() ); // combine into 1 vector of all ado data
   }
