@@ -35,13 +35,9 @@ namespace rslam_utils {
     map<string, geometry_msgs::Pose> prev_gt_pose;
     double prev_gt_time = -100000000;
     map<string, vector<pair<string, geometry_msgs::Pose>>> instances_and_poses_by_class_map; 
-    // map<string, map<string, geometry_msgs::Pose>> instances_and_poses_by_class_map; 
+
     ///////
     // loop through all the gt data to find how many of each class type we see (and also what their FIRST pose is)
-
-    // WHY LAST POSE? NOT FIRST????
-    cout << endl;
-
     cout << "WARNING!!! Using the gt data to get perfect gt's for corespondence. In realtime, will need to build structure of seen objects and poses iteratively!" << endl;
     set<string> seen_instances;
     for(rosbag::MessageInstance const m: rosbag::View(bag)) { // DUMMY FOR LOOP TO INITIALIZE THE GT POSES FOR HUNGARIAN ALGO
@@ -146,22 +142,6 @@ namespace rslam_utils {
                 vector< vector<double> > costMatrix; // rows: # object instances seen this timestep, col: total # of possible instances of this class
                 bool b_print_out_hungarian_algo_details = true;
                 int row_index = 0; // index of currently seen object instances i.e. est_pose_vec
-
-                // if(est_pose_vec.size() > instance_gt_pose_vec.size()) {
-                //   cout << "ERROR!!! THIS CANT HAPPEN!" << endl;
-                //   cout << "class: " << cls << endl;
-                //   cout << "total number of tracked objects this timestep (all classes) = " << (raptor_msg->tracked_objects).size() << endl;
-                //   cout << "gt instances seen this step:   ";
-                //   for (const auto & instance_str_pose_pair : instance_gt_pose_vec) {
-                //     cout << instance_str_pose_pair.first << ", ";
-                //   }
-                //   cout << endl;
-
-                //   for (const auto & class_pose_vec : observed_poses_by_class) {
-                //     cout << "raptor has " << class_pose_vec.second.size() << " estimates for class " << class_pose_vec.first << endl;
-                //   }
-                //   cout << endl;
-                // }
 
                 vector<string> candidate_ado_names;
                 for (const auto & tracked_pose : est_pose_vec) {
@@ -466,18 +446,22 @@ namespace rslam_utils {
     int ridx = 0, num_ado_obj_seen = 0;
     for (const auto & rstep : raptor_data) {
       double t = get<0>(rstep);
+      cout << "Processing measurements from time " << t << endl;
+      if(ridx == 43){
+        cout << endl;
+      }
       gtsam::Pose3 tf_ego_w_gt_unrect = get<1>(rstep).inverse();
       gtsam::Pose3 tf_ego_w_est_unrect = get<2>(rstep).inverse();
       map<string, pair<gtsam::Pose3, gtsam::Pose3> > measurements_unrect = get<3>(rstep);
       map<string, pair<gtsam::Pose3, gtsam::Pose3> > measurements_out;
 
       gtsam::Pose3 tf_w_ego_gt, tf_w_ego_est;
+      bool b_have_tf_w_ego = false;
       for (const auto & key_val : measurements_unrect) {
         string ado_name = key_val.first;
         pair<gtsam::Pose3, gtsam::Pose3> ado_w_gt_est_pair_unrect = key_val.second;
         gtsam::Pose3 tf_ego_ado_gt  = tf_ego_w_gt_unrect  * ado_w_gt_est_pair_unrect.first;  // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
         gtsam::Pose3 tf_ego_ado_est = tf_ego_w_est_unrect * ado_w_gt_est_pair_unrect.second; // (tf_w_ego_est.inverse()) * tf_w_ado_est;
-        bool b_have_tf_w_ego = false;
         if (b_first_step) {
           // here ego is identity by definition, and we know we havent seen it before
           tf_w_ado0_gt[ado_name]  = tf_ego_ado_gt;
