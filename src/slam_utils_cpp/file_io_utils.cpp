@@ -526,6 +526,9 @@ namespace rslam_utils {
                     tf_w_ego_est2 = tf_w_ado0_est[ado_name2] * (tf_ego_ado_est2.inverse());
 
                     double s = (t - t1) / (t2 - t1);
+                    if(t1 == t2) {
+                      cout << endl;
+                    }
                     tf_w_ego_gt1  = interp_pose(tf_w_ego_gt1,  tf_w_ego_gt2,  s); // ego pose corresponding to current measuremnt 
                     tf_w_ego_est1 = interp_pose(tf_w_ego_est1, tf_w_ego_est2, s);
 
