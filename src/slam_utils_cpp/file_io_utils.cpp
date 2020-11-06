@@ -30,7 +30,7 @@ namespace rslam_utils {
     rosbag::Bag bag;
     bag.open(rosbag_fn, rosbag::bagmode::Read);
     int num_msg_total = 0;
-    double time = 0.0, time0 = -1, ave_dt = 0, last_time = 0;
+    double time = 0.0, time0 = -1, ave_dt = 0, last_time = 0, last_time_debug = -1;
     geometry_msgs::PoseStamped::ConstPtr geo_msg = nullptr;
     map<string, geometry_msgs::Pose> prev_gt_pose;
     double prev_gt_time = -100000000;
@@ -207,6 +207,13 @@ namespace rslam_utils {
             if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
               geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
               if (geo_msg != nullptr) {
+                if( ado_topic_to_name[topic_str] == "bowl_green_msl") {
+                  cout << "new gt message for " << ado_topic_to_name[topic_str] << " at " << time*1000 << endl;
+                  if( abs(last_time_debug - time) < 0.00001) {
+                    cout << endl;
+                  }
+                  last_time_debug = time;
+                }
                 ado_data_gt[ado_topic_to_name[topic_str]].emplace_back(time, remove_yaw(ros_geo_pose_to_gtsam(geo_msg->pose)));
                 prev_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
                 break;
@@ -295,7 +302,10 @@ namespace rslam_utils {
         object_est_gt_data_vec_t ado_data_single = key_val.second;
         data_tuple ado_data_tuple = ado_data_single[ado_idxs[ado_name]];
         double this_ado_time = get<0>(ado_data_tuple);
-        if ( dt_thresh > std::abs(this_ado_time - current_time) ) {
+        if(abs(29.7225 - current_time) < 0.1) { // 30.116
+          cout << endl; // this is where we see at least 1 instance of duplicate times
+        }
+        if ( dt_thresh > abs(this_ado_time - current_time) ) {
           // this ado data is part of this msl_raptor iteration
           measurement[ado_name] = make_pair(get<2>(ado_data_tuple), get<3>(ado_data_tuple));
           meas_time += this_ado_time;
@@ -308,7 +318,14 @@ namespace rslam_utils {
           }
         }
         if ( (ado_idxs[ado_name] >= 0) && (get<0>(ado_data_single[ado_idxs[ado_name]]) < next_time) ) {
+          if ( abs(get<0>(ado_data_single[ado_idxs[ado_name]]) - get<0>(ado_data_single[ado_idxs[ado_name] - 1])) < 0.00001) {
+            cout << "WE HAVE TWO RAPTOR MEAUSMRENTS WITH THE SAME TIME!! THIS SHOULDNT HAPPEN!" << endl;
+            assert(false);
+          }
           next_time = get<0>(ado_data_single[ado_idxs[ado_name]]); // get the next closest ado time to use for next raptor iteration
+          if(abs(next_time - current_time) < 0.001) {
+            cout << ado_idxs[ado_name] << endl; // DEBUG - this shouldnt happen
+          }
         }
       }
       ado_data_grouped.emplace_back( meas_time / ((double)measurement.size()), measurement );
@@ -371,12 +388,15 @@ namespace rslam_utils {
     uint next_gt_time_ind = 0;
     gtsam::Pose3 prev_gt, prev_est;
     int gt_ind = 0;
-    double t_gt0 = get<0>(data_gt[gt_ind]);
+    double t_gt0 = get<0>(data_gt[gt_ind]), prev_est_t = -1434.324234;
 
     for (uint i = 0; i < data_est.size()-1; i++) {
       t_est = get<0>(data_est[i]);
       if (t_est < t_gt0) {
         continue;
+      }
+      if(i==62) {
+        cout << endl;
       }
 
       double t_gt1, t_gt2, s;
@@ -392,6 +412,10 @@ namespace rslam_utils {
       s = (t_est - t_gt1) / (t_gt2 - t_gt1);
       gtsam::Pose3 tf_gt = rslam_utils::interp_pose(prev_gt, get<1>(data_gt[gt_ind]), s);
       data.emplace_back(t_est, params.obj_id, tf_gt, get<1>(data_est[i]));
+      if ( abs(prev_est_t - t_est) < 0.0001 ) {
+        cout << endl;
+      }
+      prev_est_t = t_est;
     }
   }
 
