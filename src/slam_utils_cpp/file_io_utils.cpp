@@ -302,13 +302,10 @@ namespace rslam_utils {
         object_est_gt_data_vec_t ado_data_single = key_val.second;
         data_tuple ado_data_tuple = ado_data_single[ado_idxs[ado_name]];
         double this_ado_time = get<0>(ado_data_tuple);
-        if(abs(29.7225 - current_time) < 0.1) { // 30.116
-          cout << endl; // this is where we see at least 1 instance of duplicate times
-        }
         if ( dt_thresh > abs(this_ado_time - current_time) ) {
           // this ado data is part of this msl_raptor iteration
           measurement[ado_name] = make_pair(get<2>(ado_data_tuple), get<3>(ado_data_tuple));
-          meas_time += this_ado_time;
+          meas_time += this_ado_time; // summed here because will be averaged at end of loop
           if (ado_idxs[ado_name] + 1 < ado_data_single.size()) {
             ado_idxs[ado_name]++;
             b_finished = false; // do at least 1 more round
