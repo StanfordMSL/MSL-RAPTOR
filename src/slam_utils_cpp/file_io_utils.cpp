@@ -467,10 +467,6 @@ namespace rslam_utils {
     int ridx = 0, num_ado_obj_seen = 0;
     for (const auto & rstep : raptor_data) {
       double t = get<0>(rstep);
-      cout << "Processing measurements from time " << t << endl;
-      if(ridx == 43){
-        cout << endl;
-      }
       gtsam::Pose3 tf_ego_w_gt_unrect = get<1>(rstep).inverse();
       gtsam::Pose3 tf_ego_w_est_unrect = get<2>(rstep).inverse();
       map<string, pair<gtsam::Pose3, gtsam::Pose3> > measurements_unrect = get<3>(rstep);
@@ -531,9 +527,6 @@ namespace rslam_utils {
                     tf_w_ego_est2 = tf_w_ado0_est[ado_name2] * (tf_ego_ado_est2.inverse());
 
                     double s = (t - t1) / (t2 - t1);
-                    if(t1 == t2) {
-                      cout << endl;
-                    }
                     tf_w_ego_gt1  = interp_pose(tf_w_ego_gt1,  tf_w_ego_gt2,  s); // ego pose corresponding to current measuremnt 
                     tf_w_ego_est1 = interp_pose(tf_w_ego_est1, tf_w_ego_est2, s);
 
