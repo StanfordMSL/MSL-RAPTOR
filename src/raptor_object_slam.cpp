@@ -47,11 +47,207 @@ class MSLRaptorSlamClass {
       vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > raptor_data; // time, ego_pose_gt, ego_pose_est, ado_name_to_gt_est_poses
       rslam_utils::load_rosbag(raptor_data, num_ado_objs, processed_rosbag, ego_ns, obj_param_map, dt_thresh, b_nocs_data); // "fills in" raptor_data, num_ado_objs
       string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
-      run_batch_slam(raptor_data, num_ado_objs);
+      run_batch_slam333(raptor_data, num_ado_objs);
+      // run_batch_slam(raptor_data, num_ado_objs);
+      // run_iterative_slam(raptor_data, num_ado_objs);
     }
 
+    void run_iterative_slam(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int num_ado_objs) {
+      // note: object id serves as landmark id, landmark is same as saying "ado"
+      // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
+      // https://github.com/borglab/gtsam/blob/develop/examples/RangeISAMExample_plaza2.cpp < -- example ISAM2
 
-    void run_batch_slam(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int num_ado_objs) {
+      // SET PARAMTERS FOR RUN
+      bool b_use_gt = false;
+      bool b_use_gt_init = false;
+      if (b_use_gt) {
+        b_use_gt_init = true;
+      }
+
+      // Set Noise parameters
+      bool robust = false;
+      Vector priorSigmas = Vector3(1,1,M_PI);
+      Vector odoSigmas = Vector3(0.05, 0.01, 0.1);
+      double sigmaR = 100; // range standard deviation
+      const gtsam::noiseModel::Base::shared_ptr // all same type
+      priorNoise = gtsam::noiseModel::Diagonal::Sigmas(priorSigmas), //prior
+      odoNoise = gtsam::noiseModel::Diagonal::Sigmas(odoSigmas), // odometry
+      gaussian = gtsam::noiseModel::Isotropic::Sigma(1, sigmaR), // non-robust
+      tukey = gtsam::noiseModel::Robust::Create(gtsam::noiseModel::mEstimator::Tukey::Create(15), gaussian), //robust
+      rangeNoise = robust ? tukey : gaussian;
+      // Eventually I will use the ukf's covarience here, but for now use a constant one
+      Vector priorSigmas6d = (Vector(6) << Vector3(1.,1.,1.), Vector3(M_PI,M_PI,M_PI)).finished();
+      noiseModel::Diagonal::shared_ptr constNoiseMatrix = gtsam::noiseModel::Isotropic::Sigmas(priorSigmas6d);
+      // noiseModel::Diagonal::shared_ptr constNoiseMatrix = noiseModel::Diagonal::Sigmas( (Vector(6) << Vector3::Constant(.005), Vector3::Constant(.05) ).finished());
+
+      // DECLARE VARIABLES 
+      // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
+      map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+      map<Symbol, double> ego_time_map; // store the time at each camera position
+      map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps;
+      vector<pair<Pose3, Pose3>> tf_w_ego_gt_est_vec;
+      int t_ind = 0, ego_pose_index = 1;
+
+      // Initialize iSAM
+      ISAM2 isam;
+      // STEP 0) Create graph & value objects, create noise model, and add first pose at origin
+      // int t_ind_cutoff = 3000;
+      NonlinearFactorGraph newFactors;
+      Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
+
+
+      // Add first pose ("anchor" the graph)
+      bool b_landmarks_observed = false; // set to true if we observe at least 1 landmark (so we know if we should try to estimate a pose)
+      Symbol ego_sym = Symbol('x', ego_pose_index);
+      Pose3 first_pose = get<2>(raptor_data[0]);  // use gt value for first ego pose
+      newFactors.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose, 1); // put a unary factor on first pose to "anchor" the whole graph
+      // newFactors.addPrior(ego_sym, first_pose, constNoiseMatrix);
+      // initial_estimate.insert(ego_sym, first_pose);
+
+      // STEP 1) loop through ego poses, at each time do the following:
+      //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
+      //  - 1B) If first timestep, use the fact that x1 is defined to be origin to set ground truth pose of landmarks. Also use first estimate as initial estimate for landmark pose
+      //  - 1C) Otherwise, use gt / estimate of landmark poses from t0 and current time to gt / estimate of current camera pose (SUBSTITUE FOR ODOMETRY!!)
+      //  - 1D) Use estimate of current camera pose for value initalization
+
+      /////////////////////////////////////
+      // For each ado object (landmark) there will be a single node in the graph. 
+      //    Add it to the graph here and initialized it. Also save values
+      map<string, gtsam::Pose3> tf_w_ado0_gt, tf_w_ado0_est;
+      rslam_utils::get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est, num_ado_objs);
+
+      for (auto const & key_val : tf_w_ado0_gt) {
+        cout << "ado_name : " << key_val.first << "\ntf_w_ado0_gt = " << key_val.second << "tf_w_ado0_est = " << tf_w_ado0_est[key_val.first] << endl;
+      }
+
+      // assume we know our list of ado objects & have initial estimates
+      for (const auto & key_val : tf_w_ado0_gt) {
+        string ado_name = key_val.first;
+        Pose3 tf_w_ado_gt = key_val.second;
+        Pose3 tf_w_ado_est = tf_w_ado0_est[ado_name];
+        Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id);
+
+        tf_w_gt_map[ado_sym] = tf_w_ado_gt;
+        if (b_use_gt) {
+          tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt);
+          initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt));
+        }
+        else {
+          if (b_use_gt_init) {
+            tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt);
+            initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt)); 
+          }
+          else {
+            tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_est); 
+            initial_estimate.insert(ado_sym, rslam_utils::add_noise_to_pose3(tf_w_ado_est, 0.05, 0)); 
+          }
+        }
+        cout << ado_sym << " init est set [ADO]" << endl;
+      }
+
+
+      // isam parameters
+      size_t minMeas = 100; // minimum number of range measurements to process initially
+      size_t incMeas = 10; // minimum number of range measurements to process after
+
+      // set some loop variables
+      bool initialized_isam = false;
+      Pose3 tf_w_ego_est_latest = first_pose; // where we (ego) are currently
+      size_t num_meas_since_update = 0; // number of measurements since last isam2 update
+      map<double, tuple<string, gtsam::Pose3, gtsam::Pose3>> tf_w_ego_map_isam;
+      double t0 = get<0>(raptor_data[0]);
+      gtsam::Pose3 tf_w_ego_gt0  = get<1>(raptor_data[0]);
+      gtsam::Pose3 tf_w_ego_est0 = get<2>(raptor_data[0]);
+      tf_w_ego_map_isam[t0] = make_tuple(string(ego_sym), tf_w_ego_gt0, tf_w_ego_est0);
+
+      for (const auto & rstep : raptor_data ) {
+        double time = get<0>(rstep);
+        ego_pose_index = 1 + t_ind;
+        ego_sym = Symbol('x', ego_pose_index);
+        gtsam::Pose3 tf_w_ego_gt  = get<1>(rstep);
+        gtsam::Pose3 tf_w_ego_est = get<2>(rstep);
+        tf_w_ego_est_latest = tf_w_ego_est;
+        map<string, pair<gtsam::Pose3, gtsam::Pose3> > measurements = get<3>(rstep);
+
+        // initialize estimate for ego pose
+        if (b_use_gt) {
+          initial_estimate.insert(ego_sym, Pose3(tf_w_ego_gt));
+          tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
+        }
+        else {
+          if (b_use_gt_init) {
+            initial_estimate.insert(ego_sym, Pose3(tf_w_ego_gt));
+            tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
+          }
+          else {
+            Pose3 tf_w_ego_est_corupted = rslam_utils::add_noise_to_pose3(tf_w_ego_est, 0.1, 0);
+            cout << tf_w_ego_est.translation() - tf_w_ego_est_corupted.translation() <<endl;
+            initial_estimate.insert(ego_sym, tf_w_ego_est_corupted);
+            tf_w_est_preslam_map[ego_sym] = tf_w_ego_est_corupted;
+          }
+        }
+        cout << ego_sym << " init est set [EGO]" << endl;
+        // record values for later easy access by symbol
+        ego_time_map[ego_sym] = time;
+        tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
+
+        gtsam::Pose3 tf_w_ado_gt, tf_w_ado_est;
+        for (const auto & key_val : measurements) {
+          string ado_name = key_val.first;
+          Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id);
+          pair<gtsam::Pose3, gtsam::Pose3> ado_w_gt_est_pair = key_val.second;
+          gtsam::Pose3 tf_ego_ado_gt  = tf_w_ego_gt.inverse()  * ado_w_gt_est_pair.first;  // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
+          gtsam::Pose3 tf_ego_ado_est = tf_w_ego_est.inverse() * ado_w_gt_est_pair.second; // (tf_w_ego_est.inverse()) * tf_w_ado_est;
+          tf_w_ado_gt  = tf_w_ego_gt  * tf_ego_ado_gt;
+          tf_w_ado_est = tf_w_ego_est * tf_ego_ado_est;
+          
+          // record values for later easy access by symbol
+          tf_ego_ado_maps[ego_sym][ado_sym] = make_pair(Pose3(tf_ego_ado_gt), Pose3(tf_ego_ado_est)); // this is so these can be written to a csv file later
+
+          
+          // Add measurement to graph
+          if (b_use_gt) {
+            newFactors.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_gt), constNoiseMatrix);
+            // cout << ego_sym << " <--> " << ado_sym << endl;
+          }
+          else {
+            newFactors.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
+          }
+          cout << ego_sym << " <- graph -> " << ado_sym << endl;
+        }
+        num_meas_since_update++;
+        t_ind++;
+        // Check whether to update iSAM 2 - either its the first time AND its > minMeas... or we have done at least 1 update AND now its been incMeas since
+        if ((!initialized_isam && num_meas_since_update > minMeas) || (initialized_isam && num_meas_since_update > incMeas)) {
+          if (!initialized_isam) { // Do a full optimize for first minK ranges
+            LevenbergMarquardtOptimizer batchOptimizer(newFactors, initial_estimate);
+            initial_estimate = batchOptimizer.optimize();
+            initialized_isam = true;
+          }
+          isam.update(newFactors, initial_estimate);
+          Values result = isam.calculateEstimate();
+          tf_w_ego_est = result.at<Pose3>(t_ind);
+          tf_w_ego_map_isam[time] = make_tuple(string(ego_sym), tf_w_ego_gt, tf_w_ego_est);
+          newFactors = NonlinearFactorGraph();
+          initial_estimate = Values();
+          num_meas_since_update = 0;
+        }
+      }
+      cout << "done with isam" << endl;
+
+      ofstream myFile("/mounted_folder/test_graphs_gtsam/isam_ego_output.csv");
+      for (const auto & key_val : tf_w_ego_map_isam ) {
+        double time = key_val.first;
+        string ego_sym_str = get<0>(key_val.second);
+        gtsam::Pose3 tf_w_ego_gt  = get<1>(key_val.second);
+        gtsam::Pose3 tf_w_ego_est = get<2>(key_val.second);
+        myFile << time << ", " << ego_sym_str << ", " << pose_to_string_line(tf_w_ego_gt) << ", " << pose_to_string_line(tf_w_ego_est) << "\n";
+      }
+      myFile.close();
+      cout << "wrote isam to file" << endl;
+    }
+
+    void run_batch_slam222(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int num_ado_objs) {
       // note: object id serves as landmark id, landmark is same as saying "ado"
       // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
 
@@ -72,13 +268,16 @@ class MSLRaptorSlamClass {
       int t_ind = 0, ego_pose_index = 1;
 
       // STEP 0) Create graph & value objects, create noise model, and add first pose at origin
-      int t_ind_cutoff = 3000;
+      int t_ind_cutoff = 300;
       NonlinearFactorGraph graph;
       Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
 
       // Eventually I will use the ukf's covarience here, but for now use a constant one
+      Vector priorSigmas = (Vector(6) << Vector3(1.,1.,1.), Vector3(M_PI,M_PI,M_PI)).finished();
+      // noiseModel::Diagonal::shared_ptr constNoiseMatrix = gtsam::noiseModel::Isotropic::Sigmas(priorSigmas);
       noiseModel::Diagonal::shared_ptr constNoiseMatrix;
       constNoiseMatrix = noiseModel::Diagonal::Sigmas( (Vector(6) << Vector3::Constant(.005), Vector3::Constant(.05) ).finished());
+      
 
       // Add first pose ("anchor" the graph)
       bool b_landmarks_observed = false; // set to true if we observe at least 1 landmark (so we know if we should try to estimate a pose)
@@ -102,6 +301,7 @@ class MSLRaptorSlamClass {
         cout << "ado_name : " << key_val.first << "\ntf_w_ado0_gt = " << key_val.second << "tf_w_ado0_est = " << tf_w_ado0_est[key_val.first] << endl;
       }
 
+      // assume we know our list of ado objects & have initial estimates
       for (const auto & key_val : tf_w_ado0_gt) {
         string ado_name = key_val.first;
         Pose3 tf_w_ado_gt = key_val.second;
@@ -125,8 +325,28 @@ class MSLRaptorSlamClass {
         }
       }
 
+
+      // isam & parameters
+      ISAM2 isam;
+      size_t minMeas = 100; // minimum number of range measurements to process initially
+      size_t incMeas = 10; // minimum number of range measurements to process after
+
+      // set some loop variables
+      bool initialized_isam = false;
+      Pose3 tf_w_ego_est_latest = first_pose; // where we (ego) are currently
+      size_t num_meas_since_update = 0; // number of measurements since last isam2 update
+      map<double, tuple<string, gtsam::Pose3, gtsam::Pose3>> tf_w_ego_map_isam;
+      double t0 = get<0>(raptor_data[0]);
+      gtsam::Pose3 tf_w_ego_gt0  = get<1>(raptor_data[0]);
+      gtsam::Pose3 tf_w_ego_est0 = get<2>(raptor_data[0]);
+      tf_w_ego_map_isam[t0] = make_tuple(string(ego_sym), tf_w_ego_gt0, tf_w_ego_est0);
+
       for (const auto & rstep : raptor_data ) {
         double time = get<0>(rstep);
+        // if(ego_pose_index > t_ind_cutoff) {
+        //   cout << "\n\nBREAKING LOOP EARLY DUE TO CUTOFF LIMIT!\n" << endl;
+        //   break;
+        // }
         ego_pose_index = 1 + t_ind;
         ego_sym = Symbol('x', ego_pose_index);
         gtsam::Pose3 tf_w_ego_gt  = get<1>(rstep);
@@ -145,7 +365,7 @@ class MSLRaptorSlamClass {
           }
           else {
             Pose3 tf_w_ego_est_corupted = rslam_utils::add_noise_to_pose3(tf_w_ego_est, 0.1, 0);
-            cout << tf_w_ego_est.translation() - tf_w_ego_est_corupted.translation() <<endl;
+            // cout << tf_w_ego_est.translation() - tf_w_ego_est_corupted.translation() <<endl;
             initial_estimate.insert(ego_sym, tf_w_ego_est_corupted);
             tf_w_est_preslam_map[ego_sym] = tf_w_ego_est_corupted;
           }
@@ -177,49 +397,38 @@ class MSLRaptorSlamClass {
             graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
           }
         }
+        num_meas_since_update++; // only count batches of measurements for now
+
+        // Check whether to update iSAM 2 - either its the first time AND its > minMeas... or we have done at least 1 update AND now its been incMeas since
+        if ((!initialized_isam && num_meas_since_update > minMeas) || (initialized_isam && num_meas_since_update > incMeas)) {
+          if (!initialized_isam) { // Do a full optimize for first minK ranges
+            LevenbergMarquardtOptimizer batchOptimizer(graph, initial_estimate);
+            cout << initial_estimate.size() << endl;
+            cout << "l9: "  << initial_estimate.at<Pose3>(symbol('l', 9))  << endl;
+            cout << "l10: " << initial_estimate.at<Pose3>(symbol('l', 10)) << endl;
+            cout << "l11: " << initial_estimate.at<Pose3>(symbol('l', 11)) << endl;
+            cout << "l12: " << initial_estimate.at<Pose3>(symbol('l', 12)) << endl;
+            cout << "x101: " << initial_estimate.at<Pose3>(symbol('x', 101)) << endl;
+            // cout << "x102: " << initial_estimate.at<Pose3>(symbol('x', 102)) << endl;
+            // cout << "x103: " << initial_estimate.at<Pose3>(symbol('x', 103)) << endl;
+            // int tmp_ind = 1;
+            // for (int tmp_ind = 1; tmp_ind < num_meas_since_update+2; tmp_ind++) {
+            //   cout << "x" << tmp_ind << ": " << initial_estimate.at<Pose3>(symbol('x', tmp_ind)) << endl;
+            //   tmp_ind++;
+            // }
+            graph.print();
+            initial_estimate = batchOptimizer.optimize();
+            initialized_isam = true;
+          }
+          isam.update(graph, initial_estimate);
+          Values result = isam.calculateEstimate();
+          tf_w_ego_est = result.at<Pose3>(t_ind);
+          tf_w_ego_map_isam[time] = make_tuple(string(ego_sym), tf_w_ego_gt, tf_w_ego_est);
+          graph = NonlinearFactorGraph();
+          initial_estimate = Values();
+          num_meas_since_update = 0;
+        }
         t_ind++;
-
-        // string ado_name = get<1>(rstep);
-        // Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id);
-        // Pose3 tf_ego_ado_gt  = (get<2>(rstep).inverse()) * get<4>(rstep); // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
-        // Pose3 tf_ego_ado_est = (get<3>(rstep).inverse()) * get<5>(rstep); // (tf_w_ego_est.inverse()) * tf_w_ado_est;
-        // Pose3 tf_w_ego_gt  = tf_w_ado0_gt[ado_name]  * (tf_ego_ado_gt.inverse());
-        // Pose3 tf_w_ego_est = tf_w_ado0_est[ado_name] * (tf_ego_ado_est.inverse());
-        // Pose3 tf_w_ado_gt  = tf_w_ado0_gt[ado_name];
-        // Pose3 tf_w_ado_est = tf_w_ado0_est[ado_name];
-
-
-        // ego_pose_index = 1 + t_ind;
-        // ego_sym = Symbol('x', ego_pose_index);
-
-        // record values for later easy access by symbol
-        // ego_time_map[ego_sym] = time;
-        // tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
-        // tf_ego_ado_maps[ego_sym][ado_sym] = make_pair(Pose3(tf_ego_ado_gt), Pose3(tf_ego_ado_est)); // this is so these can be written to a csv file later
-
-        // if (b_use_gt) {
-        //   graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_gt), constNoiseMatrix);
-        // }
-        // else {
-        //   graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
-        // }
-
-        // // initialize estimate for ego pose
-        // if (b_use_gt) {
-        //   initial_estimate.insert(ego_sym, Pose3(tf_w_ego_gt));
-        //   tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
-        // }
-        // else {
-        //   if (b_use_gt_init) {
-        //     initial_estimate.insert(ego_sym, Pose3(tf_w_ego_gt));
-        //     tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
-        //   }
-        //   else {
-        //     initial_estimate.insert(ego_sym, Pose3(tf_w_ego_est));
-        //     tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_est);
-        //   }
-        // }
-        // t_ind++;
       }
       cout << "done building batch slam graph (w/ initializations)!" << endl;
 
@@ -279,6 +488,441 @@ class MSLRaptorSlamClass {
       string fn = "/mounted_folder/test_graphs_gtsam/graph1.csv";
       cout << "writing results to: " << fn << endl;
       rslam_utils::write_results_csv(fn, raptor_data, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps, obj_param_map);
+    }
+
+    void run_batch_slam333(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int num_ado_objs) {
+      // note: object id serves as landmark id, landmark is same as saying "ado"
+      // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
+
+
+      // SET PARAMTERS FOR RUN
+      bool b_use_gt = false;
+      bool b_use_gt_init = false;
+      if (b_use_gt) {
+        b_use_gt_init = true;
+      }
+
+      // DECLARE VARIABLES 
+      // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
+      map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+      map<Symbol, double> ego_time_map; // store the time at each camera position
+      map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps;
+      vector<pair<Pose3, Pose3>> tf_w_ego_gt_est_vec;
+      int t_ind = 0, ego_pose_index = 1;
+
+      // STEP 0) Create graph & value objects, create noise model, and add first pose at origin
+      int t_ind_cutoff = 300;
+      NonlinearFactorGraph graph;
+      Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
+
+      // Eventually I will use the ukf's covarience here, but for now use a constant one
+      Vector priorSigmas = (Vector(6) << Vector3(1.,1.,1.), Vector3(M_PI,M_PI,M_PI)).finished();
+      // noiseModel::Diagonal::shared_ptr constNoiseMatrix = gtsam::noiseModel::Isotropic::Sigmas(priorSigmas);
+      noiseModel::Diagonal::shared_ptr constNoiseMatrix;
+      constNoiseMatrix = noiseModel::Diagonal::Sigmas( (Vector(6) << Vector3::Constant(.005), Vector3::Constant(.05) ).finished());
+      
+
+      // Add first pose ("anchor" the graph)
+      bool b_landmarks_observed = false; // set to true if we observe at least 1 landmark (so we know if we should try to estimate a pose)
+      Symbol ego_sym = Symbol('x', ego_pose_index);
+      Pose3 first_pose = get<2>(raptor_data[0]);  // use gt value for first ego pose
+      graph.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose, 1); // put a unary factor on first pose to "anchor" the whole graph
+
+      // STEP 1) loop through ego poses, at each time do the following:
+      //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
+      //  - 1B) If first timestep, use the fact that x1 is defined to be origin to set ground truth pose of landmarks. Also use first estimate as initial estimate for landmark pose
+      //  - 1C) Otherwise, use gt / estimate of landmark poses from t0 and current time to gt / estimate of current camera pose (SUBSTITUE FOR ODOMETRY!!)
+      //  - 1D) Use estimate of current camera pose for value initalization
+
+      /////////////////////////////////////
+      // For each ado object (landmark) there will be a single node in the graph. 
+      //    Add it to the graph here and initialized it. Also save values
+      map<string, gtsam::Pose3> tf_w_ado0_gt, tf_w_ado0_est;
+      rslam_utils::get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est, num_ado_objs);
+
+      for (auto const & key_val : tf_w_ado0_gt) {
+        cout << "ado_name : " << key_val.first << "\ntf_w_ado0_gt = " << key_val.second << "tf_w_ado0_est = " << tf_w_ado0_est[key_val.first] << endl;
+      }
+
+      // assume we know our list of ado objects & have initial estimates
+      for (const auto & key_val : tf_w_ado0_gt) {
+        string ado_name = key_val.first;
+        Pose3 tf_w_ado_gt = key_val.second;
+        Pose3 tf_w_ado_est = tf_w_ado0_est[ado_name];
+        Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id);
+
+        tf_w_gt_map[ado_sym] = tf_w_ado_gt;
+        if (b_use_gt) {
+          tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt);
+          initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt));
+        }
+        else {
+          if (b_use_gt_init) {
+            tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt);
+            initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt)); 
+          }
+          else {
+            tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_est); 
+            initial_estimate.insert(ado_sym, rslam_utils::add_noise_to_pose3(tf_w_ado_est, 0.05, 0)); 
+          }
+        }
+      }
+
+      // isam & parameters
+      ISAM2 isam;
+      size_t minMeas = 100; // minimum number of range measurements to process initially
+      size_t incMeas = 10; // minimum number of range measurements to process after
+
+      // set some loop variables
+      bool initialized_isam = false;
+      Pose3 tf_w_ego_est_latest = first_pose; // where we (ego) are currently
+      size_t num_meas_since_update = 0; // number of measurements since last isam2 update
+      map<double, tuple<string, gtsam::Pose3, gtsam::Pose3>> tf_w_ego_map_isam;
+      double t0 = get<0>(raptor_data[0]);
+      gtsam::Pose3 tf_w_ego_gt0  = get<1>(raptor_data[0]);
+      gtsam::Pose3 tf_w_ego_est0 = get<2>(raptor_data[0]);
+      tf_w_ego_map_isam[t0] = make_tuple(string(ego_sym), tf_w_ego_gt0, tf_w_ego_est0);
+
+      for (const auto & rstep : raptor_data ) {
+        double time = get<0>(rstep);
+        // if(ego_pose_index > t_ind_cutoff) {
+        //   cout << "\n\nBREAKING LOOP EARLY DUE TO CUTOFF LIMIT!\n" << endl;
+        //   break;
+        // }
+        ego_pose_index = 1 + t_ind;
+        ego_sym = Symbol('x', ego_pose_index);
+        gtsam::Pose3 tf_w_ego_gt  = get<1>(rstep);
+        gtsam::Pose3 tf_w_ego_est = get<2>(rstep);
+        map<string, pair<gtsam::Pose3, gtsam::Pose3> > measurements = get<3>(rstep);
+
+        // initialize estimate for ego pose
+        if (b_use_gt) {
+          initial_estimate.insert(ego_sym, Pose3(tf_w_ego_gt));
+          tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
+        }
+        else {
+          if (b_use_gt_init) {
+            initial_estimate.insert(ego_sym, Pose3(tf_w_ego_gt));
+            tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
+          }
+          else {
+            Pose3 tf_w_ego_est_corupted = rslam_utils::add_noise_to_pose3(tf_w_ego_est, 0.1, 0);
+            cout << tf_w_ego_est.translation() - tf_w_ego_est_corupted.translation() <<endl;
+            initial_estimate.insert(ego_sym, tf_w_ego_est_corupted);
+            tf_w_est_preslam_map[ego_sym] = tf_w_ego_est_corupted;
+          }
+        }
+
+        // record values for later easy access by symbol
+        ego_time_map[ego_sym] = time;
+        tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
+
+        gtsam::Pose3 tf_w_ado_gt, tf_w_ado_est;
+        for (const auto & key_val : measurements) {
+          string ado_name = key_val.first;
+          Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id);
+          pair<gtsam::Pose3, gtsam::Pose3> ado_w_gt_est_pair = key_val.second;
+          gtsam::Pose3 tf_ego_ado_gt  = tf_w_ego_gt.inverse()  * ado_w_gt_est_pair.first;  // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
+          gtsam::Pose3 tf_ego_ado_est = tf_w_ego_est.inverse() * ado_w_gt_est_pair.second; // (tf_w_ego_est.inverse()) * tf_w_ado_est;
+          tf_w_ado_gt  = tf_w_ego_gt  * tf_ego_ado_gt;
+          tf_w_ado_est = tf_w_ego_est * tf_ego_ado_est;
+          
+          // record values for later easy access by symbol
+          tf_ego_ado_maps[ego_sym][ado_sym] = make_pair(Pose3(tf_ego_ado_gt), Pose3(tf_ego_ado_est)); // this is so these can be written to a csv file later
+          
+          // Add measurement to graph
+          if (b_use_gt) {
+            graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_gt), constNoiseMatrix);
+            // cout << ego_sym << " <--> " << ado_sym << endl;
+          }
+          else {
+            graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
+          }
+        }
+
+
+        num_meas_since_update++; // only count batches of measurements for now
+
+        // Check whether to update iSAM 2 - either its the first time AND its > minMeas... or we have done at least 1 update AND now its been incMeas since
+        if ((!initialized_isam && num_meas_since_update > minMeas) || (initialized_isam && num_meas_since_update > incMeas)) {
+          cout << endl;
+        }
+        t_ind++;
+      }
+      cout << "done building batch slam graph (w/ initializations)!" << endl;
+
+      // STEP 2) create Levenberg-Marquardt optimizer for resulting factor graph, optimize
+      LevenbergMarquardtOptimizer optimizer(graph, initial_estimate);
+      Values result = optimizer.optimize();
+      cout << "done optimizing pose graph" << endl;
+
+      // STEP 3 Loop through each ego /landmark pose and compare estimate with ground truth (both before and after slam optimization)
+      Values::ConstFiltered<Pose3> poses = result.filter<Pose3>();
+
+      int i = 0;
+      vector<double> t_diff_pre, rot_diff_pre, t_diff_post, rot_diff_post;
+      double ave_t_diff_pre = 0, ave_rot_diff_pre = 0, ave_t_diff_post = 0, ave_rot_diff_post = 0;
+      bool b_degrees = true;  
+      for(const auto& key_value: poses) {
+        // Extract Symbol and Pose from dict & store in map
+        Symbol sym = Symbol(key_value.key);
+        Pose3 tf_w_est_postslam = key_value.value;
+        tf_w_est_postslam_map[sym] = tf_w_est_postslam;
+
+        // Find corresponding gt pose and preslam pose
+        Pose3 tf_w_gt = tf_w_gt_map[sym], tf_w_gt_inv = tf_w_gt.inverse();
+        Pose3 tf_w_est_preslam = tf_w_est_preslam_map[sym];
+        
+        double t_diff_pre_val, rot_diff_pre_val, t_diff_post_val, rot_diff_post_val; 
+        rslam_utils::calc_pose_delta(tf_w_est_preslam, tf_w_gt_inv, &t_diff_pre_val, &rot_diff_pre_val, b_degrees);
+        rslam_utils::calc_pose_delta(tf_w_est_postslam, tf_w_gt_inv, &t_diff_post_val, &rot_diff_post_val, b_degrees);
+        t_diff_pre.push_back(t_diff_pre_val);
+        rot_diff_pre.push_back(rot_diff_pre_val);
+        t_diff_post.push_back(t_diff_post_val);
+        rot_diff_post.push_back(rot_diff_post_val);
+        ave_t_diff_pre += abs(t_diff_pre_val);
+        ave_rot_diff_pre += abs(rot_diff_pre_val);
+        ave_t_diff_post += abs(t_diff_post_val);
+        ave_rot_diff_post += abs(rot_diff_post_val);
+
+        cout << "-----------------------------------------------------" << endl;
+        cout << "evaluating " << sym << ":" << endl;
+        // cout << "gt pose:" << tf_w_gt << endl;
+        // cout << "pre-process est pose:" << tf_w_est_preslam << endl;
+        // cout << "post-process est pose:" << tf_w_est_postslam << endl;
+        cout << "delta pre-slam: t = " << t_diff_pre_val << ", ang = " << rot_diff_pre_val << " deg" << endl;
+        cout << "delta post-slam: t = " << t_diff_post_val << ", ang = " << rot_diff_post_val << " deg" << endl;
+        i++;
+      }
+      ave_t_diff_pre /= double(i);
+      ave_rot_diff_pre /= double(i);
+      ave_t_diff_post /= double(i);
+      ave_rot_diff_post /= double(i);
+      cout << "\n-----------------------------------------------------\n-----------------------------------------------------\n" << endl;
+      cout << "initial error = " << graph.error(initial_estimate) << endl;  // iterate over all the factors_ to accumulate the log probabilities
+      cout << "final error = " << graph.error(result) << "\n" << endl;  // iterate over all the factors_ to accumulate the log probabilities
+      cout << "Averages t_pre = " << ave_t_diff_pre << ", t_post = " << ave_t_diff_post << endl;
+      cout << "Averages rot_pre = " << ave_rot_diff_pre << " deg, rot_post = " << ave_rot_diff_post << " deg" << endl;
+
+      string fn = "/mounted_folder/test_graphs_gtsam/graph1.csv";
+      cout << "writing results to: " << fn << endl;
+      rslam_utils::write_results_csv(fn, raptor_data, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps, obj_param_map);
+    }
+
+    void run_batch_slam(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int num_ado_objs) {
+      // note: object id serves as landmark id, landmark is same as saying "ado"
+      // https://github.com/borglab/gtsam/blob/develop/examples/StereoVOExample.cpp <-- example VO, but using betweenFactors instead of stereo
+
+
+      // SET PARAMTERS FOR RUN
+      bool b_use_gt = false;
+      bool b_use_gt_init = false;
+      if (b_use_gt) {
+        b_use_gt_init = true;
+      }
+
+      // DECLARE VARIABLES 
+      // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
+      map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+      map<Symbol, double> ego_time_map; // store the time at each camera position
+      map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps;
+      vector<pair<Pose3, Pose3>> tf_w_ego_gt_est_vec;
+      int t_ind = 0, ego_pose_index = 1;
+
+      // STEP 0) Create graph & value objects, create noise model, and add first pose at origin
+      int t_ind_cutoff = 300;
+      NonlinearFactorGraph graph;
+      Values initial_estimate; // create Values object to contain initial estimates of camera poses and landmark locations
+
+      // Eventually I will use the ukf's covarience here, but for now use a constant one
+      Vector priorSigmas = (Vector(6) << Vector3(1.,1.,1.), Vector3(M_PI,M_PI,M_PI)).finished();
+      // noiseModel::Diagonal::shared_ptr constNoiseMatrix = gtsam::noiseModel::Isotropic::Sigmas(priorSigmas);
+      noiseModel::Diagonal::shared_ptr constNoiseMatrix;
+      constNoiseMatrix = noiseModel::Diagonal::Sigmas( (Vector(6) << Vector3::Constant(.005), Vector3::Constant(.05) ).finished());
+      
+
+      // Add first pose ("anchor" the graph)
+      bool b_landmarks_observed = false; // set to true if we observe at least 1 landmark (so we know if we should try to estimate a pose)
+      Symbol ego_sym = Symbol('x', ego_pose_index);
+      Pose3 first_pose = get<2>(raptor_data[0]);  // use gt value for first ego pose
+      graph.emplace_shared<NonlinearEquality<Pose3> >(Symbol('x', ego_pose_index), first_pose, 1); // put a unary factor on first pose to "anchor" the whole graph
+
+      // STEP 1) loop through ego poses, at each time do the following:
+      //  - 1A) Add factors to graph between this pose and any visible landmarks various landmarks as we go 
+      //  - 1B) If first timestep, use the fact that x1 is defined to be origin to set ground truth pose of landmarks. Also use first estimate as initial estimate for landmark pose
+      //  - 1C) Otherwise, use gt / estimate of landmark poses from t0 and current time to gt / estimate of current camera pose (SUBSTITUE FOR ODOMETRY!!)
+      //  - 1D) Use estimate of current camera pose for value initalization
+
+      /////////////////////////////////////
+      // For each ado object (landmark) there will be a single node in the graph. 
+      //    Add it to the graph here and initialized it. Also save values
+      map<string, gtsam::Pose3> tf_w_ado0_gt, tf_w_ado0_est;
+      rslam_utils::get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est, num_ado_objs);
+
+      for (auto const & key_val : tf_w_ado0_gt) {
+        cout << "ado_name : " << key_val.first << "\ntf_w_ado0_gt = " << key_val.second << "tf_w_ado0_est = " << tf_w_ado0_est[key_val.first] << endl;
+      }
+
+      // assume we know our list of ado objects & have initial estimates
+      for (const auto & key_val : tf_w_ado0_gt) {
+        string ado_name = key_val.first;
+        Pose3 tf_w_ado_gt = key_val.second;
+        Pose3 tf_w_ado_est = tf_w_ado0_est[ado_name];
+        Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id);
+
+        tf_w_gt_map[ado_sym] = tf_w_ado_gt;
+        if (b_use_gt) {
+          tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt);
+          initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt));
+        }
+        else {
+          if (b_use_gt_init) {
+            tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt);
+            initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt)); 
+          }
+          else {
+            tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_est); 
+            initial_estimate.insert(ado_sym, rslam_utils::add_noise_to_pose3(tf_w_ado_est, 0.05, 0)); 
+          }
+        }
+      }
+
+      for (const auto & rstep : raptor_data ) {
+        double time = get<0>(rstep);
+        // if(ego_pose_index > t_ind_cutoff) {
+        //   cout << "\n\nBREAKING LOOP EARLY DUE TO CUTOFF LIMIT!\n" << endl;
+        //   break;
+        // }
+        ego_pose_index = 1 + t_ind;
+        ego_sym = Symbol('x', ego_pose_index);
+        gtsam::Pose3 tf_w_ego_gt  = get<1>(rstep);
+        gtsam::Pose3 tf_w_ego_est = get<2>(rstep);
+        map<string, pair<gtsam::Pose3, gtsam::Pose3> > measurements = get<3>(rstep);
+
+        // initialize estimate for ego pose
+        if (b_use_gt) {
+          initial_estimate.insert(ego_sym, Pose3(tf_w_ego_gt));
+          tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
+        }
+        else {
+          if (b_use_gt_init) {
+            initial_estimate.insert(ego_sym, Pose3(tf_w_ego_gt));
+            tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
+          }
+          else {
+            Pose3 tf_w_ego_est_corupted = rslam_utils::add_noise_to_pose3(tf_w_ego_est, 0.1, 0);
+            cout << tf_w_ego_est.translation() - tf_w_ego_est_corupted.translation() <<endl;
+            initial_estimate.insert(ego_sym, tf_w_ego_est_corupted);
+            tf_w_est_preslam_map[ego_sym] = tf_w_ego_est_corupted;
+          }
+        }
+
+        // record values for later easy access by symbol
+        ego_time_map[ego_sym] = time;
+        tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
+
+        gtsam::Pose3 tf_w_ado_gt, tf_w_ado_est;
+        for (const auto & key_val : measurements) {
+          string ado_name = key_val.first;
+          Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id);
+          pair<gtsam::Pose3, gtsam::Pose3> ado_w_gt_est_pair = key_val.second;
+          gtsam::Pose3 tf_ego_ado_gt  = tf_w_ego_gt.inverse()  * ado_w_gt_est_pair.first;  // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
+          gtsam::Pose3 tf_ego_ado_est = tf_w_ego_est.inverse() * ado_w_gt_est_pair.second; // (tf_w_ego_est.inverse()) * tf_w_ado_est;
+          tf_w_ado_gt  = tf_w_ego_gt  * tf_ego_ado_gt;
+          tf_w_ado_est = tf_w_ego_est * tf_ego_ado_est;
+          
+          // record values for later easy access by symbol
+          tf_ego_ado_maps[ego_sym][ado_sym] = make_pair(Pose3(tf_ego_ado_gt), Pose3(tf_ego_ado_est)); // this is so these can be written to a csv file later
+          
+          // Add measurement to graph
+          if (b_use_gt) {
+            graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_gt), constNoiseMatrix);
+            // cout << ego_sym << " <--> " << ado_sym << endl;
+          }
+          else {
+            graph.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
+          }
+        }
+        t_ind++;
+      }
+      cout << "done building batch slam graph (w/ initializations)!" << endl;
+
+      // STEP 2) create Levenberg-Marquardt optimizer for resulting factor graph, optimize
+      LevenbergMarquardtOptimizer optimizer(graph, initial_estimate);
+      Values result = optimizer.optimize();
+      cout << "done optimizing pose graph" << endl;
+
+      // STEP 3 Loop through each ego /landmark pose and compare estimate with ground truth (both before and after slam optimization)
+      Values::ConstFiltered<Pose3> poses = result.filter<Pose3>();
+
+      int i = 0;
+      vector<double> t_diff_pre, rot_diff_pre, t_diff_post, rot_diff_post;
+      double ave_t_diff_pre = 0, ave_rot_diff_pre = 0, ave_t_diff_post = 0, ave_rot_diff_post = 0;
+      bool b_degrees = true;  
+      for(const auto& key_value: poses) {
+        // Extract Symbol and Pose from dict & store in map
+        Symbol sym = Symbol(key_value.key);
+        Pose3 tf_w_est_postslam = key_value.value;
+        tf_w_est_postslam_map[sym] = tf_w_est_postslam;
+
+        // Find corresponding gt pose and preslam pose
+        Pose3 tf_w_gt = tf_w_gt_map[sym], tf_w_gt_inv = tf_w_gt.inverse();
+        Pose3 tf_w_est_preslam = tf_w_est_preslam_map[sym];
+        
+        double t_diff_pre_val, rot_diff_pre_val, t_diff_post_val, rot_diff_post_val; 
+        rslam_utils::calc_pose_delta(tf_w_est_preslam, tf_w_gt_inv, &t_diff_pre_val, &rot_diff_pre_val, b_degrees);
+        rslam_utils::calc_pose_delta(tf_w_est_postslam, tf_w_gt_inv, &t_diff_post_val, &rot_diff_post_val, b_degrees);
+        t_diff_pre.push_back(t_diff_pre_val);
+        rot_diff_pre.push_back(rot_diff_pre_val);
+        t_diff_post.push_back(t_diff_post_val);
+        rot_diff_post.push_back(rot_diff_post_val);
+        ave_t_diff_pre += abs(t_diff_pre_val);
+        ave_rot_diff_pre += abs(rot_diff_pre_val);
+        ave_t_diff_post += abs(t_diff_post_val);
+        ave_rot_diff_post += abs(rot_diff_post_val);
+
+        cout << "-----------------------------------------------------" << endl;
+        cout << "evaluating " << sym << ":" << endl;
+        // cout << "gt pose:" << tf_w_gt << endl;
+        // cout << "pre-process est pose:" << tf_w_est_preslam << endl;
+        // cout << "post-process est pose:" << tf_w_est_postslam << endl;
+        cout << "delta pre-slam: t = " << t_diff_pre_val << ", ang = " << rot_diff_pre_val << " deg" << endl;
+        cout << "delta post-slam: t = " << t_diff_post_val << ", ang = " << rot_diff_post_val << " deg" << endl;
+        i++;
+      }
+      ave_t_diff_pre /= double(i);
+      ave_rot_diff_pre /= double(i);
+      ave_t_diff_post /= double(i);
+      ave_rot_diff_post /= double(i);
+      cout << "\n-----------------------------------------------------\n-----------------------------------------------------\n" << endl;
+      cout << "initial error = " << graph.error(initial_estimate) << endl;  // iterate over all the factors_ to accumulate the log probabilities
+      cout << "final error = " << graph.error(result) << "\n" << endl;  // iterate over all the factors_ to accumulate the log probabilities
+      cout << "Averages t_pre = " << ave_t_diff_pre << ", t_post = " << ave_t_diff_post << endl;
+      cout << "Averages rot_pre = " << ave_rot_diff_pre << " deg, rot_post = " << ave_rot_diff_post << " deg" << endl;
+
+      string fn = "/mounted_folder/test_graphs_gtsam/graph1.csv";
+      cout << "writing results to: " << fn << endl;
+      rslam_utils::write_results_csv(fn, raptor_data, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps, obj_param_map);
+    }
+
+    string pose_to_string_line(Pose3 p){
+      string s;
+      Point3 t = p.translation();
+      Rot3 R = p.rotation();
+      Matrix3 M = R.matrix();
+      s = to_string(t.x()) + ", ";
+      s += to_string(t.y()) + ", ";
+      s += to_string(t.z()) + ", ";
+      s += to_string(M(0,0)) + ", ";
+      s += to_string(M(0,1)) + ", ";
+      s += to_string(M(0,2)) + ", ";
+      s += to_string(M(1,0)) + ", ";
+      s += to_string(M(1,1)) + ", ";
+      s += to_string(M(1,2)) + ", ";
+      s += to_string(M(2,0)) + ", ";
+      s += to_string(M(2,1)) + ", ";
+      s += to_string(M(2,2));
+      return s;
     }
 
     ~MSLRaptorSlamClass() {}

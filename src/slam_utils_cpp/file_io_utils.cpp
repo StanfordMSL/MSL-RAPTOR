@@ -140,7 +140,7 @@ namespace rslam_utils {
               // For each class seen, if more than 1 object use hungarian algo with the gt data
               //    hungarian algo: 1) build cost matrix 2) solve assignment
                 vector< vector<double> > costMatrix; // rows: # object instances seen this timestep, col: total # of possible instances of this class
-                bool b_print_out_hungarian_algo_details = true;
+                bool b_print_out_hungarian_algo_details = false;
                 int row_index = 0; // index of currently seen object instances i.e. est_pose_vec
 
                 vector<string> candidate_ado_names;
@@ -207,13 +207,13 @@ namespace rslam_utils {
             if (m.getTopic() == topic_str || ("/" + m.getTopic() == topic_str)) {
               geo_msg = m.instantiate<geometry_msgs::PoseStamped>();
               if (geo_msg != nullptr) {
-                if( ado_topic_to_name[topic_str] == "bowl_green_msl") {
-                  cout << "new gt message for " << ado_topic_to_name[topic_str] << " at " << time*1000 << endl;
-                  if( abs(last_time_debug - time) < 0.00001) {
-                    cout << endl;
-                  }
-                  last_time_debug = time;
-                }
+                // if( ado_topic_to_name[topic_str] == "bowl_green_msl") {
+                //   cout << "new gt message for " << ado_topic_to_name[topic_str] << " at " << time*1000 << endl;
+                //   if( abs(last_time_debug - time) < 0.00001) {
+                //     cout << endl;
+                //   }
+                //   last_time_debug = time;
+                // }
                 ado_data_gt[ado_topic_to_name[topic_str]].emplace_back(time, remove_yaw(ros_geo_pose_to_gtsam(geo_msg->pose)));
                 prev_gt_pose[ado_topic_to_name[topic_str]] = geo_msg->pose;
                 break;
