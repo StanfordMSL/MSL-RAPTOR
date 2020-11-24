@@ -157,16 +157,16 @@ class MSLRaptorSlamClass {
       bool initialized_isam = false;
       Pose3 tf_w_ego_est_latest = first_pose; // where we (ego) are currently
       size_t num_meas_since_update = 0; // number of measurements since last isam2 update
-      map<double, tuple<string, gtsam::Pose3, gtsam::Pose3>> tf_w_ego_map_isam;
       double t0 = get<0>(raptor_data[0]);
       gtsam::Pose3 tf_w_ego_gt0  = get<1>(raptor_data[0]);
       gtsam::Pose3 tf_w_ego_est0 = get<2>(raptor_data[0]);
-      tf_w_ego_map_isam[t0] = make_tuple(string(ego_sym), tf_w_ego_gt0, tf_w_ego_est0);
+      map<string, double> ego_sym_time_map; //  map[ego+sym] = time;
 
       for (const auto & rstep : raptor_data ) {
         double time = get<0>(rstep);
         ego_pose_index = 1 + t_ind;
         ego_sym = Symbol('x', ego_pose_index);
+        ego_sym_time_map[ego_sym] = time;
         gtsam::Pose3 tf_w_ego_gt  = get<1>(rstep);
         gtsam::Pose3 tf_w_ego_est = get<2>(rstep);
         tf_w_ego_est_latest = tf_w_ego_est;
@@ -233,8 +233,7 @@ class MSLRaptorSlamClass {
           }
           isam.update(newFactors, initial_estimate);
           Values result = isam.calculateEstimate();
-          tf_w_ego_est = result.at<Pose3>(symbol('x', t_ind));
-          tf_w_ego_map_isam[time] = make_tuple(string(ego_sym), tf_w_ego_gt, tf_w_ego_est);
+          tf_w_ego_est = result.at<Pose3>(symbol('x', t_ind));          
           newFactors = NonlinearFactorGraph();
           initial_estimate = Values();
           num_meas_since_update = 0;
@@ -242,6 +241,17 @@ class MSLRaptorSlamClass {
         t_ind++;
       }
       cout << "done with isam" << endl;
+
+      // save all ego values in tf_w_ego_map_isam
+      Values result = isam.calculateEstimate();
+      map<double, tuple<string, gtsam::Pose3, gtsam::Pose3>> tf_w_ego_map_isam;
+      Values::ConstFiltered<Pose3> isam_poses = result.filter<Pose3>(Symbol::ChrTest('x'));
+      int itr = 0;
+      for(const auto& key_value: isam_poses) {
+        Symbol ego_sym = Symbol(key_value.key);
+        Pose3 tf_w_ego_est_tmp = key_value.value;
+        tf_w_ego_map_isam[ego_sym_time_map[ego_sym]] = make_tuple(string(ego_sym), tf_w_gt_map[ego_sym], tf_w_ego_est_tmp);
+      }
 
       ofstream myFile("/mounted_folder/test_graphs_gtsam/isam_ego_output.csv");
       for (const auto & key_val : tf_w_ego_map_isam ) {
