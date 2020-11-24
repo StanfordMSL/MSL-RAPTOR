@@ -47,9 +47,9 @@ class MSLRaptorSlamClass {
       vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > raptor_data; // time, ego_pose_gt, ego_pose_est, ado_name_to_gt_est_poses
       rslam_utils::load_rosbag(raptor_data, num_ado_objs, processed_rosbag, ego_ns, obj_param_map, dt_thresh, b_nocs_data); // "fills in" raptor_data, num_ado_objs
       string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
-      run_batch_slam333(raptor_data, num_ado_objs);
+      // run_batch_slam333(raptor_data, num_ado_objs);
       // run_batch_slam(raptor_data, num_ado_objs);
-      // run_iterative_slam(raptor_data, num_ado_objs);
+      run_iterative_slam(raptor_data, num_ado_objs);
     }
 
     void run_iterative_slam(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int num_ado_objs) {
@@ -120,29 +120,33 @@ class MSLRaptorSlamClass {
         cout << "ado_name : " << key_val.first << "\ntf_w_ado0_gt = " << key_val.second << "tf_w_ado0_est = " << tf_w_ado0_est[key_val.first] << endl;
       }
 
+      // IMPORTANT: dont insert inital values until you actually see the object, otherwise with isam you can get error!
       // assume we know our list of ado objects & have initial estimates
+      map<string, pair<bool, Pose3>> initial_estimate_tf_w_ado_map; //map: ado_name -> <b_have_initialized_this_ado, tf_w_ado0>
       for (const auto & key_val : tf_w_ado0_gt) {
         string ado_name = key_val.first;
         Pose3 tf_w_ado_gt = key_val.second;
         Pose3 tf_w_ado_est = tf_w_ado0_est[ado_name];
-        Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id);
+        Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id); 
 
         tf_w_gt_map[ado_sym] = tf_w_ado_gt;
         if (b_use_gt) {
           tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt);
-          initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt));
+          // initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt));
+          initial_estimate_tf_w_ado_map[ado_sym] = make_pair(false, Pose3(tf_w_ado_gt));
         }
         else {
           if (b_use_gt_init) {
             tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt);
-            initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt)); 
+            // initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt)); 
+            initial_estimate_tf_w_ado_map[ado_sym] = make_pair(false, Pose3(tf_w_ado_gt));
           }
           else {
             tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_est); 
-            initial_estimate.insert(ado_sym, rslam_utils::add_noise_to_pose3(tf_w_ado_est, 0.05, 0)); 
+            // initial_estimate.insert(ado_sym, rslam_utils::add_noise_to_pose3(tf_w_ado_est, 0.05, 0)); 
+            initial_estimate_tf_w_ado_map[ado_sym] = make_pair(false, Pose3(tf_w_ado_est));
           }
         }
-        cout << ado_sym << " init est set [ADO]" << endl;
       }
 
 
@@ -200,6 +204,12 @@ class MSLRaptorSlamClass {
           gtsam::Pose3 tf_ego_ado_est = tf_w_ego_est.inverse() * ado_w_gt_est_pair.second; // (tf_w_ego_est.inverse()) * tf_w_ado_est;
           tf_w_ado_gt  = tf_w_ego_gt  * tf_ego_ado_gt;
           tf_w_ado_est = tf_w_ego_est * tf_ego_ado_est;
+
+          // check if we have seen this before, if not init estimate
+          if(!initial_estimate_tf_w_ado_map[ado_sym].first) {
+            initial_estimate.insert(ado_sym, initial_estimate_tf_w_ado_map[ado_sym].second);
+            initial_estimate_tf_w_ado_map[ado_sym].first = true;
+          }
           
           // record values for later easy access by symbol
           tf_ego_ado_maps[ego_sym][ado_sym] = make_pair(Pose3(tf_ego_ado_gt), Pose3(tf_ego_ado_est)); // this is so these can be written to a csv file later
@@ -216,22 +226,22 @@ class MSLRaptorSlamClass {
           cout << ego_sym << " <- graph -> " << ado_sym << endl;
         }
         num_meas_since_update++;
-        t_ind++;
         // Check whether to update iSAM 2 - either its the first time AND its > minMeas... or we have done at least 1 update AND now its been incMeas since
         if ((!initialized_isam && num_meas_since_update > minMeas) || (initialized_isam && num_meas_since_update > incMeas)) {
-          if (!initialized_isam) { // Do a full optimize for first minK ranges
+          if (!initialized_isam) { // Do a full optimize for first minMeas ranges
             LevenbergMarquardtOptimizer batchOptimizer(newFactors, initial_estimate);
             initial_estimate = batchOptimizer.optimize();
             initialized_isam = true;
           }
           isam.update(newFactors, initial_estimate);
           Values result = isam.calculateEstimate();
-          tf_w_ego_est = result.at<Pose3>(t_ind);
+          tf_w_ego_est = result.at<Pose3>(symbol('x', t_ind));
           tf_w_ego_map_isam[time] = make_tuple(string(ego_sym), tf_w_ego_gt, tf_w_ego_est);
           newFactors = NonlinearFactorGraph();
           initial_estimate = Values();
           num_meas_since_update = 0;
         }
+        t_ind++;
       }
       cout << "done with isam" << endl;
 
@@ -547,6 +557,9 @@ class MSLRaptorSlamClass {
       // assume we know our list of ado objects & have initial estimates
       for (const auto & key_val : tf_w_ado0_gt) {
         string ado_name = key_val.first;
+        if(ado_name == "mug_duke") {
+          continue;
+        }
         Pose3 tf_w_ado_gt = key_val.second;
         Pose3 tf_w_ado_est = tf_w_ado0_est[ado_name];
         Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id);
@@ -644,7 +657,16 @@ class MSLRaptorSlamClass {
         num_meas_since_update++; // only count batches of measurements for now
 
         // Check whether to update iSAM 2 - either its the first time AND its > minMeas... or we have done at least 1 update AND now its been incMeas since
-        if ((!initialized_isam && num_meas_since_update > minMeas) || (initialized_isam && num_meas_since_update > incMeas)) {
+        if (1 || ((!initialized_isam && num_meas_since_update > minMeas) || (initialized_isam && num_meas_since_update > incMeas))) {
+          LevenbergMarquardtOptimizer batchOptimizer(graph, initial_estimate);
+          graph.print();
+          cout << initial_estimate.size() << endl;
+          cout << "l9: "  << initial_estimate.at<Pose3>(symbol('l', 9))  << endl;
+          cout << "l10: " << initial_estimate.at<Pose3>(symbol('l', 10)) << endl;
+          cout << "l11: " << initial_estimate.at<Pose3>(symbol('l', 11)) << endl;
+          // cout << "l12: " << initial_estimate.at<Pose3>(symbol('l', 12)) << endl;
+          cout << "x1: " << initial_estimate.at<Pose3>(symbol('x', 1)) << endl;
+          initial_estimate = batchOptimizer.optimize();
           cout << endl;
         }
         t_ind++;
