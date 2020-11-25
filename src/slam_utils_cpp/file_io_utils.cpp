@@ -116,8 +116,8 @@ namespace rslam_utils {
             map<string, vector<geometry_msgs::Pose>> observed_poses_by_class;
             for (const auto & tracked_obj : raptor_msg->tracked_objects) {
               geometry_msgs::Pose tracked_pose = tracked_obj.pose.pose;
-              if( observed_poses_by_class.find(tracked_obj.class_str) == observed_poses_by_class.end() ) { 
-                // first oservance of this object, need to initialize vector
+              if( observed_poses_by_class.count(tracked_obj.class_str) == 0 ) { 
+                // first observance of this object, need to initialize vector
                 vector<geometry_msgs::Pose> pose_vec{tracked_pose};
                 observed_poses_by_class[tracked_obj.class_str] = pose_vec; 
               }
@@ -133,7 +133,9 @@ namespace rslam_utils {
               if (instance_gt_pose_vec.size() == 1) {
                 // No need for hungarian algo, just 1 object of this class in our environment!
                 string instance_name = instance_gt_pose_vec[0].first;
-                geometry_msgs::Pose pose = instance_gt_pose_vec[0].second;
+                // geometry_msgs::Pose pose = instance_gt_pose_vec[0].second; // THIS IS WRONG!!!
+                geometry_msgs::Pose pose = est_pose_vec[0]; 
+                assert(est_pose_vec.size()==1);
                 ado_data_est[instance_name].emplace_back(time, ros_geo_pose_to_gtsam(pose));
               }
               else { // use Hungarian algo!
@@ -537,7 +539,6 @@ namespace rslam_utils {
         gtsam::Pose3 tf_w_ado_est_pre   = tf_w_ego_est_pre * tf_ego_ado_est;
         gtsam::Pose3 tf_w_ado_est_post  = tf_w_ego_est_post * tf_ego_ado_est;
 
-        cout << ado_sym << tf_w_ado_gt << tf_w_ado_est_pre << tf_w_ado_est_post << endl;
 
         myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_gt) << ", " 
                                                 << pose_to_string_line(tf_w_ado_est_pre) << ", " 
