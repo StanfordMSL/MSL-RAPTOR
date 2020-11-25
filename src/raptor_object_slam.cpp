@@ -111,50 +111,22 @@ class MSLRaptorSlamClass {
 
       /////////////////////////////////////
       // For each ado object (landmark) there will be a single node in the graph. 
-      //    Add it to the graph here and initialized it. Also save values
+      // assume we know our list of ado objects & have initial estimates
       map<string, gtsam::Pose3> tf_w_ado0_gt, tf_w_ado0_est;
       rslam_utils::get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est);
-      vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > raptor_data_tmp = raptor_data;
-      rslam_utils::write_batch_slam_inputs_csv("/mounted_folder/test_graphs_gtsam/batch_input2.csv", raptor_data_tmp, obj_param_map);
 
+      cout << "\n---------- tf_w_ado0 --------------------" << endl;
       for (auto const & key_val : tf_w_ado0_gt) {
         cout << "ado_name : " << key_val.first << "\ntf_w_ado0_gt = " << key_val.second << "tf_w_ado0_est = " << tf_w_ado0_est[key_val.first] << endl;
       }
+      cout << "---------- done printing out tf_w_ado0 --------------------\n" << endl;
 
-      // IMPORTANT: dont insert inital values until you actually see the object, otherwise with isam you can get error!
-      // assume we know our list of ado objects & have initial estimates
-      map<string, pair<bool, Pose3>> initial_estimate_tf_w_ado_map; //map: ado_name -> <b_have_initialized_this_ado, tf_w_ado0>
-      for (const auto & key_val : tf_w_ado0_gt) {
-        string ado_name = key_val.first;
-        Pose3 tf_w_ado_gt = key_val.second;
-        Pose3 tf_w_ado_est = tf_w_ado0_est[ado_name];
-        Symbol ado_sym = Symbol('l', obj_param_map[ado_name].obj_id); 
-
-        tf_w_gt_map[ado_sym] = tf_w_ado_gt;
-        if (b_use_gt) {
-          tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt);
-          // initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt));
-          initial_estimate_tf_w_ado_map[ado_sym] = make_pair(false, Pose3(tf_w_ado_gt));
-        }
-        else {
-          if (b_use_gt_init) {
-            tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt);
-            // initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt)); 
-            initial_estimate_tf_w_ado_map[ado_sym] = make_pair(false, Pose3(tf_w_ado_gt));
-          }
-          else {
-            tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_est); 
-            // initial_estimate.insert(ado_sym, rslam_utils::add_noise_to_pose3(tf_w_ado_est, 0.05, 0)); 
-            initial_estimate_tf_w_ado_map[ado_sym] = make_pair(false, Pose3(tf_w_ado_est));
-            cout << "=========" << ado_name << tf_w_ado_gt << tf_w_ado_est << endl;
-          }
-        }
-      }
       // isam parameters
       size_t minMeas = 100; // minimum number of range measurements to process initially
       size_t incMeas = 10; // minimum number of range measurements to process after
 
       // set some loop variables
+      set<string> seen_ado_objects; // keep track of which ado objects have been seen (and therefore have had their position estimates initialized)
       bool initialized_isam = false;
       Pose3 tf_w_ego_est_latest = first_pose; // where we (ego) are currently
       size_t num_meas_since_update = 0; // number of measurements since last isam2 update
@@ -204,10 +176,26 @@ class MSLRaptorSlamClass {
           tf_w_ado_gt  = tf_w_ego_gt  * tf_ego_ado_gt;
           tf_w_ado_est = tf_w_ego_est * tf_ego_ado_est;
 
-          // check if we have seen this before, if not init estimate
-          if(!initial_estimate_tf_w_ado_map[ado_sym].first) {
-            initial_estimate.insert(ado_sym, initial_estimate_tf_w_ado_map[ado_sym].second);
-            initial_estimate_tf_w_ado_map[ado_sym].first = true;
+          // check if we have seen this before, if not init ado estimate [this is done ONCE per ado object]
+          if (seen_ado_objects.count(ado_name) == 0) {
+            seen_ado_objects.insert(ado_name); // this marks it as "seen"
+            Pose3 tf_w_ado_gt_init = tf_w_ado0_gt[ado_name];
+            Pose3 tf_w_ado_est_init = tf_w_ado0_est[ado_name];
+            tf_w_gt_map[ado_sym] = tf_w_ado_gt_init; // this is probably "right" way to do it
+            if (b_use_gt) {
+              tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt_init);
+              initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt_init));
+            }
+            else {
+              if (b_use_gt_init) {
+                tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_gt_init);
+                initial_estimate.insert(ado_sym, Pose3(tf_w_ado_gt_init)); ;
+              }
+              else {
+                tf_w_est_preslam_map[ado_sym] = Pose3(tf_w_ado_est_init); 
+                initial_estimate.insert(ado_sym, rslam_utils::add_noise_to_pose3(tf_w_ado_est_init, 0.05, 0)); 
+              }
+            }
           }
           
           // record values for later easy access by symbol
