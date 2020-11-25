@@ -184,7 +184,7 @@ class MSLRaptorSlamClass {
             tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
           }
           else {
-            Pose3 tf_w_ego_est_corupted = rslam_utils::add_noise_to_pose3(tf_w_ego_est, 0.1, 0);
+            Pose3 tf_w_ego_est_corupted = rslam_utils::add_noise_to_pose3(tf_w_ego_est, 0.2, 0);
             // cout << tf_w_ego_est.translation() - tf_w_ego_est_corupted.translation() <<endl;
             initial_estimate.insert(ego_sym, tf_w_ego_est_corupted);
             tf_w_est_preslam_map[ego_sym] = tf_w_ego_est_corupted;

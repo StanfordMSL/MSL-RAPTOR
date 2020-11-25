@@ -510,11 +510,6 @@ namespace rslam_utils {
                                     map<gtsam::Symbol, map<gtsam::Symbol, pair<gtsam::Pose3, gtsam::Pose3> > > &tf_ego_ado_maps,
                                     map<string, obj_param_t> &obj_param_map) {
     ofstream myFile(fn);
-    // for (const auto & ado_sym : ado_sym_list) {
-    //     myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_gt) << ", " 
-    //                                             << pose_to_string_line(tf_w_ado_est_pre) << ", " 
-    //                                             << pose_to_string_line(tf_w_ado_est_post) << "\n";
-    // }
     int t_ind = 0;
     for (const auto & raptor_step : raptor_data ) {
       int ego_pose_index = 1 + t_ind;
@@ -532,8 +527,8 @@ namespace rslam_utils {
 
       for (const auto & single_ado_meas : ado_w_gt_est_pair_map) {
         gtsam::Symbol ado_sym = single_ado_meas.first;
-        gtsam::Pose3 tf_ego_ado_gt  = get<0>(single_ado_meas.second);
-        gtsam::Pose3 tf_ego_ado_est = get<1>(single_ado_meas.second);
+        gtsam::Pose3 tf_ego_ado_gt  = single_ado_meas.second.first;
+        gtsam::Pose3 tf_ego_ado_est = single_ado_meas.second.second;
 
         gtsam::Pose3 tf_w_ado_gt        = tf_w_ego_gt * tf_ego_ado_gt;
         gtsam::Pose3 tf_w_ado_est_pre   = tf_w_ego_est_pre * tf_ego_ado_est;
@@ -543,6 +538,9 @@ namespace rslam_utils {
         myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_gt) << ", " 
                                                 << pose_to_string_line(tf_w_ado_est_pre) << ", " 
                                                 << pose_to_string_line(tf_w_ado_est_post) << "\n";
+        // myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_gt) << ", " 
+        //                                         << pose_to_string_line(tf_w_est_preslam_map[ado_sym]) << ", " 
+        //                                         << pose_to_string_line(tf_w_est_postslam_map[ado_sym]) << "\n";
       }
       t_ind++;
     }
