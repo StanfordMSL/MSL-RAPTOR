@@ -156,10 +156,17 @@ class MSLRaptorSlamClass {
             tf_w_est_preslam_map[ego_sym] = Pose3(tf_w_ego_gt);
           }
           else {
-            Pose3 tf_w_ego_est_corupted = rslam_utils::add_noise_to_pose3(tf_w_ego_est, 0.2, 0);
-            // cout << tf_w_ego_est.translation() - tf_w_ego_est_corupted.translation() <<endl;
-            initial_estimate.insert(ego_sym, tf_w_ego_est_corupted);
-            tf_w_est_preslam_map[ego_sym] = tf_w_ego_est_corupted;
+            Pose3 tf_w_ego_est_for_init;
+            if (initialized_isam) {
+              Values result = isam.calculateEstimate();
+              tf_w_ego_est_for_init = result.at<Pose3>(symbol('x', t_ind));
+            }
+            else {  
+              tf_w_ego_est_for_init = rslam_utils::add_noise_to_pose3(tf_w_ego_est, 0.2, 0);
+              // cout << tf_w_ego_est.translation() - tf_w_ego_est_corupted.translation() <<endl;
+            }
+            initial_estimate.insert(ego_sym, tf_w_ego_est_for_init);
+            tf_w_est_preslam_map[ego_sym] = tf_w_ego_est_for_init;
           }
         }
         // record values for later easy access by symbol
@@ -211,7 +218,7 @@ class MSLRaptorSlamClass {
         }
         num_meas_since_update++;
         // Check whether to update iSAM 2 - either its the first time AND its > minMeas... or we have done at least 1 update AND now its been incMeas since
-        if ((!initialized_isam && num_meas_since_update > minMeas) || (initialized_isam && num_meas_since_update > incMeas)) {
+        if ((!initialized_isam && num_meas_since_update > minMeas) || (initialized_isam)) {// && num_meas_since_update > incMeas)) {
           if (!initialized_isam) { // Do a full optimize for first minMeas ranges
             LevenbergMarquardtOptimizer batchOptimizer(newFactors, initial_estimate);
             initial_estimate = batchOptimizer.optimize();
