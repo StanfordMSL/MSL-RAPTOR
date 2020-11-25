@@ -1,5 +1,6 @@
 
 #include "raptor_object_slam.h"
+#include <chrono> 
 
 using namespace std;
 using namespace gtsam;
@@ -134,8 +135,12 @@ class MSLRaptorSlamClass {
       gtsam::Pose3 tf_w_ego_gt0  = get<1>(raptor_data[0]);
       gtsam::Pose3 tf_w_ego_est0 = get<2>(raptor_data[0]);
       map<string, double> ego_sym_time_map; //  map[ego+sym] = time;
+      auto tic_batch_slam = std::chrono::high_resolution_clock::now();
+      long total_microsecs_isam = 0;
+      int num_isam_updates = 0;
 
       for (const auto & rstep : raptor_data ) {
+        auto tic_whole_loop = std::chrono::high_resolution_clock::now(); 
         double time = get<0>(rstep);
         ego_pose_index = 1 + t_ind;
         ego_sym = Symbol('x', ego_pose_index);
@@ -223,17 +228,29 @@ class MSLRaptorSlamClass {
             LevenbergMarquardtOptimizer batchOptimizer(newFactors, initial_estimate);
             initial_estimate = batchOptimizer.optimize();
             initialized_isam = true;
+            auto duration_batch_slam = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - tic_batch_slam);
+            cout << "duration_batch_slam = " << duration_batch_slam.count() << " microseconds\t " << duration_batch_slam.count()/double(num_meas_since_update) << " microsec per step" << endl;
           }
           isam.update(newFactors, initial_estimate);
+          auto tic_isam_update = std::chrono::high_resolution_clock::now();
           Values result = isam.calculateEstimate();
+          auto duration_isam_update = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - tic_isam_update);
+          cout << "duration_isam_update = " << duration_isam_update.count() << " microseconds" << endl;
+
           tf_w_ego_est = result.at<Pose3>(symbol('x', t_ind));          
           newFactors = NonlinearFactorGraph();
           initial_estimate = Values();
           num_meas_since_update = 0;
         }
         t_ind++;
+        auto duration_whole_loop = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - tic_whole_loop);
+        cout << "duration_whole_loop = " << duration_whole_loop.count() << " microseconds" << endl;
+        if(initialized_isam) {
+          num_isam_updates++;
+          total_microsecs_isam += duration_whole_loop.count();
+        }
       }
-      cout << "done with isam" << endl;
+      cout << "done with isam (ave " << total_microsecs_isam/double(num_isam_updates) << " microsecs / isam itr" << endl;
       Values result = isam.calculateBestEstimate(); // calculate final estimate
       analyze_and_save_results(result, tf_w_gt_map, tf_w_est_preslam_map, tf_ego_ado_maps, raptor_data);
     }
