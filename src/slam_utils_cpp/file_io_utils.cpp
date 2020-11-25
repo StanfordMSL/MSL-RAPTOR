@@ -246,22 +246,17 @@ namespace rslam_utils {
 
     zip_data_by_ego(raptor_data, ego_data, ado_data_grouped, dt_thresh);
 
-    // trim_data_range(raptor_data, 20, 40);
-    if (1 || b_nocs_data) {
-      string fn = "/mounted_folder/test_graphs_gtsam/batch_input1.csv";
-      write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
-      fn = "/mounted_folder/test_graphs_gtsam/all_trajs.csv";
-      map<gtsam::Symbol, map<double, pair<gtsam::Pose3, gtsam::Pose3> > > all_trajs;
-      write_all_traj_csv(fn, raptor_data, all_trajs, obj_param_map, num_ado_objs);
-      // convert_data_to_static_obstacles(raptor_data, num_ado_objs);
+    // // trim_data_range(raptor_data, 20, 40);
+    write_batch_slam_inputs_csv("/mounted_folder/test_graphs_gtsam/batch_input1.csv", raptor_data, obj_param_map);
+    // if (1 || b_nocs_data) {
+    //   fn = "/mounted_folder/test_graphs_gtsam/all_trajs.csv";
+    //   map<gtsam::Symbol, map<double, pair<gtsam::Pose3, gtsam::Pose3> > > all_trajs;
+    //   write_all_traj_csv(fn, raptor_data, all_trajs, obj_param_map, num_ado_objs);
+    //   // convert_data_to_static_obstacles(raptor_data, num_ado_objs);
 
-      // fn = "/mounted_folder/test_graphs_gtsam/batch_input2.csv";
-      // write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
-    }
-    return;
-  }
-
-  void process_raptor_estimates(msl_raptor::TrackedObjects::ConstPtr & raptor_msg, map<string, object_data_vec_t> & ado_data_est, const map<string, geometry_msgs::Pose> & prev_gt_pose) {
+    //   // fn = "/mounted_folder/test_graphs_gtsam/batch_input2.csv";
+    //   // write_batch_slam_inputs_csv(fn, raptor_data, obj_param_map);
+    // }
     return;
   }
 
@@ -392,9 +387,6 @@ namespace rslam_utils {
       if (t_est < t_gt0) {
         continue;
       }
-      if(i==62) {
-        cout << endl;
-      }
 
       double t_gt1, t_gt2, s;
       while (get<0>(data_gt[gt_ind]) < t_est) {
@@ -409,9 +401,6 @@ namespace rslam_utils {
       s = (t_est - t_gt1) / (t_gt2 - t_gt1);
       gtsam::Pose3 tf_gt = rslam_utils::interp_pose(prev_gt, get<1>(data_gt[gt_ind]), s);
       data.emplace_back(t_est, params.obj_id, tf_gt, get<1>(data_est[i]));
-      if ( abs(prev_est_t - t_est) < 0.0001 ) {
-        cout << endl;
-      }
       prev_est_t = t_est;
     }
   }
@@ -421,8 +410,9 @@ namespace rslam_utils {
     vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > data_out;
     
     map<string, gtsam::Pose3> tf_w_ado0_gt, tf_w_ado0_est;
-    int num_ado_obj_seen = get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est, num_ado_objs);
-    assert(num_ado_obj_seen == num_ado_objs);
+    get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est);
+    // int num_ado_obj_seen = get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est, num_ado_objs);
+    // assert(num_ado_obj_seen == num_ado_objs);
     // for (const auto & key_val : tf_w_ado0_gt) {
     //   string ado_name = key_val.first;
     //   gtsam::Pose3 tf_w_ado_gt = key_val.second;
@@ -458,102 +448,26 @@ namespace rslam_utils {
     raptor_data = data_out;
   }
 
-  int get_tf_w_ado_for_all_objects(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
-                                    map<string, gtsam::Pose3> &tf_w_ado0_gt, map<string, gtsam::Pose3> &tf_w_ado0_est, int num_ado_objs) {
+  void get_tf_w_ado_for_all_objects(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
+                                    map<string, gtsam::Pose3> &tf_w_ado0_gt, map<string, gtsam::Pose3> &tf_w_ado0_est) {
 
-    bool b_first_step = true;
-    gtsam::Pose3 tf_w_ego_gt1, tf_w_ego_est1;
-    double t1;
-    int ridx = 0, num_ado_obj_seen = 0;
+    // fill in tf_w_ado0_est and tf_w_ado0_gt. This can be tricky when we only have relative measurements and we dont see an object on the first timestep
+    
+    // first loop over data to fill in these maps
     for (const auto & rstep : raptor_data) {
-      double t = get<0>(rstep);
-      gtsam::Pose3 tf_ego_w_gt_unrect = get<1>(rstep).inverse();
-      gtsam::Pose3 tf_ego_w_est_unrect = get<2>(rstep).inverse();
-      map<string, pair<gtsam::Pose3, gtsam::Pose3> > measurements_unrect = get<3>(rstep);
-      map<string, pair<gtsam::Pose3, gtsam::Pose3> > measurements_out;
-
-      gtsam::Pose3 tf_w_ego_gt, tf_w_ego_est;
-      bool b_have_tf_w_ego = false;
-      for (const auto & key_val : measurements_unrect) {
+      map<string, pair<gtsam::Pose3, gtsam::Pose3> > measurements = get<3>(rstep);
+      for (const auto & key_val : measurements) { // name, pair<Pose3, Pose3>
         string ado_name = key_val.first;
-        pair<gtsam::Pose3, gtsam::Pose3> ado_w_gt_est_pair_unrect = key_val.second;
-        gtsam::Pose3 tf_ego_ado_gt  = tf_ego_w_gt_unrect  * ado_w_gt_est_pair_unrect.first;  // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
-        gtsam::Pose3 tf_ego_ado_est = tf_ego_w_est_unrect * ado_w_gt_est_pair_unrect.second; // (tf_w_ego_est.inverse()) * tf_w_ado_est;
-        if (b_first_step) {
-          // here ego is identity by definition, and we know we havent seen it before
-          tf_w_ado0_gt[ado_name]  = tf_ego_ado_gt;
-          tf_w_ado0_est[ado_name] = tf_ego_ado_est;
-          t1 = t;
-          tf_w_ego_gt1  = tf_w_ado0_gt[ado_name]  * (tf_ego_ado_gt.inverse());
-          tf_w_ego_est1 = tf_w_ado0_est[ado_name] * (tf_ego_ado_est.inverse());
-          num_ado_obj_seen++;
-        }
-        else {
-          if (tf_w_ado0_gt.find(ado_name) != tf_w_ado0_gt.end() ) {
-            // we have seen this one before, use it to calculate tf_w_ego_X
-            t1 = t;
-            tf_w_ego_gt1 = tf_w_ado0_gt[ado_name] * (tf_ego_ado_gt.inverse());
-            tf_w_ego_est1 = tf_w_ado0_est[ado_name] * (tf_ego_ado_est.inverse());
-            b_have_tf_w_ego = true;
-            continue;
-          }
-          else {
-            //first time we have seen this ado object
-            if (b_have_tf_w_ego) {
-              // a different ado object we saw this same image has a known world pose, use that to locate
-              tf_w_ado0_gt[ado_name]  = tf_w_ego_gt1  * tf_ego_ado_gt;
-              tf_w_ado0_est[ado_name] = tf_w_ego_est1 * tf_ego_ado_est;
-              num_ado_obj_seen++;
-            }
-            else {
-              // we dont already know where we are currently - starting on this same measurement loop here and going forward to try to find a match
-              // if not, look in the future and interpolate!
-              
-              bool b_found_match = false;
-              int i = ridx; // start ON our same index
-              gtsam::Pose3 tf_w_ego_gt2, tf_w_ego_est2;
-              double t2;
-              while (!b_found_match) {
-                map<string, pair<gtsam::Pose3, gtsam::Pose3> > measurements_unrect2 = get<3>(raptor_data[i]);
-                for (const auto & key_val2 : measurements_unrect2) {
-                  string ado_name2 = key_val2.first;
-                  if (tf_w_ado0_gt.find(ado_name2) != tf_w_ado0_gt.end()) {
-                    // great, we can use this!
-                    pair<gtsam::Pose3, gtsam::Pose3> ado_w_gt_est_pair_unrect2 = key_val2.second;
-                    gtsam::Pose3 tf_ego_ado_gt2  = tf_ego_w_gt_unrect  * ado_w_gt_est_pair_unrect2.first;  // (tf_w_ego_gt.inverse()) * tf_w_ado_gt;
-                    gtsam::Pose3 tf_ego_ado_est2 = tf_ego_w_est_unrect * ado_w_gt_est_pair_unrect2.second; // (tf_w_ego_est.inverse()) * tf_w_ado_est;
-                    t2 = t;
-                    tf_w_ego_gt2  = tf_w_ado0_gt[ado_name2]  * (tf_ego_ado_gt2.inverse());
-                    tf_w_ego_est2 = tf_w_ado0_est[ado_name2] * (tf_ego_ado_est2.inverse());
-
-                    double s = (t - t1) / (t2 - t1);
-                    tf_w_ego_gt1  = interp_pose(tf_w_ego_gt1,  tf_w_ego_gt2,  s); // ego pose corresponding to current measuremnt 
-                    tf_w_ego_est1 = interp_pose(tf_w_ego_est1, tf_w_ego_est2, s);
-
-                    tf_w_ado0_gt[ado_name]  = tf_w_ego_gt1  * tf_ego_ado_gt;
-                    tf_w_ado0_est[ado_name] = tf_w_ego_est1 * tf_ego_ado_est;
-                    b_have_tf_w_ego = true;
-                    num_ado_obj_seen++;
-                    b_found_match = true; // use this flag to continue in the next-layer loop aswell
-                    break;
-                  }
-                }
-                i++;
-                if (i >= raptor_data.size() ) {
-                  cout << "WARNING AT END OF DATA!!" << endl;
-                }
-              } // end while(!b_found_match)
-            } // if/else already know tf_w_ego
-          } // if/else the ado_name is already in out map
-        } // if/else b_first_ste[]
-      } // for each ado obj in our measurements for this step
-      if (num_ado_obj_seen == num_ado_objs) {
-        break; // this is just to save us from having to loop over all the data
-      }
-      b_first_step = false;
-      ridx++;
-    } // for each raptor step
-    return num_ado_obj_seen;
+        pair<gtsam::Pose3, gtsam::Pose3> ado_w_gt_est_pair = key_val.second;
+        gtsam::Pose3 tf_w_ado_gt = ado_w_gt_est_pair.first;
+        gtsam::Pose3 tf_w_ado_est = ado_w_gt_est_pair.second;
+        if(tf_w_ado0_gt.count(ado_name) == 0) {
+          // this means we have not seen this ado object before
+          tf_w_ado0_gt[ado_name] = tf_w_ado_gt;
+          tf_w_ado0_est[ado_name] = tf_w_ado_est;
+        } // end if we have seen this ado object before
+      } // end loop over ado objects at this time step
+    } // end loop over all data
   }
 
 
@@ -623,6 +537,8 @@ namespace rslam_utils {
         gtsam::Pose3 tf_w_ado_est_pre   = tf_w_ego_est_pre * tf_ego_ado_est;
         gtsam::Pose3 tf_w_ado_est_post  = tf_w_ego_est_post * tf_ego_ado_est;
 
+        cout << ado_sym << tf_w_ado_gt << tf_w_ado_est_pre << tf_w_ado_est_post << endl;
+
         myFile << -1 << ", " << ado_sym << ", " << pose_to_string_line(tf_w_ado_gt) << ", " 
                                                 << pose_to_string_line(tf_w_ado_est_pre) << ", " 
                                                 << pose_to_string_line(tf_w_ado_est_post) << "\n";
@@ -637,7 +553,7 @@ namespace rslam_utils {
                             map<string, obj_param_t> &obj_param_map, int num_ado_objs) {
     // generate all trajectories
     map<string, gtsam::Pose3> tf_w_ado0_gt, tf_w_ado0_est;
-    int num_ado_obj_seen = get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est, num_ado_objs);
+    get_tf_w_ado_for_all_objects(raptor_data, tf_w_ado0_gt, tf_w_ado0_est);
     
     ofstream myFile(fn);
 

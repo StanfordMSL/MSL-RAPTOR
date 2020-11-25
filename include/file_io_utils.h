@@ -23,13 +23,11 @@
 namespace rslam_utils {
     void load_rosbag(vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int &num_ado_objs,
                     std::string rosbag_fn, std::string ego_ns, std::map<std::string, obj_param_t> obj_param_map, double dt_thresh, bool b_nocs_data);
-
-    void process_raptor_estimates(msl_raptor::TrackedObjects::ConstPtr & raptor_msg, map<string, object_data_vec_t> & ado_data_est, const map<string, geometry_msgs::Pose> & last_gt_pose);
                     
     void convert_data_to_static_obstacles(vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int num_ado_objs);
 
-    int get_tf_w_ado_for_all_objects(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
-                                       map<string, gtsam::Pose3> &tf_w_ado0_gt, map<string, gtsam::Pose3> &tf_w_ado0_est, int num_ado_objs);
+    void get_tf_w_ado_for_all_objects(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, 
+                                       map<string, gtsam::Pose3> &tf_w_ado0_gt, map<string, gtsam::Pose3> &tf_w_ado0_est);
 
     void group_ado_measurements_by_time(vector<pair<double, map<string, pair<gtsam::Pose3, gtsam::Pose3>>>> &ado_data_grouped,
                                         const map<string, object_est_gt_data_vec_t> &ado_data, double dt_thresh);
