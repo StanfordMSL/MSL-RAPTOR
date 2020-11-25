@@ -81,7 +81,7 @@ class MSLRaptorSlamClass {
 
       // DECLARE VARIABLES 
       // These will store the following poses: ground truth, quasi-odometry, and post-slam optimized
-      map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map, tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
+      map<Symbol, Pose3> tf_w_gt_map, tf_w_est_preslam_map; // these are all tf_w_ego or tf_w_ado frames. Note: gt relative pose at t0 is the same as world pose (since we make our coordinate system based on our initial ego pose)
       map<Symbol, double> ego_time_map; // store the time at each camera position
       map<Symbol, map<Symbol, pair<Pose3, Pose3> > > tf_ego_ado_maps;
       vector<pair<Pose3, Pose3>> tf_w_ego_gt_est_vec;
@@ -240,8 +240,16 @@ class MSLRaptorSlamClass {
       }
       cout << "done with isam" << endl;
       Values result = isam.calculateBestEstimate(); // calculate final estimate
+      analyze_and_save_results(result, tf_w_gt_map, tf_w_est_preslam_map, tf_ego_ado_maps, raptor_data);
+    }
 
-     // STEP 3 Loop through each ego /landmark pose and compare estimate with ground truth (both before and after slam optimization)
+    void analyze_and_save_results(Values &result, 
+                                  map<Symbol, Pose3> &tf_w_gt_map, 
+                                  map<Symbol, Pose3> &tf_w_est_preslam_map, 
+                                  map<Symbol, map<Symbol, pair<Pose3, Pose3>>> &tf_ego_ado_maps, 
+                                  const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data) {
+      // Loop through each ego /landmark pose and compare estimate with ground truth (both before and after slam optimization)
+      map<Symbol, Pose3> tf_w_est_postslam_map; // these are all tf_w_ego or tf_w_ado frames
       Values::ConstFiltered<Pose3> isam_output_ego_poses = result.filter<Pose3>(Symbol::ChrTest('x'));
       Values::ConstFiltered<Pose3> isam_output_ado_poses = result.filter<Pose3>(Symbol::ChrTest('l'));
 
@@ -475,58 +483,7 @@ class MSLRaptorSlamClass {
       LevenbergMarquardtOptimizer optimizer(graph, initial_estimate);
       Values result = optimizer.optimize();
       cout << "done optimizing pose graph" << endl;
-
-      // STEP 3 Loop through each ego /landmark pose and compare estimate with ground truth (both before and after slam optimization)
-      Values::ConstFiltered<Pose3> poses = result.filter<Pose3>();
-
-      int i = 0;
-      vector<double> t_diff_pre, rot_diff_pre, t_diff_post, rot_diff_post;
-      double ave_t_diff_pre = 0, ave_rot_diff_pre = 0, ave_t_diff_post = 0, ave_rot_diff_post = 0;
-      bool b_degrees = true;  
-      for(const auto& key_value: poses) {
-        // Extract Symbol and Pose from dict & store in map
-        Symbol sym = Symbol(key_value.key);
-        Pose3 tf_w_est_postslam = key_value.value;
-        tf_w_est_postslam_map[sym] = tf_w_est_postslam;
-
-        // Find corresponding gt pose and preslam pose
-        Pose3 tf_w_gt = tf_w_gt_map[sym], tf_w_gt_inv = tf_w_gt.inverse();
-        Pose3 tf_w_est_preslam = tf_w_est_preslam_map[sym];
-        
-        double t_diff_pre_val, rot_diff_pre_val, t_diff_post_val, rot_diff_post_val; 
-        rslam_utils::calc_pose_delta(tf_w_est_preslam, tf_w_gt_inv, &t_diff_pre_val, &rot_diff_pre_val, b_degrees);
-        rslam_utils::calc_pose_delta(tf_w_est_postslam, tf_w_gt_inv, &t_diff_post_val, &rot_diff_post_val, b_degrees);
-        t_diff_pre.push_back(t_diff_pre_val);
-        rot_diff_pre.push_back(rot_diff_pre_val);
-        t_diff_post.push_back(t_diff_post_val);
-        rot_diff_post.push_back(rot_diff_post_val);
-        ave_t_diff_pre += abs(t_diff_pre_val);
-        ave_rot_diff_pre += abs(rot_diff_pre_val);
-        ave_t_diff_post += abs(t_diff_post_val);
-        ave_rot_diff_post += abs(rot_diff_post_val);
-
-        cout << "-----------------------------------------------------" << endl;
-        cout << "evaluating " << sym << ":" << endl;
-        // cout << "gt pose:" << tf_w_gt << endl;
-        // cout << "pre-process est pose:" << tf_w_est_preslam << endl;
-        // cout << "post-process est pose:" << tf_w_est_postslam << endl;
-        cout << "delta pre-slam: t = " << t_diff_pre_val << ", ang = " << rot_diff_pre_val << " deg" << endl;
-        cout << "delta post-slam: t = " << t_diff_post_val << ", ang = " << rot_diff_post_val << " deg" << endl;
-        i++;
-      }
-      ave_t_diff_pre /= double(i);
-      ave_rot_diff_pre /= double(i);
-      ave_t_diff_post /= double(i);
-      ave_rot_diff_post /= double(i);
-      cout << "\n-----------------------------------------------------\n-----------------------------------------------------\n" << endl;
-      cout << "initial error = " << graph.error(initial_estimate) << endl;  // iterate over all the factors_ to accumulate the log probabilities
-      cout << "final error = " << graph.error(result) << "\n" << endl;  // iterate over all the factors_ to accumulate the log probabilities
-      cout << "Averages t_pre = " << ave_t_diff_pre << ", t_post = " << ave_t_diff_post << endl;
-      cout << "Averages rot_pre = " << ave_rot_diff_pre << " deg, rot_post = " << ave_rot_diff_post << " deg" << endl;
-
-      string fn = "/mounted_folder/test_graphs_gtsam/graph1.csv";
-      cout << "writing results to: " << fn << endl;
-      rslam_utils::write_results_csv(fn, raptor_data, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps, obj_param_map);
+      analyze_and_save_results(result, tf_w_gt_map, tf_w_est_preslam_map, tf_ego_ado_maps, raptor_data);
     }
 
     ~MSLRaptorSlamClass() {}
