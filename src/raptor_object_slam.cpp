@@ -189,7 +189,6 @@ class MSLRaptorSlamClass {
             tf_w_est_preslam_map[ego_sym] = tf_w_ego_est_corupted;
           }
         }
-        cout << ego_sym << " init est set [EGO]" << endl;
         // record values for later easy access by symbol
         ego_time_map[ego_sym] = time;
         tf_w_gt_map[ego_sym] = Pose3(tf_w_ego_gt);
@@ -216,12 +215,10 @@ class MSLRaptorSlamClass {
           // Add measurement to graph
           if (b_use_gt) {
             newFactors.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_gt), constNoiseMatrix);
-            // cout << ego_sym << " <--> " << ado_sym << endl;
           }
           else {
             newFactors.emplace_shared<BetweenFactor<Pose3> >(ego_sym, ado_sym, Pose3(tf_ego_ado_est), constNoiseMatrix);
           }
-          cout << ego_sym << " <- graph -> " << ado_sym << endl;
         }
         num_meas_since_update++;
         // Check whether to update iSAM 2 - either its the first time AND its > minMeas... or we have done at least 1 update AND now its been incMeas since
@@ -242,27 +239,116 @@ class MSLRaptorSlamClass {
       }
       cout << "done with isam" << endl;
 
-      // save all ego values in tf_w_ego_map_isam
-      Values result = isam.calculateEstimate();
-      map<double, tuple<string, gtsam::Pose3, gtsam::Pose3>> tf_w_ego_map_isam;
-      Values::ConstFiltered<Pose3> isam_poses = result.filter<Pose3>(Symbol::ChrTest('x'));
-      int itr = 0;
-      for(const auto& key_value: isam_poses) {
-        Symbol ego_sym = Symbol(key_value.key);
-        Pose3 tf_w_ego_est_tmp = key_value.value;
-        tf_w_ego_map_isam[ego_sym_time_map[ego_sym]] = make_tuple(string(ego_sym), tf_w_gt_map[ego_sym], tf_w_ego_est_tmp);
-      }
+    //   // save all ego values in tf_w_ego_map_isam
+      Values result = isam.calculateBestEstimate();
+    //   map<double, tuple<string, gtsam::Pose3, gtsam::Pose3>> tf_w_ego_map_isam;
+    //   Values::ConstFiltered<Pose3> isam_poses = result.filter<Pose3>(Symbol::ChrTest('x'));
+    //   int itr = 0;
+    //   for(const auto& key_value: isam_poses) {
+    //     Symbol ego_sym = Symbol(key_value.key);
+    //     Pose3 tf_w_ego_est_tmp = key_value.value;
+    //     tf_w_ego_map_isam[ego_sym_time_map[ego_sym]] = make_tuple(string(ego_sym), tf_w_gt_map[ego_sym], tf_w_ego_est_tmp);
+    //   }
 
-      ofstream myFile("/mounted_folder/test_graphs_gtsam/isam_ego_output.csv");
-      for (const auto & key_val : tf_w_ego_map_isam ) {
-        double time = key_val.first;
-        string ego_sym_str = get<0>(key_val.second);
-        gtsam::Pose3 tf_w_ego_gt  = get<1>(key_val.second);
-        gtsam::Pose3 tf_w_ego_est = get<2>(key_val.second);
-        myFile << time << ", " << ego_sym_str << ", " << pose_to_string_line(tf_w_ego_gt) << ", " << pose_to_string_line(tf_w_ego_est) << "\n";
+    //   ofstream myFile("/mounted_folder/test_graphs_gtsam/isam_ego_output.csv");
+    //   for (const auto & key_val : tf_w_ego_map_isam ) {
+    //     double time = key_val.first;
+    //     string ego_sym_str = get<0>(key_val.second);
+    //     gtsam::Pose3 tf_w_ego_gt  = get<1>(key_val.second);
+    //     gtsam::Pose3 tf_w_ego_est = get<2>(key_val.second);
+    //     myFile << time << ", " << ego_sym_str << ", " << pose_to_string_line(tf_w_ego_gt) << ", " << pose_to_string_line(tf_w_ego_est) << "\n";
+    //   }
+    //   myFile.close();
+    //   cout << "wrote isam to file" << endl;
+
+    // STEP 3 Loop through each ego /landmark pose and compare estimate with ground truth (both before and after slam optimization)
+      Values::ConstFiltered<Pose3> isam_output_ego_poses = result.filter<Pose3>(Symbol::ChrTest('x'));
+      Values::ConstFiltered<Pose3> isam_output_ado_poses = result.filter<Pose3>(Symbol::ChrTest('l'));
+
+      bool b_degrees = true; 
+
+      int i = 0;
+      vector<double> t_diff_pre, rot_diff_pre, t_diff_post, rot_diff_post;
+      double ego_ave_t_diff_pre = 0, ego_ave_rot_diff_pre = 0, ego_ave_t_diff_post = 0, ego_ave_rot_diff_post = 0; 
+      for(const auto& key_value: isam_output_ego_poses) {
+        // Extract Symbol and Pose from dict & store in map
+        Symbol ego_sym = Symbol(key_value.key);
+        Pose3 tf_w_est_postslam = key_value.value;
+        tf_w_est_postslam_map[ego_sym] = tf_w_est_postslam;
+
+        // Find corresponding gt pose and preslam pose
+        Pose3 tf_w_gt = tf_w_gt_map[ego_sym], tf_w_gt_inv = tf_w_gt.inverse();
+        Pose3 tf_w_est_preslam = tf_w_est_preslam_map[ego_sym];
+        
+        double t_diff_pre_val, rot_diff_pre_val, t_diff_post_val, rot_diff_post_val; 
+        rslam_utils::calc_pose_delta(tf_w_est_preslam, tf_w_gt_inv, &t_diff_pre_val, &rot_diff_pre_val, b_degrees);
+        rslam_utils::calc_pose_delta(tf_w_est_postslam, tf_w_gt_inv, &t_diff_post_val, &rot_diff_post_val, b_degrees);
+        t_diff_pre.push_back(t_diff_pre_val);
+        rot_diff_pre.push_back(rot_diff_pre_val);
+        t_diff_post.push_back(t_diff_post_val);
+        rot_diff_post.push_back(rot_diff_post_val);
+        ego_ave_t_diff_pre += abs(t_diff_pre_val);
+        ego_ave_rot_diff_pre += abs(rot_diff_pre_val);
+        ego_ave_t_diff_post += abs(t_diff_post_val);
+        ego_ave_rot_diff_post += abs(rot_diff_post_val);
+
+        cout << "-----------------------------------------------------" << endl;
+        cout << "evaluating " << ego_sym << ":" << endl;
+        cout << "ego delta pre-slam: t = " << t_diff_pre_val << ", ang = " << rot_diff_pre_val << " deg" << endl;
+        cout << "ego delta post-slam: t = " << t_diff_post_val << ", ang = " << rot_diff_post_val << " deg" << endl;
+        i++;
       }
-      myFile.close();
-      cout << "wrote isam to file" << endl;
+      ego_ave_t_diff_pre /= double(i);
+      ego_ave_rot_diff_pre /= double(i);
+      ego_ave_t_diff_post /= double(i);
+      ego_ave_rot_diff_post /= double(i);
+
+      i = 0;
+      t_diff_pre.clear(); rot_diff_pre.clear(); t_diff_post.clear(); rot_diff_post.clear();
+      double ado_ave_t_diff_pre = 0, ado_ave_rot_diff_pre = 0, ado_ave_t_diff_post = 0, ado_ave_rot_diff_post = 0; 
+      for(const auto& key_value: isam_output_ado_poses) {
+        // Extract Symbol and Pose from dict & store in map
+        Symbol ado_sym = Symbol(key_value.key);
+        Pose3 tf_w_est_postslam = key_value.value;
+        tf_w_est_postslam_map[ado_sym] = tf_w_est_postslam;
+
+        // Find corresponding gt pose and preslam pose
+        Pose3 tf_w_gt = tf_w_gt_map[ado_sym], tf_w_gt_inv = tf_w_gt.inverse();
+        Pose3 tf_w_est_preslam = tf_w_est_preslam_map[ado_sym];
+
+        double t_diff_pre_val, rot_diff_pre_val, t_diff_post_val, rot_diff_post_val; 
+        rslam_utils::calc_pose_delta(tf_w_est_preslam, tf_w_gt_inv, &t_diff_pre_val, &rot_diff_pre_val, b_degrees);
+        rslam_utils::calc_pose_delta(tf_w_est_postslam, tf_w_gt_inv, &t_diff_post_val, &rot_diff_post_val, b_degrees);
+        t_diff_pre.push_back(t_diff_pre_val);
+        rot_diff_pre.push_back(rot_diff_pre_val);
+        t_diff_post.push_back(t_diff_post_val);
+        rot_diff_post.push_back(rot_diff_post_val);
+        ado_ave_t_diff_pre += abs(t_diff_pre_val);
+        ado_ave_rot_diff_pre += abs(rot_diff_pre_val);
+        ado_ave_t_diff_post += abs(t_diff_post_val);
+        ado_ave_rot_diff_post += abs(rot_diff_post_val);
+
+        cout << "-----------------------------------------------------" << endl;
+        cout << "evaluating " << ado_sym << ":" << endl;
+        cout << "ado delta pre-slam: t = " << t_diff_pre_val << ", ang = " << rot_diff_pre_val << " deg" << endl;
+        cout << "ado delta post-slam: t = " << t_diff_post_val << ", ang = " << rot_diff_post_val << " deg" << endl;
+        i++;
+      }
+      ado_ave_t_diff_pre /= double(i);
+      ado_ave_rot_diff_pre /= double(i);
+      ado_ave_t_diff_post /= double(i);
+      ado_ave_rot_diff_post /= double(i);
+
+      cout << "\n-----------------------------------------------------\n-----------------------------------------------------\n" << endl;
+      cout << "Average ego t_pre = " << ego_ave_t_diff_pre << ", t_post = " << ego_ave_t_diff_post << endl;
+      cout << "Average ego rot_pre = " << ego_ave_rot_diff_pre << " deg, rot_post = " << ego_ave_rot_diff_post << " deg" << endl;
+      cout << "Average ado t_pre = " << ado_ave_t_diff_pre << ", t_post = " << ado_ave_t_diff_post << endl;
+      cout << "Average ado rot_pre = " << ado_ave_rot_diff_pre << " deg, rot_post = " << ado_ave_rot_diff_post << " deg" << endl;
+      cout << "\n-----------------------------------------------------\n-----------------------------------------------------\n" << endl;
+
+      string fn = "/mounted_folder/test_graphs_gtsam/graph1.csv";
+      cout << "writing results to: " << fn << endl;
+      rslam_utils::write_results_csv(fn, raptor_data, tf_w_est_preslam_map, tf_w_est_postslam_map, tf_ego_ado_maps, obj_param_map);
     }
 
     void run_batch_slam(const vector<tuple<double, gtsam::Pose3, gtsam::Pose3, map<string, pair<gtsam::Pose3, gtsam::Pose3> > > > &raptor_data, int num_ado_objs) {
