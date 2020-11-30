@@ -382,6 +382,9 @@ b_enforce_0: []
 ---
 id: 40
 ns: 'bowl_white_msl'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
+cust_vert_scale: [1.0, 1.0, 1.0]
+cust_vert_rpy: [0.0, 0.0, 0.0]
 class_str: 'bowl'
 bound_box_l: 0.17
 bound_box_h: 0.066
@@ -390,6 +393,9 @@ b_enforce_0: []
 ---
 id: 41
 ns: 'bowl_green_msl'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
+cust_vert_scale: [1.0, 1.0, 1.0]
+cust_vert_rpy: [0.0, 0.0, 0.0]
 class_str: 'bowl'
 bound_box_l: 0.17
 bound_box_h: 0.066
@@ -398,24 +404,27 @@ b_enforce_0: []
 ---
 id: 42
 ns: 'mug_duke'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
+cust_vert_scale: [1.0, 1.0, 1.0]
+cust_vert_rpy: [0.0, 0.0, 0.0]
 class_str: 'cup'
 bound_box_l: 0.095
 bound_box_h: 0.096
 bound_box_w: 0.083
 b_enforce_0: []
----
-id: 43
-ns: 'mug_black'
-class_str: 'cup'
-bound_box_l: 0.095
-bound_box_h: 0.10
-bound_box_w: 0.08
-b_enforce_0: []
----
-id: 43
-ns: 'mug_yellow_black'
-class_str: 'cup'
-bound_box_l: 0.11
-bound_box_h: 0.095
-bound_box_w: 0.09
-b_enforce_0: []
+#---
+# id: 43
+# ns: 'mug_black'
+# class_str: 'cup'
+# bound_box_l: 0.095
+# bound_box_h: 0.10
+# bound_box_w: 0.08
+# b_enforce_0: []
+# ---
+# id: 43
+# ns: 'mug_yellow_black'
+# class_str: 'cup'
+# bound_box_l: 0.11
+# bound_box_h: 0.095
+# bound_box_w: 0.09
+# b_enforce_0: []

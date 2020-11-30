@@ -538,7 +538,6 @@ class rosbags_to_logs:
                 proj_3d_bb = np.reshape(to.projected_3d_bb, (int(len(to.projected_3d_bb)/2), 2) )
 
             connected_inds = []
-            print("{}: len(to.projected_3d_bb) = {}, len(to.connected_inds) = {}".format(to.class_str, len(to.projected_3d_bb), len(to.connected_inds)))
             if len(to.connected_inds) > 0:
                 connected_inds = np.reshape(to.connected_inds, (int(len(to.connected_inds)/2), 2) )
             else:
@@ -546,10 +545,6 @@ class rosbags_to_logs:
                 connected_inds = np.array([[0, 1], [1, 2], [2, 3], [3, 0],  # edges of front surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
                                            [7, 4], [4, 5], [5, 6], [6, 7],  # edges of back surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
                                            [0, 7], [1, 6], [2, 5], [3, 4]]) # horizontal edges of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
-            # connected_inds = np.array([[0, 1], [1, 2], [2, 3], [3, 0],  # edges of front surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
-            #                            [7, 4], [4, 5], [5, 6], [6, 7],  # edges of back surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
-            #                            [0, 7], [1, 6], [2, 5], [3, 4]]) # horizontal edges of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
-
 
             if to.class_str in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
                 self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append((pose, proj_3d_bb, connected_inds))
