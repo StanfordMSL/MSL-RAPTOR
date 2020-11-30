@@ -258,6 +258,24 @@ if __name__ == '__main__':
                 print("---\nid: {}\nns: '{}'\nclass_str: '{}'".format(i + start_num, name, class_str))
                 print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
                 print("b_enforce_0: []")
+        elif True:
+            b_save = True
+            b_plot = False
+            objs = {}
+            objs["mug_duke"]       = mug_dims_to_verts(D=0.083,   H=0.096,   l=0.03, h=0.07, w=0.01, o=0.015, name="mug_duke")
+            objs["bowl_white_msl"] = bowl_dims_to_verts(Dt=0.17, Dm=0.15, Db=0.1, Ht=0.066, Hb=0.03, name="bowl_white_msl")
+            objs["bowl_green_msl"] = bowl_dims_to_verts(Dt=0.17, Dm=0.15, Db=0.1, Ht=0.066, Hb=0.03, name="bowl_green_msl")
+
+            if b_save:
+                save_path = '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
+                if not os.path.exists( save_path ):
+                    os.makedirs( save_path )
+                for key in objs:
+                    save_objs_verts_as_txt(verts=objs[key][0], name=key, path=save_path, connected_inds=objs[key][1])
+            if b_plot:
+                # plot_object_verts(objs["mug_duke"][0], connected_inds=objs["mug_duke"][1])
+                plot_object_verts(objs["bowl_white_msl"][0], connected_inds=objs["bowl_white_msl"][1])
+                plt.show()
         else:
             b_save = True
             b_plot = True
