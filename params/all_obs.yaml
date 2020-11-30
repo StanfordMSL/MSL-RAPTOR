@@ -377,4 +377,45 @@ class_str: 'bottle'
 bound_box_l: 0.07
 bound_box_h: 0.26
 bound_box_w: 0.07
-b_enforce_0: ['yaw']
+b_enforce_0: []
+
+---
+id: 40
+ns: 'bowl_white_msl'
+class_str: 'bowl'
+bound_box_l: 0.17
+bound_box_h: 0.066
+bound_box_w: 0.17
+b_enforce_0: []
+---
+id: 41
+ns: 'bowl_green_msl'
+class_str: 'bowl'
+bound_box_l: 0.17
+bound_box_h: 0.066
+bound_box_w: 0.17
+b_enforce_0: []
+---
+id: 42
+ns: 'mug_duke'
+class_str: 'cup'
+bound_box_l: 0.095
+bound_box_h: 0.096
+bound_box_w: 0.083
+b_enforce_0: []
+---
+id: 43
+ns: 'mug_black'
+class_str: 'cup'
+bound_box_l: 0.095
+bound_box_h: 0.10
+bound_box_w: 0.08
+b_enforce_0: []
+---
+id: 43
+ns: 'mug_yellow_black'
+class_str: 'cup'
+bound_box_l: 0.11
+bound_box_h: 0.095
+bound_box_w: 0.09
+b_enforce_0: []

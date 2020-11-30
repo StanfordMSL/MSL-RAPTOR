@@ -237,7 +237,6 @@ class rosbags_to_logs:
                                 [ np.sin(np.pi), np.cos(np.pi), 0.              ],
                                 [ 0.             , 0.             , 1.              ]])
             for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds in corespondences:
-
                 if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
                     continue
 
@@ -341,6 +340,7 @@ class rosbags_to_logs:
                     #     projected_vertices[i, :] = rc
                     # projected_vertices = np.fliplr(projected_vertices)
 
+
                     if self.b_save_3dbb_imgs and len(bb_proj) > 0:
                         if t_est in self.processed_image_dict:
                             self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
@@ -414,11 +414,11 @@ class rosbags_to_logs:
                 self.topic_func_dict[topic](msg, t=t.to_sec())
             elif t_split[-1] == 'msl_raptor_state': # estimate
                 self.parse_ado_est_msg(msg)
-            elif t_split[1] in self.ado_names_all and t_split[-1] == 'pose' and t_split[-2] == 'vision_pose': # ground truth from a quad / nocs
+            elif t_split[1] in self.ado_names_all and t_split[-1] == 'pose' and t_split[-2] == 'vision_pose': # ground truth from a quad (mavros) / nocs
                 name = t_split[1]
                 self.ado_names.add(name)
                 self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
-            elif t_split[1] == 'vrpn_client_node' and t_split[-1] == 'pose': # ground truth from optitrack default
+            elif (t_split[1] == 'vrpn_client_node' and t_split[-1] == 'pose'): # ground truth from optitrack default 
                 name = t_split[2]
                 self.ado_names.add(name)
                 self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
@@ -538,8 +538,18 @@ class rosbags_to_logs:
                 proj_3d_bb = np.reshape(to.projected_3d_bb, (int(len(to.projected_3d_bb)/2), 2) )
 
             connected_inds = []
+            print("{}: len(to.projected_3d_bb) = {}, len(to.connected_inds) = {}".format(to.class_str, len(to.projected_3d_bb), len(to.connected_inds)))
             if len(to.connected_inds) > 0:
                 connected_inds = np.reshape(to.connected_inds, (int(len(to.connected_inds)/2), 2) )
+            else:
+                # this means we didnt have custom vertices, use generic 3D bounding box
+                connected_inds = np.array([[0, 1], [1, 2], [2, 3], [3, 0],  # edges of front surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
+                                           [7, 4], [4, 5], [5, 6], [6, 7],  # edges of back surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
+                                           [0, 7], [1, 6], [2, 5], [3, 4]]) # horizontal edges of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
+            # connected_inds = np.array([[0, 1], [1, 2], [2, 3], [3, 0],  # edges of front surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
+            #                            [7, 4], [4, 5], [5, 6], [6, 7],  # edges of back surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
+            #                            [0, 7], [1, 6], [2, 5], [3, 4]]) # horizontal edges of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
+
 
             if to.class_str in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
                 self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append((pose, proj_3d_bb, connected_inds))
