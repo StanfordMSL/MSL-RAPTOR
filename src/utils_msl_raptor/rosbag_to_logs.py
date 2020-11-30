@@ -225,7 +225,7 @@ class rosbags_to_logs:
                 min_dist_err = 1e10
                 for (ado_pose, bb_proj, connected_inds) in candidate_poses_and_bbs:
                     tf_w_ado_est = pose_to_tf(ado_pose)
-                    dist_err = la.norm(tf_w_ado_est[0:3, 3] - tf_w_ado_gt[0:3, 3])
+                    dist_err = la.norm(tf_w_ado_est[0:3, 3] - tf_w_ado_gt[0:3, 3]) 
                     if dist_err < min_dist_err:
                         min_dist_err = dist_err
                         best_corr = (tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds)
