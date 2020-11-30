@@ -1,3 +1,4 @@
 swell_bottle
-mug2_scene3_norm
-bowl_white_small_norm
+mug_duke
+bowl_white_msl
+bowl_green_msl
