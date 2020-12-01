@@ -8,6 +8,7 @@ import yaml
 import pdb
 # math
 import numpy as np
+from scipy.optimize import linear_sum_assignment as scipy_hung_alg
 from scipy.spatial.transform import Rotation as R
 
 from matplotlib import pyplot as plt
@@ -104,6 +105,7 @@ class rosbags_to_logs:
         self.bb_3d_dict_all = defaultdict(list)  # turns the name into the len, width, height, and diam of the object
         self.tf_cam_ego = None
         self.class_str_to_name_dict = defaultdict(list)
+        self.ado_name_to_class = {} # pulled from the all_obs yaml file
         self.b_enforce_0_dict = {}
         self.fixed_vals = {}
         self.read_yaml(ego_yaml=ego_yaml, ado_yaml=ado_yaml)
@@ -196,6 +198,11 @@ class rosbags_to_logs:
         ###################################
 
         print("Post-processing data now")
+        # loop over all the actually seen ado objects, and sort them by class. this way we know the max number of candidates for coorespondences
+        for ado_name in self.ado_names:
+            class_str = self.ado_name_to_class[ado_name]
+            self.class_str_to_name_dict[class_str].append(ado_name)
+
         t_img_to_t_est_dict = {}
         add_errs = []
         R_errs = []
@@ -205,40 +212,50 @@ class rosbags_to_logs:
             if t_est < 0:
                 continue
 
-            # at a given time, look at what classes were seen. compile all objects of these classes into a list
-            candidate_name_class = []
-            classes_seen_this_itr = self.ado_est_pose_BY_TIME_BY_CLASS[t_est].keys()
-            for class_str in classes_seen_this_itr:
-                for name in self.class_str_to_name_dict[class_str]:
-                    candidate_name_class.append((name, class_str))
-
-            # for each object seen, find the closest ground truth pose
             corespondences = []
-            for name, class_str in candidate_name_class:
-                candidate_poses_and_bbs = self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_str]
-                if candidate_poses_and_bbs is None or len(candidate_poses_and_bbs) == 0 or not name in self.t_gt:
-                    continue
-                t_gt, gt_ind = find_closest_by_time(t_est, self.t_gt[name])
-                tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[name][gt_ind])
+            for class_name_seen in self.ado_est_pose_BY_TIME_BY_CLASS[t_est].keys():
+                ado_name_candidates = self.class_str_to_name_dict[class_name_seen]
+                total_num_of_this_classs = len(ado_name_candidates)
+                num_seen_of_this_class = len(self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_name_seen])
 
-                # try each candidate pose
-                min_dist_err = 1e10
-                for (ado_pose, bb_proj, connected_inds) in candidate_poses_and_bbs:
-                    tf_w_ado_est = pose_to_tf(ado_pose)
-                    dist_err = la.norm(tf_w_ado_est[0:3, 3] - tf_w_ado_gt[0:3, 3]) 
-                    if dist_err < min_dist_err:
-                        min_dist_err = dist_err
-                        best_corr = (tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds)
-                corespondences.append(best_corr)
-                
+                cost_mat = 1e5*np.ones((num_seen_of_this_class, total_num_of_this_classs))
+
+                # get each tf_w_ado_est that we have this round (can be less than total number we have)
+                ado_est_data_list = []
+                ado_gt_data_list = []
+                for hun_row, (tf_w_ado_est_ros_format, bb_proj, connected_inds) in enumerate(self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_name_seen]): # ado_pose, bb_proj, connected_inds
+                    tf_w_ado_est = pose_to_tf(tf_w_ado_est_ros_format)
+                    ado_est_data_list.append((tf_w_ado_est, bb_proj, connected_inds))
+
+                    # get tf_w_ado_gt for each candidate
+                    for hun_col, ado_name_cand in enumerate(ado_name_candidates):
+                        t_gt, gt_ind = find_closest_by_time(t_est, self.t_gt[ado_name_cand])
+                        tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[ado_name_cand][gt_ind])
+                        ado_gt_data_list.append((tf_w_ado_gt, t_gt, ado_name_cand))
+                        cost_mat[hun_row, hun_col] = la.norm(tf_w_ado_gt[0:3, 3] - tf_w_ado_est[0:3, 3])
+                        assert(abs(t_gt - t_est) < 0.1) # make sure there are no surprises
+                # now we have a cost matrix with the rows being the ado objects we have seen this round (but only know the classes of) and the columns being the ground truth ado ojbects (we know the full names in ) ado_name_candidates list
+                row_inds, col_inds = scipy_hung_alg(cost_mat)
+
+                # use our results to build tuples
+                for (ado_seen_idx, ado_gt_idx) in zip(row_inds, col_inds):
+                    tf_w_ado_est, bb_proj, connected_inds = ado_est_data_list[ado_seen_idx]
+                    tf_w_ado_gt, t_gt, ado_name = ado_gt_data_list[ado_gt_idx]
+
+                    corespondences.append((tf_w_ado_est, tf_w_ado_gt, ado_name, class_name_seen, t_gt, bb_proj, connected_inds))
+                    
+                    print('error (trans dist) for {} after hung alg = {}'.format(ado_name, cost_mat[ado_seen_idx, ado_gt_idx]))
+            ################ END HUNG ALG ##############################
+            
             if len(corespondences) == 0:
                 continue
             R_deltaz = np.array([[ np.cos(np.pi),-np.sin(np.pi), 0.              ],
                                 [ np.sin(np.pi), np.cos(np.pi), 0.              ],
                                 [ 0.             , 0.             , 1.              ]])
             for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds in corespondences:
-                if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
-                    continue
+                print(name)
+                # if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
+                #     continue
 
                 # if self.rb_name == "msl_raptor_output_from_bag_scene_2.bag" and t_gt > 2.3 and t_gt < 18:
                 #     """ FIX ERROR IN GROUNT TRUTH!!!! """
@@ -339,7 +356,6 @@ class rosbags_to_logs:
                     #     rc = np.array([rc[1], rc[0]]) / rc[2]
                     #     projected_vertices[i, :] = rc
                     # projected_vertices = np.fliplr(projected_vertices)
-
 
                     if self.b_save_3dbb_imgs and len(bb_proj) > 0:
                         if t_est in self.processed_image_dict:
@@ -479,7 +495,8 @@ class rosbags_to_logs:
                     l = float(obj_dict['bound_box_l']) 
                     w = float(obj_dict['bound_box_w'])
                     h = float(obj_dict['bound_box_h'])
-                    self.class_str_to_name_dict[class_str].append(name)
+                    # self.class_str_to_name_dict[class_str].append(name)
+                    self.ado_name_to_class[name] = class_str
                     if 'diam' in obj_dict:
                         d = obj_dict['diam']
                     else:
