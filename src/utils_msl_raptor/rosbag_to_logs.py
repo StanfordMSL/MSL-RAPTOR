@@ -222,6 +222,17 @@ class rosbags_to_logs:
             if t_est < 0:
                 continue
 
+            # find corresponding ego pose 
+            t_gt, gt_ind = find_closest_by_time(t_est, self.ego_gt_time_pose)
+            tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[gt_ind])
+            t_est2, est_ind = find_closest_by_time(t_est, self.ego_est_time_pose)
+            tf_w_ego_est = pose_to_tf(self.ego_est_pose[est_ind])
+            print("t_gt - t_est = {}, t_est2 - t_est = {}".format(t_gt - t_est, t_est2 - t_est))
+            tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
+            tf_cam_w = inv_tf(tf_w_cam)
+            # pdb.set_trace()
+
+
             corespondences = []
             for class_name_seen in self.ado_est_pose_BY_TIME_BY_CLASS[t_est].keys():
                 ado_name_candidates = self.class_str_to_name_dict[class_name_seen]
@@ -247,7 +258,8 @@ class rosbags_to_logs:
                             assert(abs(t_gt - t_est) < 0.1) # make sure there are no surprises
                         except:
                             print("FAILED ASSERTION: assert(abs(t_gt - t_est) < 0.1) ...  abs(t_gt - t_est) = {}".format(abs(t_gt - t_est)))
-                            RuntimeError("FAILED ASSERTION!!!")
+                            pdb.set_trace()
+                            raise RuntimeError("FAILED ASSERTION!!!")
                 # now we have a cost matrix with the rows being the ado objects we have seen this round (but only know the classes of) and the columns being the ground truth ado ojbects (we know the full names in ) ado_name_candidates list
                 row_inds, col_inds = scipy_hung_alg(cost_mat)
 
@@ -258,7 +270,7 @@ class rosbags_to_logs:
 
                     corespondences.append((tf_w_ado_est, tf_w_ado_gt, ado_name, class_name_seen, t_gt, bb_proj, connected_inds, bb_proj_gt))
                     
-                    print('error (trans dist) for {} after hung alg = {}'.format(ado_name, cost_mat[ado_seen_idx, ado_gt_idx]))
+                    # print('error (trans dist) for {} after hung alg = {}'.format(ado_name, cost_mat[ado_seen_idx, ado_gt_idx]))
             ################ END HUNG ALG ##############################
             
             if len(corespondences) == 0:
@@ -266,6 +278,9 @@ class rosbags_to_logs:
             R_deltaz = np.array([[ np.cos(np.pi),-np.sin(np.pi), 0.              ],
                                 [ np.sin(np.pi), np.cos(np.pi), 0.              ],
                                 [ 0.             , 0.             , 1.              ]])
+
+
+
             for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds, bb_proj_gt in corespondences:
                 # if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
                 #     continue
@@ -290,16 +305,12 @@ class rosbags_to_logs:
                                      [-box_length/2, box_width/2,-box_height/2, 1.],
                                      [-box_length/2, box_width/2, box_height/2, 1.]]).T
                 
-                if gt_ind > len(self.ego_gt_pose):
-                    break # this can happen at the end of a bag
+                # if gt_ind > len(self.ego_gt_pose):
+                #     break # this can happen at the end of a bag
+                # pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
+                # tf_w_ego_est = pose_to_tf(pose_msg)
 
-                tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[gt_ind])
-
-                pose_msg, _ = find_closest_by_time(t_est, self.ego_est_time_pose, message_list=self.ego_est_pose)
-                tf_w_ego_est = pose_to_tf(pose_msg)
-
-                tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
-                tf_cam_w = inv_tf(tf_w_cam)
+                
                 tf_cam_ado_est = tf_cam_w @ tf_w_ado_est
                 tf_cam_ado_gt = tf_cam_w @ tf_w_ado_gt
 
@@ -357,34 +368,25 @@ class rosbags_to_logs:
                         image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
                         image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
                     
-                    # alt_pr = pose_to_3d_bb_proj(tf_w_ado_est, tf_w_ego_gt, vertices, ukf_dict[obj_id].camera)
-                    # print(self.new_camera_matrix)
-                    # print(self.tf_cam_ego)
-                    # N = vertices.shape[1]
-                    # tf_cam_ado = self.tf_cam_ego @ inv_tf(tf_w_ego_gt) @ tf_w_ado_est
-                    # vertices_cam = tf_cam_ado @ vertices
-                    # projected_vertices = np.zeros((N, 2))
-                    # for i, bb_vert in enumerate(vertices_cam.T):
-                    #     rc = self.new_camera_matrix @ np.reshape(bb_vert[0:3], 3, 1)
-                    #     rc = np.array([rc[1], rc[0]]) / rc[2]
-                    #     projected_vertices[i, :] = rc
-                    # projected_vertices = np.fliplr(projected_vertices)
-
-
-                    ###### COLOR LEGEND ##################################
-                    # "light" color - this is msl-raptor's estimate as calculated in real time (in msl-raptor code)
-                    # "darker" color - this is the ground truth calculated locally
-                    # black - this is the estimate calculated locally
-                    # white - this is the gt calculated in msl raptor
-
+                    
                     if self.b_save_3dbb_imgs and len(bb_proj) > 0:
                         image_to_draw_on = image
+                        ###### COLOR LEGEND ##################################
+                        # black/white is gt, "darker" colors are calculated locally
+                        # "light" color - this is msl-raptor's estimate as calculated in real time (in msl-raptor code)
+                        # "darker" color - this is the estimate calculated locally
+                        # black - this is the gt calculated locally
+                        # white - this is the gt calculated in msl raptor
+                        color_est_raptor = self.ado_name_to_color[name]
+                        color_est_local  = (self.ado_name_to_color[name][0] // 2, self.ado_name_to_color[name][1] // 2, self.ado_name_to_color[name][2] // 2)
+                        color_gt_local   = (0, 0, 0)  # black
+                        color_gt_raptor  = (255, 255, 2550)  # white 
 
                         # draw the gt verts if this is enabled
                         if self.b_plot_gt_overlay:
                             if len(bb_proj_gt) > 0:
                                 # if sent over, plot the gt projection as calculated by msl raptor
-                                image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_gt, color_pr=(255,255,255), linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
+                                image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_gt, color_pr=color_gt_raptor, linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
 
                             # plot the verts as calculated here
                             bb_3d, _, _, _, _, _, connected_inds_gt_list = self.info_for_gt_overlay # bb_3d, obj_width, obj_height, classes_names, classes_ids, objects_names_per_class, connected_inds
@@ -394,21 +396,35 @@ class rosbags_to_logs:
                                 pdb.set_trace()
                             else:
                                 bb_proj_gt_calc_local = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, tf_w_ego_gt, bb_3d[class_str], self.camera) ) # fliplr is needed because of x /y  <===> column / row
-                                bb_proj_est_calc_local = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_est, tf_w_ego_gt, bb_3d[class_str], self.camera) )
-                            color_tuple = (self.ado_name_to_color[name][0] // 2, self.ado_name_to_color[name][1] // 2, self.ado_name_to_color[name][2] // 2)
-                            image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_gt_calc_local, color_pr=color_tuple, linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
-                            image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_est_calc_local, color_pr=(0,0,0), linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
+                                bb_proj_est_calc_local = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_est, tf_w_ego_est, bb_3d[class_str], self.camera) )
+                            image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_gt_calc_local, color_pr=color_gt_local, linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
+                            image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_est_calc_local, color_pr=color_est_local, linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
 
-                            # if i == 407 and name=="swell_bottle":
-                            #     pdb.set_trace()
 
                         # now draw our estimated verts - as calculated by msl raptor
                         if t_est in self.processed_image_dict:
-                            self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
+                            self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj, color_pr=color_est_raptor, linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
                             self.processed_image_dict[t_est][1].append(bb_proj)
                             self.processed_image_dict[t_est][2].append(name)
                         else:
-                            self.processed_image_dict[t_est] = [draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds), [bb_proj], [name]]
+                            self.processed_image_dict[t_est] = [draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj, color_pr=color_est_raptor, linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds), [bb_proj], [name]]
+
+
+                        if name=="swell_bottle":
+                            if i == 0:
+                                print("tf_w_ado_gt:\n{}".format(tf_w_ado_gt))
+                            # print("tf_w_ego_gt:\n{}".format(tf_w_ego_gt))
+                            # print("tf_w_ego_est:\n{}".format(tf_w_ego_est))
+                            t_err_ego = la.norm(tf_w_ego_gt[0:3, 3] - tf_w_ego_gt[0:3, 3])
+                            R_err_ego = calcAngularDistance(tf_w_ego_gt[0:3, 0:3], tf_w_ego_gt[0:3, 0:3]) # in degrees
+                            print("ego err: trans = {}, rot = {} deg".format(t_err_ego, R_err_ego))
+                            # if i == 3:
+                            #     pdb.set_trace()
+            # save the image
+            fn_str = "mslraptor_{:d}".format(i)
+            cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", image_to_draw_on)
+            # pdb.set_trace()
+
                     ######################################################
             
 
@@ -416,39 +432,39 @@ class rosbags_to_logs:
             self.raptor_metrics.calc_final_metrics()
             self.raptor_metrics.print_final_metrics()
 
-        # write images!!
-        if self.b_save_3dbb_imgs:
-            b_fill_in_gaps = False
-            img_ind = 0
-            max_skip_count = 3
-            if b_fill_in_gaps:
-                for img_msg_time, img_msg in zip(self.img_time_buffer, self.img_msg_buffer):
-                    if img_msg_time < -0.04:
-                        continue
-                    if self.rb_name in self.bags_and_cut_times and img_msg_time + self.t0 > self.bags_and_cut_times[self.rb_name]:
-                        break
-                    if img_msg_time in t_img_to_t_est_dict:
-                        # we have a bb for this frame
-                        image, last_bb_proj_list, last_name_list = self.processed_image_dict[t_img_to_t_est_dict[img_msg_time]]
-                        skip_count = 0
-                    else:
-                        # we dont, use the latest bb if within skip_count
-                        image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
-                        image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
-                        if skip_count < max_skip_count: # if its jus a little later... reuse prev box
-                            for bb_proj, name in zip(last_bb_proj_list, last_name_list):
-                                image = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
-                        else:
-                            print("over skip count ({})".format(img_ind))
-                        skip_count += 1
-                    fn_str = "mslraptor_{:d}".format(img_ind)
-                    cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", image)
-                    img_ind += 1
-            else:
-                for img_ind, t_est in enumerate(self.processed_image_dict):
-                    image, _, _ = self.processed_image_dict[t_est]
-                    fn_str = "mslraptor_{:d}".format(img_ind)
-                    cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", image)
+        # # write images!!
+        # if self.b_save_3dbb_imgs:
+        #     b_fill_in_gaps = False
+        #     img_ind = 0
+        #     max_skip_count = 3
+        #     if b_fill_in_gaps:
+        #         for img_msg_time, img_msg in zip(self.img_time_buffer, self.img_msg_buffer):
+        #             if img_msg_time < -0.04:
+        #                 continue
+        #             if self.rb_name in self.bags_and_cut_times and img_msg_time + self.t0 > self.bags_and_cut_times[self.rb_name]:
+        #                 break
+        #             if img_msg_time in t_img_to_t_est_dict:
+        #                 # we have a bb for this frame
+        #                 image, last_bb_proj_list, last_name_list = self.processed_image_dict[t_img_to_t_est_dict[img_msg_time]]
+        #                 skip_count = 0
+        #             else:
+        #                 # we dont, use the latest bb if within skip_count
+        #                 image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
+        #                 image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
+        #                 if skip_count < max_skip_count: # if its jus a little later... reuse prev box
+        #                     for bb_proj, name in zip(last_bb_proj_list, last_name_list):
+        #                         image = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth)
+        #                 else:
+        #                     print("over skip count ({})".format(img_ind))
+        #                 skip_count += 1
+        #             fn_str = "mslraptor_{:d}".format(img_ind)
+        #             cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", image)
+        #             img_ind += 1
+        #     else:
+        #         for img_ind, t_est in enumerate(self.processed_image_dict):
+        #             image, _, _ = self.processed_image_dict[t_est]
+        #             fn_str = "mslraptor_{:d}".format(img_ind)
+        #             cv2.imwrite("/mounted_folder/raptor_processed_bags/output_imgs/" + fn_str + ".jpg", image)
         
         print("done processing rosbag into logs!")
         plt.figure(0)
@@ -497,6 +513,8 @@ class rosbags_to_logs:
         self.img_time_buffer = np.asarray(self.img_time_buffer) - self.t0
         # self.detect_time[n] = np.asarray(self.detect_time) - self.t0
         # self.detect_times[n] = np.asarray(self.detect_times) - self.t0
+        self.ego_est_time_pose = np.asarray(self.ego_est_time_pose) - self.t0
+        self.ego_gt_time_pose = np.asarray(self.ego_gt_time_pose) - self.t0
 
 
     def read_yaml(self, ego_yaml="quad7", ado_yaml="all_obs"):
@@ -577,7 +595,7 @@ class rosbags_to_logs:
                 self.dist_coefs = None
                 self.new_camera_matrix = self.K
             if self.b_plot_gt_overlay:
-                self.camera = camera_slim(camera_info)
+                self.camera = camera_slim(camera_info, self.tf_cam_ego, self.K, self.new_camera_matrix)
     
 
     def parse_ado_est_msg(self, msg, t=None):
@@ -668,40 +686,23 @@ class rosbags_to_logs:
             self.abb_list[name].append(([msg.x, msg.y, msg.width, msg.height, msg.angle*180./np.pi], msg.im_seg_mode))
             self.abb_time_list[name].append(t)
 
-class camera_slim: # THIS IS A SLIMMED DOWN VERSION OF THE CLASS FROM RAPTOR WITH SOME ELEMENTS HARDCODED IN (this is for debugging and allows us to plot 3d verts)
-    def __init__(self, camera_info):
+class camera_slim: # THIS IS A SLIMMED DOWN VERSION OF THE CLASS FROM RAPTOR. We get the inputs from our yaml file (this is for debugging and allows us to plot 3d verts)
+    def __init__(self, camera_info, tf_cam_ego, K, new_camera_matrix):
         """
         K: camera intrinsic matrix 
         tf_cam_ego: camera pose relative to the ego_quad (fixed)
         """
-        print("\n\nWARNING!!! This CAMERA depends on hardcoded values - for debugging only!!!!!!!!!!!!!!!!!!!!!!!!\n\n")
-        self.K = np.reshape(camera_info.K, (3, 3))
+        self.K = K
         if len(camera_info.D) == 5:
             self.dist_coefs = np.reshape(camera_info.D, (5,))
-            self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
+            self.new_camera_matrix = new_camera_matrix
         else:
             self.dist_coefs = None
-            self.new_camera_matrix = self.K
+            self.new_camera_matrix = new_camera_matrix
 
         self.K_inv = la.inv(self.K)
         self.new_camera_matrix_inv = la.inv(self.new_camera_matrix)
-        self.tf_cam_ego = np.eye(4)
-        self.tf_cam_ego[0:3, 3] = np.asarray([0.01504337, -0.06380886, -0.13854437])
-        self.tf_cam_ego[0:3, 0:3] = np.reshape([-0.000682621737, -0.999890488, -0.014783269, 0.035042397, 0.0147502748, -0.999276969, 0.999385593, -0.00120016936, 0.0350284906], (3, 3))
-        Angle_x = float(0.04444444444)
-        Angle_y = float(0.04444444444)
-        Angle_z = float(0)
-        R_deltax = np.array([[ 1.             , 0.             , 0.              ],
-                                [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
-                                [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
-        R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
-                                [ 0.             , 1.             , 0               ],
-                                [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
-        R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
-                                [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
-                                [ 0.             , 0.             , 1.              ]])
-        R_delta = R_deltax @ R_deltay @ R_deltaz
-        self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
+        self.tf_cam_ego = tf_cam_ego
 
     def pnt3d_to_pix(self, pnt_c):
         """
