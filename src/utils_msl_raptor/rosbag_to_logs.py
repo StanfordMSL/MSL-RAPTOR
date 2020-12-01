@@ -233,9 +233,9 @@ class rosbags_to_logs:
                 # get each tf_w_ado_est that we have this round (can be less than total number we have)
                 ado_est_data_list = []
                 ado_gt_data_list = []
-                for hun_row, (tf_w_ado_est_ros_format, bb_proj, connected_inds) in enumerate(self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_name_seen]): # ado_pose, bb_proj, connected_inds
+                for hun_row, (tf_w_ado_est_ros_format, bb_proj, connected_inds, bb_proj_gt) in enumerate(self.ado_est_pose_BY_TIME_BY_CLASS[t_est][class_name_seen]): # ado_pose, bb_proj, connected_inds
                     tf_w_ado_est = pose_to_tf(tf_w_ado_est_ros_format)
-                    ado_est_data_list.append((tf_w_ado_est, bb_proj, connected_inds))
+                    ado_est_data_list.append((tf_w_ado_est, bb_proj, connected_inds, bb_proj_gt))
 
                     # get tf_w_ado_gt for each candidate
                     for hun_col, ado_name_cand in enumerate(ado_name_candidates):
@@ -253,10 +253,10 @@ class rosbags_to_logs:
 
                 # use our results to build tuples
                 for (ado_seen_idx, ado_gt_idx) in zip(row_inds, col_inds):
-                    tf_w_ado_est, bb_proj, connected_inds = ado_est_data_list[ado_seen_idx]
+                    tf_w_ado_est, bb_proj, connected_inds, bb_proj_gt = ado_est_data_list[ado_seen_idx]
                     tf_w_ado_gt, t_gt, ado_name = ado_gt_data_list[ado_gt_idx]
 
-                    corespondences.append((tf_w_ado_est, tf_w_ado_gt, ado_name, class_name_seen, t_gt, bb_proj, connected_inds))
+                    corespondences.append((tf_w_ado_est, tf_w_ado_gt, ado_name, class_name_seen, t_gt, bb_proj, connected_inds, bb_proj_gt))
                     
                     print('error (trans dist) for {} after hung alg = {}'.format(ado_name, cost_mat[ado_seen_idx, ado_gt_idx]))
             ################ END HUNG ALG ##############################
@@ -266,7 +266,7 @@ class rosbags_to_logs:
             R_deltaz = np.array([[ np.cos(np.pi),-np.sin(np.pi), 0.              ],
                                 [ np.sin(np.pi), np.cos(np.pi), 0.              ],
                                 [ 0.             , 0.             , 1.              ]])
-            for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds in corespondences:
+            for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds, bb_proj_gt in corespondences:
                 # if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
                 #     continue
 
@@ -370,26 +370,39 @@ class rosbags_to_logs:
                     #     projected_vertices[i, :] = rc
                     # projected_vertices = np.fliplr(projected_vertices)
 
+
+                    ###### COLOR LEGEND ##################################
+                    # "light" color - this is msl-raptor's estimate as calculated in real time (in msl-raptor code)
+                    # "darker" color - this is the ground truth calculated locally
+                    # black - this is the estimate calculated locally
+                    # white - this is the gt calculated in msl raptor
+
                     if self.b_save_3dbb_imgs and len(bb_proj) > 0:
                         image_to_draw_on = image
 
                         # draw the gt verts if this is enabled
                         if self.b_plot_gt_overlay:
+                            if len(bb_proj_gt) > 0:
+                                # if sent over, plot the gt projection as calculated by msl raptor
+                                image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_gt, color_pr=(255,255,255), linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
+
+                            # plot the verts as calculated here
                             bb_3d, _, _, _, _, _, connected_inds_gt_list = self.info_for_gt_overlay # bb_3d, obj_width, obj_height, classes_names, classes_ids, objects_names_per_class, connected_inds
                             if not class_str in bb_3d:
-                                bb_proj_gt = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, tf_w_ego_gt, vertices, self.camera)) # fliplr is needed because of x /y  <===> column / row
+                                print("WARNING - HAVENT TESTED THIS YET AND I THINK IT IS OUTDATED")
+                                bb_proj_gt_calc_local = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, tf_w_ego_gt, vertices, self.camera)) # fliplr is needed because of x /y  <===> column / row
                                 pdb.set_trace()
                             else:
-                                bb_proj_gt = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, tf_w_ego_gt, bb_3d[class_str], self.camera) ) # fliplr is needed because of x /y  <===> column / row
-                                bb_proj_est = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_est, tf_w_ego_gt, bb_3d[class_str], self.camera) )
+                                bb_proj_gt_calc_local = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, tf_w_ego_gt, bb_3d[class_str], self.camera) ) # fliplr is needed because of x /y  <===> column / row
+                                bb_proj_est_calc_local = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_est, tf_w_ego_gt, bb_3d[class_str], self.camera) )
                             color_tuple = (self.ado_name_to_color[name][0] // 2, self.ado_name_to_color[name][1] // 2, self.ado_name_to_color[name][2] // 2)
-                            image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_gt, color_pr=color_tuple, linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
-                            image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_est, color_pr=(0,0,0), linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
+                            image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_gt_calc_local, color_pr=color_tuple, linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
+                            image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_est_calc_local, color_pr=(0,0,0), linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
 
+                            # if i == 407 and name=="swell_bottle":
+                            #     pdb.set_trace()
 
-                            # pdb.set_trace()
-
-                        # now draw our estimated verts
+                        # now draw our estimated verts - as calculated by msl raptor
                         if t_est in self.processed_image_dict:
                             self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
                             self.processed_image_dict[t_est][1].append(bb_proj)
@@ -584,10 +597,6 @@ class rosbags_to_logs:
                 t_est = to.pose.header.stamp.to_sec() # to message doesnt have its own header, the publisher set this time to be that of the image the measurement that went into the ukf was received at
             pose = to.pose.pose
 
-            proj_3d_bb = []
-            if len(to.projected_3d_bb) > 0:
-                proj_3d_bb = np.reshape(to.projected_3d_bb, (int(len(to.projected_3d_bb)/2), 2) )
-
             connected_inds = []
             if len(to.connected_inds) > 0:
                 connected_inds = np.reshape(to.connected_inds, (int(len(to.connected_inds)/2), 2) )
@@ -597,10 +606,22 @@ class rosbags_to_logs:
                                            [7, 4], [4, 5], [5, 6], [6, 7],  # edges of back surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
                                            [0, 7], [1, 6], [2, 5], [3, 4]]) # horizontal edges of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
 
+            proj_3d_bb = []
+            proj_3d_bb_gt = []
+            if len(to.projected_3d_bb) > 0:
+                proj_3d_bb = np.reshape(to.projected_3d_bb, (int(len(to.projected_3d_bb)/2), 2) )
+                
+                if np.max(connected_inds)*1.5 < proj_3d_bb.shape[0]:
+                    # this means we have "too many" vertices, and indicates we lumped both estimate and gt together (via np.vstack((est, gt)))
+                    # this should be true cause connected_ind's contains vertex indices, so its max value should be the number of points
+                    proj_3d_bb_gt = proj_3d_bb[proj_3d_bb.shape[0]//2:, :]   # first half is the estimates
+                    proj_3d_bb    = proj_3d_bb[0:proj_3d_bb.shape[0]//2, :]  # second half is the ground truth
+
+
             if to.class_str in self.ado_est_pose_BY_TIME_BY_CLASS[t_est]:
-                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append((pose, proj_3d_bb, connected_inds))
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str].append((pose, proj_3d_bb, connected_inds, proj_3d_bb_gt))
             else:
-                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [(pose, proj_3d_bb, connected_inds)]
+                self.ado_est_pose_BY_TIME_BY_CLASS[t_est][to.class_str] = [(pose, proj_3d_bb, connected_inds, proj_3d_bb_gt)]
 
         self.t_est.add(t_est)
 

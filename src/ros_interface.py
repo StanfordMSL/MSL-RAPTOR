@@ -20,7 +20,7 @@ import random
 
 class ros_interface:
 
-    def __init__(self, b_use_gt_bb=False,b_verbose=False,b_use_gt_pose_init=False,b_use_gt_detect_bb=False,b_pub_3d_bb_proj=False):
+    def __init__(self, b_use_gt_bb=False,b_verbose=False,b_use_gt_pose_init=False,b_use_gt_detect_bb=False,b_pub_3d_bb_proj=False, b_publish_gt_3d_projections=False):
         
         self.verbose = b_verbose
 
@@ -35,6 +35,7 @@ class ros_interface:
         self.b_use_gt_bb = b_use_gt_bb  # toggle for debugging using ground truth bounding boxes
         self.latest_img_time = -1
         self.front_end_time = None
+        self.b_publish_gt_3d_projections = b_publish_gt_3d_projections
         ####################################################################
 
         self.ns = rospy.get_param('~ns')  # robot namespace
@@ -68,7 +69,7 @@ class ros_interface:
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', TrackedObjects, queue_size=5)
         self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', AngledBboxes, queue_size=5)
 
-        if self.b_use_gt_pose_init or self.b_use_gt_detect_bb:
+        if self.b_publish_gt_3d_projections or self.b_use_gt_pose_init or self.b_use_gt_detect_bb:
             # Create dict to store pose for each object
             self.latest_tracked_poses = {}
             for obj_name in sum(self.objects_names_per_class.values(),[]):

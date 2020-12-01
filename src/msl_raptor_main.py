@@ -35,7 +35,7 @@ def run_execution_loop():
     detector_cfg = rospy.get_param('~detector_cfg')
     b_filter_meas = True
     
-    ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb,b_pub_3d_bb_proj)  # create a ros interface object
+    ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb,b_pub_3d_bb_proj, b_publish_gt_3d_projections=(True and b_pub_3d_bb_proj))  # create a ros interface object
 
     # Returns dict of params per class name
     category_params = load_category_params()
@@ -138,10 +138,21 @@ def run_execution_loop():
             obj_ids_tracked.append(obj_id)
 
             if ukf_dict[obj_id] is not None:
+
+                
+
                 ukf_dict[obj_id].step_ukf(abb, tf_ego_w, loop_time)  # update ukf
                 if b_pub_3d_bb_proj:
                     tf_w_ado = state_to_tf(ukf_dict[obj_id].mu)
-                    ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
+                    if ros.b_publish_gt_3d_projections:
+                        tf_w_ado_gt_array = ros.get_closest_pose(class_str, ukf_dict[obj_id].mu[0:3])
+                        tf_w_ado_gt = np.eye(4)
+                        tf_w_ado_gt[0:3, 3] = tf_w_ado_gt_array[0:3]
+                        tf_w_ado_gt[0:3, 0:3] = quat_to_rotm(tf_w_ado_gt_array[3:7])
+                        ukf_dict[obj_id].projected_3d_bb = np.vstack( (np.fliplr(pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera)), 
+                                                                       np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera)) ) )
+                    else:
+                        ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
                     if class_str in connected_inds:
                         ukf_dict[obj_id].connected_inds = connected_inds[ukf_dict[obj_id].class_str]
         
@@ -175,10 +186,6 @@ def init_state_from_gt(ros, ukf):
     rospy.logwarn('using ground truth to initialize filter!')
     ukf.mu = pose_to_state_vec(ros.ado_pose_gt_rosmsg) 
     ukf.mu[0:3] += np.array([-2, .5, .5]) 
-
-
-
-
 
 def wait_intil_ros_ready(ros, rate):
     """ pause until ros is ready or timeout reached """
