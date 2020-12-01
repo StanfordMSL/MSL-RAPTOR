@@ -141,7 +141,17 @@ class rosbags_to_logs:
         self.K = None
         self.dist_coefs = None
         self.new_camera_matrix = None
+        self.camera = None
         #########################################################################################
+        self.b_plot_gt_overlay = True
+        if self.b_plot_gt_overlay:
+            objects_sizes_yaml  = "/root/msl_raptor_ws/src/msl_raptor/params/all_obs.yaml"
+            objects_used_path_and_file  = "/root/msl_raptor_ws/src/msl_raptor/params/objects_used/objects_used.txt"
+            classes_names_file = "/root/msl_raptor_ws/src/msl_raptor/params/classes.names"
+            category_params = load_category_params() # Returns dict of params per class name
+            # bb_3d, obj_width, obj_height, classes_names, classes_ids, objects_names_per_class, connected_inds = \
+            self.info_for_gt_overlay = get_object_sizes_from_yaml(objects_sizes_yaml, objects_used_path_and_file, classes_names_file, category_params)  # Parse objects used and associated configurations
+
         self.process_rb()
         
         base_path = self.log_out_dir + "/log_" + self.rb_name[:-4].split("_")[-1] 
@@ -233,7 +243,11 @@ class rosbags_to_logs:
                         tf_w_ado_gt = pose_to_tf(self.ado_gt_pose[ado_name_cand][gt_ind])
                         ado_gt_data_list.append((tf_w_ado_gt, t_gt, ado_name_cand))
                         cost_mat[hun_row, hun_col] = la.norm(tf_w_ado_gt[0:3, 3] - tf_w_ado_est[0:3, 3])
-                        assert(abs(t_gt - t_est) < 0.1) # make sure there are no surprises
+                        try:
+                            assert(abs(t_gt - t_est) < 0.1) # make sure there are no surprises
+                        except:
+                            print("FAILED ASSERTION: assert(abs(t_gt - t_est) < 0.1) ...  abs(t_gt - t_est) = {}".format(abs(t_gt - t_est)))
+                            RuntimeError("FAILED ASSERTION!!!")
                 # now we have a cost matrix with the rows being the ado objects we have seen this round (but only know the classes of) and the columns being the ground truth ado ojbects (we know the full names in ) ado_name_candidates list
                 row_inds, col_inds = scipy_hung_alg(cost_mat)
 
@@ -253,7 +267,6 @@ class rosbags_to_logs:
                                 [ np.sin(np.pi), np.cos(np.pi), 0.              ],
                                 [ 0.             , 0.             , 1.              ]])
             for tf_w_ado_est, tf_w_ado_gt, name, class_str, t_gt, bb_proj, connected_inds in corespondences:
-                print(name)
                 # if self.rb_name == "msl_raptor_output_from_bag_rosbag_for_post_process_2019-12-18-02-10-28.bag" and t_gt > 31:
                 #     continue
 
@@ -358,12 +371,31 @@ class rosbags_to_logs:
                     # projected_vertices = np.fliplr(projected_vertices)
 
                     if self.b_save_3dbb_imgs and len(bb_proj) > 0:
+                        image_to_draw_on = image
+
+                        # draw the gt verts if this is enabled
+                        if self.b_plot_gt_overlay:
+                            bb_3d, _, _, _, _, _, connected_inds_gt_list = self.info_for_gt_overlay # bb_3d, obj_width, obj_height, classes_names, classes_ids, objects_names_per_class, connected_inds
+                            if not class_str in bb_3d:
+                                bb_proj_gt = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, tf_w_ego_gt, vertices, self.camera)) # fliplr is needed because of x /y  <===> column / row
+                                pdb.set_trace()
+                            else:
+                                bb_proj_gt = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, tf_w_ego_gt, bb_3d[class_str], self.camera) ) # fliplr is needed because of x /y  <===> column / row
+                                bb_proj_est = np.fliplr(pose_to_3d_bb_proj(tf_w_ado_est, tf_w_ego_gt, bb_3d[class_str], self.camera) )
+                            color_tuple = (self.ado_name_to_color[name][0] // 2, self.ado_name_to_color[name][1] // 2, self.ado_name_to_color[name][2] // 2)
+                            image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_gt, color_pr=color_tuple, linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
+                            image_to_draw_on = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj_est, color_pr=(0,0,0), linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
+
+
+                            # pdb.set_trace()
+
+                        # now draw our estimated verts
                         if t_est in self.processed_image_dict:
-                            self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
+                            self.processed_image_dict[t_est][0] = draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds)
                             self.processed_image_dict[t_est][1].append(bb_proj)
                             self.processed_image_dict[t_est][2].append(name)
                         else:
-                            self.processed_image_dict[t_est] = [draw_2d_proj_of_3D_bounding_box(image, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds), [bb_proj], [name]]
+                            self.processed_image_dict[t_est] = [draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj, color_pr=self.ado_name_to_color[name], linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds), [bb_proj], [name]]
                     ######################################################
             
 
@@ -531,6 +563,8 @@ class rosbags_to_logs:
             else:
                 self.dist_coefs = None
                 self.new_camera_matrix = self.K
+            if self.b_plot_gt_overlay:
+                self.camera = camera_slim(camera_info)
     
 
     def parse_ado_est_msg(self, msg, t=None):
@@ -612,6 +646,50 @@ class rosbags_to_logs:
             t = msg.header.stamp.to_sec()
             self.abb_list[name].append(([msg.x, msg.y, msg.width, msg.height, msg.angle*180./np.pi], msg.im_seg_mode))
             self.abb_time_list[name].append(t)
+
+class camera_slim: # THIS IS A SLIMMED DOWN VERSION OF THE CLASS FROM RAPTOR WITH SOME ELEMENTS HARDCODED IN (this is for debugging and allows us to plot 3d verts)
+    def __init__(self, camera_info):
+        """
+        K: camera intrinsic matrix 
+        tf_cam_ego: camera pose relative to the ego_quad (fixed)
+        """
+        print("\n\nWARNING!!! This CAMERA depends on hardcoded values - for debugging only!!!!!!!!!!!!!!!!!!!!!!!!\n\n")
+        self.K = np.reshape(camera_info.K, (3, 3))
+        if len(camera_info.D) == 5:
+            self.dist_coefs = np.reshape(camera_info.D, (5,))
+            self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
+        else:
+            self.dist_coefs = None
+            self.new_camera_matrix = self.K
+
+        self.K_inv = la.inv(self.K)
+        self.new_camera_matrix_inv = la.inv(self.new_camera_matrix)
+        self.tf_cam_ego = np.eye(4)
+        self.tf_cam_ego[0:3, 3] = np.asarray([0.01504337, -0.06380886, -0.13854437])
+        self.tf_cam_ego[0:3, 0:3] = np.reshape([-0.000682621737, -0.999890488, -0.014783269, 0.035042397, 0.0147502748, -0.999276969, 0.999385593, -0.00120016936, 0.0350284906], (3, 3))
+        Angle_x = float(0.04444444444)
+        Angle_y = float(0.04444444444)
+        Angle_z = float(0)
+        R_deltax = np.array([[ 1.             , 0.             , 0.              ],
+                                [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
+                                [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
+        R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
+                                [ 0.             , 1.             , 0               ],
+                                [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
+        R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
+                                [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
+                                [ 0.             , 0.             , 1.              ]])
+        R_delta = R_deltax @ R_deltay @ R_deltaz
+        self.tf_cam_ego[0:3, 0:3] = np.matmul(R_delta, self.tf_cam_ego[0:3, 0:3])
+
+    def pnt3d_to_pix(self, pnt_c):
+        """
+        input: assumes pnt in camera frame
+        output: [row, col] i.e. the projection of xyz onto camera plane
+        """
+        rc = self.new_camera_matrix @ np.reshape(pnt_c[0:3], 3, 1)
+        rc = np.array([rc[1], rc[0]]) / rc[2]
+        return rc
 
 
 if __name__ == '__main__':
