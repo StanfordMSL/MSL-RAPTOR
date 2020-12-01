@@ -373,6 +373,9 @@ b_enforce_0: ['yaw']
 ---
 id: 39
 ns: 'swell_bottle'
+cust_vert_file: '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
+cust_vert_scale: [1.0, 1.0, 1.0]
+cust_vert_rpy: [0.0, 0.0, 0.0]
 class_str: 'bottle'
 bound_box_l: 0.07
 bound_box_h: 0.26
