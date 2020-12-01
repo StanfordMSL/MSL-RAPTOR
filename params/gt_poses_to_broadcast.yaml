@@ -1,7 +1,7 @@
 ---
 ns: 'bowl_green_msl'
 class_str: 'bowl'
-x: 1.2192
+x: 1.8288
 y: 0.6096
 z: 0.033
 qw: 1.0
@@ -11,7 +11,7 @@ qz: 0.0
 ---
 ns: 'bowl_white_msl'
 class_str: 'bowl'
-x: 1.524
+x: 2.1336
 y: -0.3048
 z: 0.033
 qw: 1.0
@@ -21,7 +21,7 @@ qz: 0.0
 ---
 ns: 'swell_bottle'
 class_str: 'bottle'
-x: 1.2192
+x: 1.8288
 y: 0.0
 z: 0.13
 qw: 1.0
@@ -31,30 +31,30 @@ qz: 0.0
 ---
 ns: 'mug_duke'
 class_str: 'cup'
-x: 1.2192
+x: 1.8288
 y: -0.6096
 z: 0.048
-qw: 1.0
+qw: 0.7854
 qx: 0.0
 qy: 0.0
-qz: 0.0
+qz: 0.7854
 ---
 ns: 'mug_black'
 class_str: 'cup'
 x: 1.2192
 y: -0.6096
 z: 0.048
-qw: 0.0
+qw: 0.7854
 qx: 0.0
 qy: 0.0
-qz: 1.0
+qz: -0.7854
 ---
 ns: 'mug_yellow_black'
 class_str: 'cup'
 x: 0.0
 y: -0.6096
 z: 0.048
-qw: -0.7854
+qw: 0.0
 qx: 0.0
 qy: 0.0
-qz: -0.7854
+qz: 1.0

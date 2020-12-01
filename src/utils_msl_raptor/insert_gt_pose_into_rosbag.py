@@ -24,7 +24,7 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
 class insert_gt_pose_into_rosbag:
-    def __init__(self, rb_path_and_name, ego_ns, b_ego_pose_est, gt_poses_to_broadcast_yaml, b_write_out = False):
+    def __init__(self, rb_path_and_name, ego_ns, b_ego_pose_est, gt_poses_to_broadcast_yaml, b_write_out = True):
         self.gt_obs = []
         self.read_gt_poses(gt_poses_to_broadcast_yaml)
         t0 = None
@@ -96,9 +96,9 @@ if __name__ == '__main__':
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
         # program = rosbags_to_logs(rb_name=my_rb_name, data_source=my_data_source, ego_yaml=my_ego_yaml, ado_yaml=my_ado_yaml, b_save_3dbb_imgs=my_b_save_3dbb_imgs)
         # rb_path_and_name_ = "/mounted_folder/raptor_processed_bags/msl_raptor_output_from_bag_rosbag_for_post_process_2020-09-29-16-32-38"
-        # rb_path_and_name_ = "/mounted_folder/rosbags_for_post_process/rosbag_for_post_process_2020-09-29-16-32-38"
+        rb_path_and_name_ = "/mounted_folder/rosbags_for_post_process/rosbag_for_post_process_2020-09-29-16-32-38"
         # rb_path_and_name_ = "/mounted_folder/rosbags_for_post_process/rosbag_for_post_process_2020-09-29-16-32-38_with_gt"
-        rb_path_and_name_ = "/mounted_folder/raptor_processed_bags/msl_raptor_output_from_bag_rosbag_for_post_process_2020-09-29-16-32-38_full_speed"
+        # rb_path_and_name_ = "/mounted_folder/raptor_processed_bags/msl_raptor_output_from_bag_rosbag_for_post_process_2020-09-29-16-32-38_full_speed"
         # rb_path_and_name_ = "/mounted_folder/raptor_processed_bags/msl_raptor_output_from_bag_rosbag_for_post_process_2020-09-29-16-32-38_with_gt"
         gt_poses_to_broadcast_yaml_ = "/root/msl_raptor_ws/src/msl_raptor/params/gt_poses_to_broadcast.yaml"
         ego_ns_ = "quad7"
