@@ -28,6 +28,7 @@ class ros_interface:
         self.im_process_output = []  # what is accessed by the main function after an image is processed
 
         self.ego_pose_rosmesg_buffer = ([], [])
+        self.ego_pose_rosmesg_buffer_gt = ([], [])
         self.ego_pose_rosmesg_buffer_len = 50
         self.ego_pose_gt_rosmsg = None
 
@@ -81,7 +82,21 @@ class ros_interface:
 
 
     def ego_pose_gt_cb(self, msg):
-        self.ego_pose_gt_rosmsg = msg.pose
+        # self.ego_pose_gt_rosmsg = msg.pose
+        """
+        Maintains a buffer of poses and times. The first element is the earliest. 
+        Stored in a way to interface with a quick method for finding closest match by time.
+        """
+        my_time = get_ros_time(msg)  # time in seconds
+
+        if len(self.ego_pose_rosmesg_buffer_gt[0]) < self.ego_pose_rosmesg_buffer_len:
+            self.ego_pose_rosmesg_buffer_gt[0].append(msg.pose)
+            self.ego_pose_rosmesg_buffer_gt[1].append(my_time)
+        else:
+            self.ego_pose_rosmesg_buffer_gt[0][0:self.ego_pose_rosmesg_buffer_len] = self.ego_pose_rosmesg_buffer_gt[0][1:self.ego_pose_rosmesg_buffer_len]
+            self.ego_pose_rosmesg_buffer_gt[1][0:self.ego_pose_rosmesg_buffer_len] = self.ego_pose_rosmesg_buffer_gt[1][1:self.ego_pose_rosmesg_buffer_len]
+            self.ego_pose_rosmesg_buffer_gt[0][-1] = msg.pose
+            self.ego_pose_rosmesg_buffer_gt[1][-1] = my_time
 
 
     def ego_pose_ekf_cb(self, msg):
@@ -118,6 +133,7 @@ class ros_interface:
         t_fe_start = time.time()  # start timer for frontend
 
         self.tf_w_ego = pose_to_tf(find_closest_by_time(my_time, self.ego_pose_rosmesg_buffer[1], self.ego_pose_rosmesg_buffer[0])[0])
+        self.tf_w_ego_gt = pose_to_tf(find_closest_by_time(my_time, self.ego_pose_rosmesg_buffer_gt[1], self.ego_pose_rosmesg_buffer_gt[0])[0])
 
         image = self.bridge.imgmsg_to_cv2(msg,desired_encoding="bgr8")
         

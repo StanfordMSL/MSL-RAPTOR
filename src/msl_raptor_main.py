@@ -113,6 +113,7 @@ def run_execution_loop():
             continue
         
         tf_w_ego = ros.tf_w_ego
+        tf_w_ego_gt = ros.tf_w_ego_gt
         tf_ego_w = inv_tf(tf_w_ego)  # ego quad pose
         
         if b_use_gt_bb:
@@ -138,21 +139,18 @@ def run_execution_loop():
             obj_ids_tracked.append(obj_id)
 
             if ukf_dict[obj_id] is not None:
-
-                
-
                 ukf_dict[obj_id].step_ukf(abb, tf_ego_w, loop_time)  # update ukf
                 if b_pub_3d_bb_proj:
                     tf_w_ado = state_to_tf(ukf_dict[obj_id].mu)
-                    if ros.b_publish_gt_3d_projections:
+                    if ros.b_publish_gt_3d_projections: # concatenate the gt projection
                         tf_w_ado_gt_array = ros.get_closest_pose(class_str, ukf_dict[obj_id].mu[0:3])
                         tf_w_ado_gt = np.eye(4)
                         tf_w_ado_gt[0:3, 3] = tf_w_ado_gt_array[0:3]
                         tf_w_ado_gt[0:3, 0:3] = quat_to_rotm(tf_w_ado_gt_array[3:7])
-                        ukf_dict[obj_id].projected_3d_bb = np.vstack( (np.fliplr(pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera)), 
-                                                                       np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera)) ) )
+                        ukf_dict[obj_id].projected_3d_bb = np.vstack( (np.fliplr(pose_to_3d_bb_proj(tf_w_ado, tf_w_ego, ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera)), 
+                                                                       np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, tf_w_ego_gt, ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera)) ) )
                     else:
-                        ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, inv_tf(tf_ego_w), ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
+                        ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, tf_w_ego, ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
                     if class_str in connected_inds:
                         ukf_dict[obj_id].connected_inds = connected_inds[ukf_dict[obj_id].class_str]
         
