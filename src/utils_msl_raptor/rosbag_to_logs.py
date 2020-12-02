@@ -227,7 +227,7 @@ class rosbags_to_logs:
             tf_w_ego_gt = pose_to_tf(self.ego_gt_pose[gt_ind])
             t_est2, est_ind = find_closest_by_time(t_est, self.ego_est_time_pose)
             tf_w_ego_est = pose_to_tf(self.ego_est_pose[est_ind])
-            print("t_gt - t_est = {}, t_est2 - t_est = {}".format(t_gt - t_est, t_est2 - t_est))
+            # print("t_gt - t_est = {.3f} s, t_est2 - t_est = {.3f} s".format(t_gt - t_est, t_est2 - t_est))
             tf_w_cam = tf_w_ego_gt @ inv_tf(self.tf_cam_ego)
             tf_cam_w = inv_tf(tf_w_cam)
             # pdb.set_trace()
@@ -410,14 +410,18 @@ class rosbags_to_logs:
                             self.processed_image_dict[t_est] = [draw_2d_proj_of_3D_bounding_box(image_to_draw_on, bb_proj, color_pr=color_est_raptor, linewidth=self.bb_linewidth, b_verts_only=False, inds_to_connect=connected_inds), [bb_proj], [name]]
 
 
-                        if name=="swell_bottle":
-                            if i == 0:
-                                print("tf_w_ado_gt:\n{}".format(tf_w_ado_gt))
+                        # if name=="swell_bottle":
+                        #     if i == 0:
+                                # pdb.set_trace()
+                                # print("tf_w_ado_gt:\n{}".format(tf_w_ado_gt))
                             # print("tf_w_ego_gt:\n{}".format(tf_w_ego_gt))
                             # print("tf_w_ego_est:\n{}".format(tf_w_ego_est))
-                            t_err_ego = la.norm(tf_w_ego_gt[0:3, 3] - tf_w_ego_gt[0:3, 3])
-                            R_err_ego = calcAngularDistance(tf_w_ego_gt[0:3, 0:3], tf_w_ego_gt[0:3, 0:3]) # in degrees
-                            print("ego err: trans = {}, rot = {} deg".format(t_err_ego, R_err_ego))
+                            # t_err_ego = la.norm(tf_w_ego_gt[0:3, 3] - tf_w_ego_est[0:3, 3])
+                            # R_err_ego = calcAngularDistance(tf_w_ego_gt[0:3, 0:3], tf_w_ego_est[0:3, 0:3]) # in degrees
+                            # # print("ego err: trans = {:.2f} mm, rot = {:.3f} deg".format(t_err_ego*1000, R_err_ego))
+                            # print("tf_w_ado_est:\n{}".format(tf_w_ado_est))
+                            # print("tf_w_ado_gt:\n{}".format(tf_w_ado_gt))
+                            # pdb.set_trace()
                             # if i == 3:
                             #     pdb.set_trace()
             # save the image
