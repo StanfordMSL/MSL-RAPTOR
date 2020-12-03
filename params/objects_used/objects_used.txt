@@ -1,4 +1,5 @@
-swell_bottle
-mug_duke
-bowl_white_msl
+bottle_swell_1
+bottle_swell_2
+bottle_swell_3
+bowl_grey_msl
 bowl_green_msl
