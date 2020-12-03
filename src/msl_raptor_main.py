@@ -35,7 +35,7 @@ def run_execution_loop():
     detector_cfg = rospy.get_param('~detector_cfg')
     b_filter_meas = True
     
-    ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb,b_pub_3d_bb_proj, b_publish_gt_3d_projections=(True and b_pub_3d_bb_proj))  # create a ros interface object
+    ros = ROS(b_use_gt_bb,b_verbose, b_use_gt_pose_init,b_use_gt_detect_bb,b_pub_3d_bb_proj, b_publish_gt_3d_projections=(False and b_pub_3d_bb_proj))  # create a ros interface object
 
     # Returns dict of params per class name
     category_params = load_category_params()
