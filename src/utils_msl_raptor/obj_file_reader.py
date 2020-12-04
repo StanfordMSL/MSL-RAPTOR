@@ -149,6 +149,63 @@ def mug_tapered_dims_to_verts(Dt, Db, H, w, l0, h0, l1, h1, l2, h2, l3, h3, ot, 
     return (cup_verts, connected_inds)
 
 
+def bottle_dims_to_verts(D_b, D_c, H, d_i_l, h_i_l, d_i_h, h_i_h, name=None):
+    """
+    This if for a swell-like water bottle - assumes Y axis is pointing up!! (along "height" dim of bottle)
+    D_b - diameter of base
+    D_c - diameter of cap
+    H - total height
+    d_i_l - diameter at the lower inflection point
+    h_i_l - height from base the lower inflection point
+    d_i_h - diameter at the lower inflection point
+    h_i_h - height from base the lower inflection point
+    """
+    origin = np.array([D_b/2, H/2, D_b/2]) # middle of 3D bounding box of bottle
+    num_radial_points = 6
+    num_points_at_each_ang = 4
+    da = 2*np.pi / num_radial_points
+    pnt_offset = np.asarray([D_b/2,   0,      D_b/2   ])
+    bottle_verts = []
+    connected_inds = []
+    for i, ang in enumerate(np.linspace(0, 2*np.pi - da, num_radial_points)):
+        R_deltay = np.array([[ np.cos(ang), 0.             , np.sin(ang) ],
+                             [ 0.         , 1.             , 0           ],
+                             [-np.sin(ang), 0.             , np.cos(ang) ]])
+        rotated_point_base = R_deltay @ np.asarray([0,   0, D_b/2]) + pnt_offset
+        rotated_point_lower_inflec = R_deltay @ np.asarray([0,  h_i_l, d_i_l/2]) + pnt_offset
+        rotated_point_higher_inflec = R_deltay @ np.asarray([0, h_i_h, d_i_h/2]) + pnt_offset
+        rotated_point_cap = R_deltay @ np.asarray([0, H, D_c/2]) + pnt_offset
+        bottle_verts.append(list(rotated_point_base))
+        bottle_verts.append(list(rotated_point_lower_inflec))
+        bottle_verts.append(list(rotated_point_higher_inflec))
+        bottle_verts.append(list(rotated_point_cap))
+
+        # connect points vertically
+        ind_first_point = num_points_at_each_ang*i
+        connected_inds.extend([[ind_first_point, ind_first_point + 1],     \
+                               [ind_first_point + 1, ind_first_point + 2], \
+                               [ind_first_point + 2, ind_first_point + 3]] )
+        if i > 0:
+            # then also connect each to previous point
+            connected_inds.extend([[ind_first_point,    ind_first_point - num_points_at_each_ang],     \
+                                  [ind_first_point + 1, ind_first_point - num_points_at_each_ang + 1], \
+                                  [ind_first_point + 2, ind_first_point - num_points_at_each_ang + 2], \
+                                  [ind_first_point + 3, ind_first_point - num_points_at_each_ang + 3]])    
+    connected_inds.extend([ [0, num_points_at_each_ang*(num_radial_points-1)], 
+                            [1, num_points_at_each_ang*(num_radial_points - 1) + 1], 
+                            [2, num_points_at_each_ang*(num_radial_points - 1) + 2], 
+                            [3, num_points_at_each_ang*(num_radial_points - 1) + 3]]) # connect first and last
+
+
+    bottle_verts = np.asarray(bottle_verts) - origin  # turn into an np array and center re-around origin
+    # turn the cup verts from NOCS frame to MSL-RAPTOR frame (Z up)
+    bottle_verts = np.concatenate((bottle_verts[:,0:1], bottle_verts[:,2:3], bottle_verts[:,1:2]), axis=1)
+
+    if name is not None:
+        print("{} dims =\n{}".format(name, np.asarray(bottle_verts)))
+    return (bottle_verts, connected_inds)
+
+
 def bowl_dims_to_verts(Dt, Dm, Db, Ht, Hb, name=None):
     """
     This if for a tapered mug 
@@ -233,7 +290,38 @@ def plot_object_verts(verts, connected_inds=None):
     ax.set_xlabel('X (mm)')
     ax.set_ylabel('Y (mm)')
     ax.set_zlabel('Z (mm)')
+    ax.axis('equal')
+    set_axes_equal(ax)
     plt.show(block=False)
+
+def set_axes_equal(ax):
+    '''Make axes of 3D plot have equal scale so that spheres appear as spheres,
+    cubes as cubes, etc..  This is one possible solution to Matplotlib's
+    ax.set_aspect('equal') and ax.axis('equal') not working for 3D.
+
+    Input
+      ax: a matplotlib axis, e.g., as output from plt.gca().
+      https://stackoverflow.com/questions/13685386/matplotlib-equal-unit-length-with-equal-aspect-ratio-z-axis-is-not-equal-to
+    '''
+
+    x_limits = ax.get_xlim3d()
+    y_limits = ax.get_ylim3d()
+    z_limits = ax.get_zlim3d()
+
+    x_range = abs(x_limits[1] - x_limits[0])
+    x_middle = np.mean(x_limits)
+    y_range = abs(y_limits[1] - y_limits[0])
+    y_middle = np.mean(y_limits)
+    z_range = abs(z_limits[1] - z_limits[0])
+    z_middle = np.mean(z_limits)
+
+    # The plot bounding box is a sphere in the sense of the infinity
+    # norm, hence I call half the max range the plot radius.
+    plot_radius = 0.5*max([x_range, y_range, z_range])
+
+    ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
+    ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
+    ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
 def save_objs_verts_as_txt(verts, name, path, connected_inds=None):
     np.savetxt(path + name, X=verts)
@@ -258,6 +346,26 @@ if __name__ == '__main__':
                 print("---\nid: {}\nns: '{}'\nclass_str: '{}'".format(i + start_num, name, class_str))
                 print("bound_box_l: {}\nbound_box_h: {}\nbound_box_w: {}".format(*spans))
                 print("b_enforce_0: []")
+        elif True:
+            b_save = True
+            b_plot = False
+            objs = {}
+            objs["mug_duke"]       = mug_dims_to_verts(D=0.083,   H=0.096,   l=0.03, h=0.07, w=0.01, o=0.015, name="mug_duke")
+            objs["bowl_white_msl"] = bowl_dims_to_verts(Dt=0.17, Dm=0.15, Db=0.1, Ht=0.066, Hb=0.03, name="bowl_white_msl")
+            objs["bowl_green_msl"] = bowl_dims_to_verts(Dt=0.17, Dm=0.15, Db=0.1, Ht=0.066, Hb=0.03, name="bowl_green_msl")
+            objs["swell_bottle"]   = bottle_dims_to_verts(D_b = 0.07, D_c=0.043, H=0.26, d_i_l=0.07, h_i_l=0.125, d_i_h=0.043, h_i_h=0.2, name="swell_bottle")
+
+            if b_save:
+                save_path = '/root/msl_raptor_ws/src/msl_raptor/params/generated_vertices_for_raptor/'
+                if not os.path.exists( save_path ):
+                    os.makedirs( save_path )
+                for key in objs:
+                    save_objs_verts_as_txt(verts=objs[key][0], name=key, path=save_path, connected_inds=objs[key][1])
+            if b_plot:
+                # plot_object_verts(objs["mug_duke"][0], connected_inds=objs["mug_duke"][1])
+                # plot_object_verts(objs["bowl_white_msl"][0], connected_inds=objs["bowl_white_msl"][1])
+                plot_object_verts(objs["swell_bottle"][0], connected_inds=objs["swell_bottle"][1])
+                plt.show()
         else:
             b_save = True
             b_plot = True

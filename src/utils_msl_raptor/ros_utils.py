@@ -2,6 +2,8 @@
 # IMPORTS
 # system
 import pdb
+import os
+import yaml
 # math
 import numpy as np
 import numpy.linalg as la
@@ -102,3 +104,102 @@ def update_running_average(ave_info, new_el):
         ave_info[0] = ave_info[0] + (new_el - ave_info[0]) / ave_info[1]
         ave_info[1] += 1
     return ave_info
+
+
+def get_object_sizes_from_yaml(objects_sizes_yaml, objects_used_path, classes_names_file, category_params):
+    # create camera object (see https://github.com/StanfordMSL/uav_game/blob/tro_experiments/ec_quad_sim/ec_quad_sim/param/quad3_trans.yaml)
+
+    with open(objects_used_path) as f:
+        objects_used = f.readlines()
+    # you may also want to remove whitespace characters like `\n` at the end of each line
+    objects_used = [x.strip() for x in objects_used]
+
+    with open(classes_names_file) as f:
+        classes_names = f.readlines()
+    # you may also want to remove whitespace characters like `\n` at the end of each line
+    classes_names = [x.strip() for x in classes_names]
+    classes_used_names = []
+    classes_used_ids = []
+    bb_3d = {}
+    obj_width = {}
+    obj_height = {}
+    conneted_inds = {}
+
+    objects_names_per_class = {}
+    with open(objects_sizes_yaml, 'r') as stream:
+        try:
+            obj_prms = list(yaml.load_all(stream))
+            for obj_dict in obj_prms:
+                if obj_dict['ns'] in objects_used:
+                    if 'cust_vert_file' in obj_dict and obj_dict['cust_vert_file'] and not obj_dict['cust_vert_file'] == "":
+                        # If we are here then a custom vertex file was provided (instead of just height / width/ length for a box)
+                        #   first load in the verts, then check if there is a list of pairs of verts to use when drawing the volume
+                        print("USING CUSTOM VERTS!!! (for {})".format(obj_dict['ns']))
+                        file_path = obj_dict['cust_vert_file'] + obj_dict['ns']
+                        loaded_verts = np.loadtxt(file_path)
+
+                        loaded_verts *= np.reshape(obj_dict['cust_vert_scale'], (1,3)).astype(float)
+
+                        Angle_x = float(obj_dict['cust_vert_rpy'][0])
+                        Angle_y = float(obj_dict['cust_vert_rpy'][1])
+                        Angle_z = float(obj_dict['cust_vert_rpy'][2])
+                        R_deltax = np.array([[ 1.             , 0.             , 0.              ],
+                                                [ 0.             , np.cos(Angle_x),-np.sin(Angle_x) ],
+                                                [ 0.             , np.sin(Angle_x), np.cos(Angle_x) ]])
+                        R_deltay = np.array([[ np.cos(Angle_y), 0.             , np.sin(Angle_y) ],
+                                                [ 0.             , 1.             , 0               ],
+                                                [-np.sin(Angle_y), 0.             , np.cos(Angle_y) ]])
+                        R_deltaz = np.array([[ np.cos(Angle_z),-np.sin(Angle_z), 0.              ],
+                                                [ np.sin(Angle_z), np.cos(Angle_z), 0.              ],
+                                                [ 0.             , 0.             , 1.              ]])
+                        R_delta = R_deltax @ R_deltay @ R_deltaz
+                        # R_delta = np.eye(3)
+
+                        loaded_verts = (R_delta @ loaded_verts.T).T
+                        bb_3d[obj_dict['class_str']] = np.concatenate(( loaded_verts, np.ones((loaded_verts.shape[0],1)) ), axis=1)
+
+                        half_width = (np.max(bb_3d[obj_dict['class_str']][:, 0]) - np.min(bb_3d[obj_dict['class_str']][:, 0])) / 2
+                        half_height = (np.max(bb_3d[obj_dict['class_str']][:, 2]) - np.min(bb_3d[obj_dict['class_str']][:, 2])) / 2
+
+                        file_path += "_joined_inds"
+                        if os.path.exists(file_path):
+                            print(obj_dict['ns'])
+                            print(obj_dict['class_str'])
+                            conneted_inds[obj_dict['class_str']] = np.loadtxt(file_path).astype(int)
+                        else:
+                            conneted_inds[obj_dict['class_str']] = None
+                    else:
+                        half_length = (float(obj_dict['bound_box_l']) + category_params[obj_dict['class_str']]['offset_bb_l']) /2
+                        half_width = (float(obj_dict['bound_box_w']) + category_params[obj_dict['class_str']]['offset_bb_w']) /2 
+                        half_height = (float(obj_dict['bound_box_h']) + category_params[obj_dict['class_str']]['offset_bb_h'])/2
+                        
+                        bb_3d[obj_dict['class_str']] = np.array([[ half_length, half_width, half_height, 1.],  # 1 front, left,  up (from quad's perspective)
+                                                                 [ half_length, half_width,-half_height, 1.],  # 2 front, right, up
+                                                                 [ half_length,-half_width,-half_height, 1.],  # 3 back,  right, up
+                                                                 [ half_length,-half_width, half_height, 1.],  # 4 back,  left,  up
+                                                                 [-half_length,-half_width, half_height, 1.],  # 5 front, left,  down
+                                                                 [-half_length,-half_width,-half_height, 1.],  # 6 front, right, down
+                                                                 [-half_length, half_width,-half_height, 1.],  # 7 back,  right, down
+                                                                 [-half_length, half_width, half_height, 1.]]) # 8 back,  left,  down
+
+                    # Rescale objects
+                    bb_3d[obj_dict['class_str']][:,:3], half_width,half_height = scale_3d_points(bb_3d[obj_dict['class_str']][:,:3], half_width,half_height,category_params[obj_dict['class_str']]['scales_xyz'])
+
+                    obj_width[obj_dict['class_str']] = 2*half_width
+                    obj_height[obj_dict['class_str']] = 2*half_height
+
+                    # Add the object's class to the classes used, if not there already
+                    if obj_dict['class_str'] not in classes_names:
+                        print('Class '+obj_dict['class_str']+' not found in the list of classes supported')
+                    elif obj_dict['class_str'] not in classes_used_names:
+                        classes_used_names.append(obj_dict['class_str'])
+                        classes_used_ids.append(classes_names.index(obj_dict['class_str']))
+                        objects_names_per_class[obj_dict['class_str']] = [obj_dict['ns']]
+                    else:
+                        objects_names_per_class[obj_dict['class_str']].append(obj_dict['ns'])
+
+
+        except yaml.YAMLError as exc:
+            print(exc)
+
+    return bb_3d, obj_width, obj_height, classes_used_names, classes_used_ids, objects_names_per_class, conneted_inds

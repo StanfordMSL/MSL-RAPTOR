@@ -20,7 +20,7 @@ import random
 
 class ros_interface:
 
-    def __init__(self, b_use_gt_bb=False,b_verbose=False,b_use_gt_pose_init=False,b_use_gt_detect_bb=False,b_pub_3d_bb_proj=False):
+    def __init__(self, b_use_gt_bb=False,b_verbose=False,b_use_gt_pose_init=False,b_use_gt_detect_bb=False,b_pub_3d_bb_proj=False, b_publish_gt_3d_projections=False):
         
         self.verbose = b_verbose
 
@@ -28,6 +28,7 @@ class ros_interface:
         self.im_process_output = []  # what is accessed by the main function after an image is processed
 
         self.ego_pose_rosmesg_buffer = ([], [])
+        self.ego_pose_rosmesg_buffer_gt = ([], [])
         self.ego_pose_rosmesg_buffer_len = 50
         self.ego_pose_gt_rosmsg = None
 
@@ -35,6 +36,7 @@ class ros_interface:
         self.b_use_gt_bb = b_use_gt_bb  # toggle for debugging using ground truth bounding boxes
         self.latest_img_time = -1
         self.front_end_time = None
+        self.b_publish_gt_3d_projections = b_publish_gt_3d_projections
         ####################################################################
 
         self.ns = rospy.get_param('~ns')  # robot namespace
@@ -68,7 +70,7 @@ class ros_interface:
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', TrackedObjects, queue_size=5)
         self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', AngledBboxes, queue_size=5)
 
-        if self.b_use_gt_pose_init or self.b_use_gt_detect_bb:
+        if self.b_publish_gt_3d_projections or self.b_use_gt_pose_init or self.b_use_gt_detect_bb:
             # Create dict to store pose for each object
             self.latest_tracked_poses = {}
             for obj_name in sum(self.objects_names_per_class.values(),[]):
@@ -80,7 +82,21 @@ class ros_interface:
 
 
     def ego_pose_gt_cb(self, msg):
-        self.ego_pose_gt_rosmsg = msg.pose
+        # self.ego_pose_gt_rosmsg = msg.pose
+        """
+        Maintains a buffer of poses and times. The first element is the earliest. 
+        Stored in a way to interface with a quick method for finding closest match by time.
+        """
+        my_time = get_ros_time(msg)  # time in seconds
+
+        if len(self.ego_pose_rosmesg_buffer_gt[0]) < self.ego_pose_rosmesg_buffer_len:
+            self.ego_pose_rosmesg_buffer_gt[0].append(msg.pose)
+            self.ego_pose_rosmesg_buffer_gt[1].append(my_time)
+        else:
+            self.ego_pose_rosmesg_buffer_gt[0][0:self.ego_pose_rosmesg_buffer_len] = self.ego_pose_rosmesg_buffer_gt[0][1:self.ego_pose_rosmesg_buffer_len]
+            self.ego_pose_rosmesg_buffer_gt[1][0:self.ego_pose_rosmesg_buffer_len] = self.ego_pose_rosmesg_buffer_gt[1][1:self.ego_pose_rosmesg_buffer_len]
+            self.ego_pose_rosmesg_buffer_gt[0][-1] = msg.pose
+            self.ego_pose_rosmesg_buffer_gt[1][-1] = my_time
 
 
     def ego_pose_ekf_cb(self, msg):
@@ -117,6 +133,7 @@ class ros_interface:
         t_fe_start = time.time()  # start timer for frontend
 
         self.tf_w_ego = pose_to_tf(find_closest_by_time(my_time, self.ego_pose_rosmesg_buffer[1], self.ego_pose_rosmesg_buffer[0])[0])
+        self.tf_w_ego_gt = pose_to_tf(find_closest_by_time(my_time, self.ego_pose_rosmesg_buffer_gt[1], self.ego_pose_rosmesg_buffer_gt[0])[0])
 
         image = self.bridge.imgmsg_to_cv2(msg,desired_encoding="bgr8")
         
