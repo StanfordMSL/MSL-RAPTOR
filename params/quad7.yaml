@@ -5,6 +5,10 @@ t_cam_ego: [0, 0, 0]
 # t_cam_ego: [0.01504337, -0.06380886, -0.13854437]
 # Correct R_cam_ego Rotation w/ Manual Calibration (assumes 'XYZ' euler angles)
 dx: 0.04444444444
-# dy: 0.04444444444
-dy: 0.07
+dy: 0.0
 dz: 0.0
+
+# old params
+# dx: 0.04444444444
+# dy: 0.04444444444
+# dz: 0.0
