@@ -80,7 +80,7 @@ class extract_camera_cal_info_from_rosbag:
         t_ego_cam_ave = np.zeros((3,))
         N = rot_vec_cam_cal_arr.shape[0]
         quat_ego_cam = np.zeros((N,4))
-        t_w_cal_offset = np.asarray([0, -7*40.0/1000.0, 4.5*40.0/1000.0])  # matlab assumes calibration board axis is in bottom right corner, each square is 40mm and board is 9 x 14
+        t_w_cal_offset = np.asarray([0, 7*40.0/1000.0, 4.5*40.0/1000.0])  # matlab assumes calibration board axis is in bottom right corner, each square is 40mm and board is 9 x 14
         R_w_cal_offset = np.array([[ 0.,  0.,  1.],
                                    [ 0., -1.,  0.],
                                    [ 1.,  0.,  0.]])  # FOR SOME REASON THIS IS NEEDED???
@@ -129,8 +129,14 @@ class extract_camera_cal_info_from_rosbag:
                 tf_ego_cam = tf_ego_cal @ inv_tf(tf_cam_cal)
                 t_ego_cam_ave += tf_ego_cam[0:3, 3]
                 quat_ego_cam[chosen_pic_ind, :] = rotm_to_quat(tf_ego_cam[0:3, 0:3])
-                print(tf_ego_cam)
-                pdb.set_trace()
+                print("###############   ind {}  ({}/{})  ################".format(img_ind, chosen_pic_ind, N))
+                print("tf_w_cal:\n{}".format(tf_w_cal))
+                print("tf_w_ego:\n{}".format(tf_w_ego))
+                print("tf_ego_cal:\n{}".format(tf_ego_cal))
+                print("tf_cam_cal:\n{}".format(tf_cam_cal))
+                print("tf_ego_cam:\n{}".format(tf_ego_cam))
+                if img_ind == 169:
+                    pdb.set_trace()
                 chosen_pic_ind += 1
         t_ego_cam_ave /= N
         quat_ego_cam_ave, _ = average_quaternions(Q=quat_ego_cam, w=None)
