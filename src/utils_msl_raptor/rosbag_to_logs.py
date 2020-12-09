@@ -80,6 +80,7 @@ class rosbags_to_logs:
                                 self.ego_est_topic : self.parse_ego_est_msg,
                                 self.cam_info_topic: self.parse_camera_info_msg}
         self.camera_topic = ego_quad_ns + '/camera/image_raw'
+        self.ego_quad_ns = ego_quad_ns
         self.b_save_3dbb_imgs = b_save_3dbb_imgs
         if self.b_save_3dbb_imgs:
             self.bridge = CvBridge()
@@ -497,10 +498,14 @@ class rosbags_to_logs:
                 self.parse_ado_est_msg(msg)
             elif t_split[1] in self.ado_names_all and t_split[-1] == 'pose' and t_split[-2] == 'vision_pose': # ground truth from a quad (mavros) / nocs
                 name = t_split[1]
+                if name == self.ego_quad_ns.split('/')[-1] or name == "quad7quad7":
+                    continue
                 self.ado_names.add(name)
                 self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
             elif (t_split[1] == 'vrpn_client_node' and t_split[-1] == 'pose'): # ground truth from optitrack default 
                 name = t_split[2]
+                if name == self.ego_quad_ns.split('/')[-1] or name == "quad7quad7":
+                    continue
                 self.ado_names.add(name)
                 self.parse_ado_gt_msg(msg, name=name, t=t.to_sec())
 
