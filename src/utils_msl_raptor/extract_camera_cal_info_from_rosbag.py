@@ -25,6 +25,17 @@ from ros_utils import *
 from math_utils import *
 
 class extract_camera_cal_info_from_rosbag:
+    '''
+    FRAME NOTATION:
+    t_A_B: translation vector from A to B in A frame
+    R_A_B: rotation matrix from A to B in A frame
+    tf_A_B: transfermation matrix s.t. a point in frame A (p_A) is p_A = tf_A_B * p_B
+    w/W: world frame, defined by optitrack (x is pointing in long dir of flightroom, z is up)
+    e/E: ego frame for quad where camera is, defined as center of optitrack marker on quads. This is located ~center of quad (left/right & front/back i.e. y_W & x_W dirs) and a few inches below the propellers
+    c/C: camera frame
+    bo/Bo: board frame (as in checkerboard) as defined by optitrack. origin is at average of the 4 corner optitrack markers, when looking perp. to board x is "up", y is "right", and z is "pointing away from you" (SOMETIMES FLIPS)
+    b/B: board frame - matlab assumes coordinate frame for checker board is in upper left corner with positive x "to the right" and positive y "down" and positive z "into the board"
+    '''
     def __init__(self, rb_path_and_name, camera_image_topic="/camera/image_raw", ego_pose_topic=None, cal_board_topic=None):
         bag_in = rosbag.Bag(rb_path_and_name + ".bag", 'r')
         image_time_dict = {}
@@ -45,7 +56,7 @@ class extract_camera_cal_info_from_rosbag:
         all_data = {}
         # MANUALLY ENTERED:
         used_imgs = [0, 86, 97, 169, 239, 260, 378, 414, 693, 757, 830, 921, 964, 981, 1074]
-        t_cam_cal_arr = np.array([
+        t_c_b_arr = np.array([
                                 [-204.57, -217.68,  990.03],
                                 [-191.24, -335.98,  845.45],
                                 [-49.576, -132.26,   936.3],
@@ -61,7 +72,7 @@ class extract_camera_cal_info_from_rosbag:
                                 [-371.2, -19.621,  503.97],
                                 [-85.631, -129.23,  686.26],
                                 [-278.61,  50.078,   517.1]]) / 1000.0
-        rot_vec_cam_cal_arr = np.array([[0.001816,  0.026344, 0.0031563],
+        rot_vec_c_b_arr = np.array([[0.001816,  0.026344, 0.0031563],
                                 [0.15452,  0.027444, -0.010806],
                                 [0.43315,  0.3572,  .18638],
                                 [0.48199,  -0.63426,  -0.13182],
@@ -77,16 +88,21 @@ class extract_camera_cal_info_from_rosbag:
                                 [0.21748,  0.2524,  0.040668],
                                 [0.41918,  0.5665,  -0.18436]])
         chosen_pic_ind = 0
-        t_ego_cam_ave = np.zeros((3,))
-        N = rot_vec_cam_cal_arr.shape[0]
-        quat_ego_cam = np.zeros((N,4))
-        t_w_cal_offset = np.asarray([0, 7*40.0/1000.0, 4.5*40.0/1000.0])  # matlab assumes calibration board axis is in bottom right corner, each square is 40mm and board is 9 x 14
-        R_w_cal_offset = np.array([[ 0.,  0.,  1.],
-                                   [ 0., -1.,  0.],
-                                   [ 1.,  0.,  0.]])  # FOR SOME REASON THIS IS NEEDED???
-        R_cal_calmatlab = np.array([[ 0.,  0.,  1.],
-                                    [ 1.,  0.,  0.],
-                                    [ 0.,  1.,  0.]])  # matlabs x is our y, matlabs y is our z, matlabs z is our x
+        tf_e_c_ave = np.zeros((3,))
+        N = rot_vec_c_b_arr.shape[0]
+        quat_e_c = np.zeros((N,4))
+        perp_dist_board_to_center_optitrack_ball = 0.009  # its a little less than 1 cm
+        t_b_bo_offset = np.asarray([7*40.0/1000.0, 4.5*40.0/1000.0, -perp_dist_board_to_center_optitrack_ball])  # matlab assumes calibration board axis is in bottom right corner, each square is 40mm and board is 9 x 14
+        # R_w_cal_offset = np.array([[ 0.,  0.,  1.],
+        #                            [ 0., -1.,  0.],
+        #                            [ 1.,  0.,  0.]])  # FOR SOME REASON THIS IS NEEDED???
+        # R_cal_calmatlab = np.array([[ 0.,  0.,  1.],
+        #                             [ 1.,  0.,  0.],
+        #                             [ 0.,  1.,  0.]])  # matlabs x is our y, matlabs y is our z, matlabs z is our x
+        R_b_bo = np.eye(3)
+        R_b_bo = np.array([[ 0.,  1.,  0.],
+                           [-1.,  0.,  0.],
+                           [ 0.,  0.,  1.]])  # matlabs x is our y, matlabs y is our z, matlabs z is our x
         for img_ind, img_time in enumerate(image_time_dict):
             image = cv_bridge.imgmsg_to_cv2(image_time_dict[img_time], desired_encoding="passthrough")
             # image = cv_bridge.imgmsg_to_cv2(image_time_dict[img_time], desired_encoding="bgr8")
@@ -98,63 +114,64 @@ class extract_camera_cal_info_from_rosbag:
                 cv2.imwrite(('/').join(rb_path_and_name.split('/')[:-1]) + '/' + fn_str + ".jpg", image)
             
             if img_ind in used_imgs:
-                t_w_ego = np.array([ego_pose_time_dict[closest_ego_time].pose.position.x, ego_pose_time_dict[closest_ego_time].pose.position.y, ego_pose_time_dict[closest_ego_time].pose.position.z])
-                t_w_cal = np.array([cal_board_time_dict[closest_cal_board_time].pose.position.x, cal_board_time_dict[closest_cal_board_time].pose.position.y, cal_board_time_dict[closest_cal_board_time].pose.position.z])
-                t_w_cal -= t_w_cal_offset
-                R_w_ego = quat_to_rotm(np.array([ego_pose_time_dict[closest_ego_time].pose.orientation.w,
+                t_w_e = np.array([ego_pose_time_dict[closest_ego_time].pose.position.x, ego_pose_time_dict[closest_ego_time].pose.position.y, ego_pose_time_dict[closest_ego_time].pose.position.z])
+                t_w_bo = np.array([cal_board_time_dict[closest_cal_board_time].pose.position.x, cal_board_time_dict[closest_cal_board_time].pose.position.y, cal_board_time_dict[closest_cal_board_time].pose.position.z])
+                R_w_e = quat_to_rotm(np.array([ego_pose_time_dict[closest_ego_time].pose.orientation.w,
                                                 ego_pose_time_dict[closest_ego_time].pose.orientation.x,
                                                 ego_pose_time_dict[closest_ego_time].pose.orientation.y,
                                                 ego_pose_time_dict[closest_ego_time].pose.orientation.z]))
-                R_w_cal = quat_to_rotm(np.array([cal_board_time_dict[closest_cal_board_time].pose.orientation.w,
+                R_w_bo = quat_to_rotm(np.array([cal_board_time_dict[closest_cal_board_time].pose.orientation.w,
                                                 cal_board_time_dict[closest_cal_board_time].pose.orientation.x,
                                                 cal_board_time_dict[closest_cal_board_time].pose.orientation.y,
                                                 cal_board_time_dict[closest_cal_board_time].pose.orientation.z]))
-                R_w_cal = R_w_cal @ R_w_cal_offset  # NOT SURE WHY THIS IS NEEDED
-                R_w_cal = R_w_cal @ R_cal_calmatlab # this is due to a difference in how matlab defines its calibration axis (https://www.mathworks.com/help/vision/ref/showextrinsics.html#btykfmm-1-view)
-                tf_w_ego = np.eye(4)
-                tf_w_ego[0:3, 0:3] = R_w_ego
-                tf_w_ego[0:3, 3] = t_w_ego
-                tf_w_cal = np.eye(4)
-                tf_w_cal[0:3, 0:3] = R_w_cal
-                tf_w_cal[0:3, 3] = t_w_cal
-                tf_ego_cal = inv_tf(tf_w_ego) @ tf_w_cal
-                # print(tf_w_cal)
-                # print("image {} t / R: {}, {}, {} ||\n{}, {}, {}\n{}, {}, {}\n{}, {}, {}\n".format(img_ind, ))
-                t_cam_cal = t_cam_cal_arr[chosen_pic_ind, :]
-                ax_ang_cam_cal = rot_vec_cam_cal_arr[chosen_pic_ind, :]  # this is ax/ang format where |vec| = ang, vec/|vec| is axis
-                R_cam_cal = quat_to_rotm(axang_to_quat(ax_ang_cam_cal)[0])[0].T
-                tf_cam_cal = np.eye(4)
-                tf_cam_cal[0:3, 0:3] = R_cam_cal
-                tf_cam_cal[0:3, 3] = t_cam_cal
-                tf_ego_cam = tf_ego_cal @ inv_tf(tf_cam_cal)
-                t_ego_cam_ave += tf_ego_cam[0:3, 3]
-                quat_ego_cam[chosen_pic_ind, :] = rotm_to_quat(tf_ego_cam[0:3, 0:3])
+                tf_w_e = np.eye(4)
+                tf_w_e[0:3, 0:3] = R_w_e
+                tf_w_e[0:3, 3] = t_w_e
+                tf_w_bo = np.eye(4)
+                tf_w_bo[0:3, 0:3] = R_w_bo
+                tf_w_bo[0:3, 3] = t_w_bo
+                tf_e_bo = inv_tf(tf_w_e) @ tf_w_bo
+                
+                t_c_b = t_c_b_arr[chosen_pic_ind, :]
+                ax_ang_c_b = rot_vec_c_b_arr[chosen_pic_ind, :]  # this is ax/ang format where |vec| = ang, vec/|vec| is axis
+                R_c_b = quat_to_rotm(axang_to_quat(ax_ang_c_b)[0])[0].T
+                
+                t_c_bo = t_c_b + t_b_bo_offset
+                R_c_bo = R_c_b @ R_b_bo
+                tf_c_bo = np.eye(4)
+                tf_c_bo[0:3, 0:3] = R_c_bo
+                tf_c_bo[0:3, 3] = t_c_bo
+                
+                tf_e_c = tf_e_bo @ inv_tf(tf_c_bo)
+
+                tf_e_c_ave += tf_e_c[0:3, 3]
+                quat_e_c[chosen_pic_ind, :] = rotm_to_quat(tf_e_c[0:3, 0:3])
                 print("###############   ind {}  ({}/{})  ################".format(img_ind, chosen_pic_ind, N))
-                print("tf_w_cal:\n{}".format(tf_w_cal))
-                print("tf_w_ego:\n{}".format(tf_w_ego))
-                print("tf_ego_cal:\n{}".format(tf_ego_cal))
-                print("tf_cam_cal:\n{}".format(tf_cam_cal))
-                print("tf_ego_cam:\n{}".format(tf_ego_cam))
+                print("tf_w_bo (CONSTANT):\n{}".format(tf_w_bo))
+                print("tf_w_e:\n{}".format(tf_w_e))
+                print("tf_e_bo:\n{}".format(tf_e_bo))
+                print("tf_c_bo:\n{}".format(tf_c_bo))
+                print("tf_e_c:\n{}".format(tf_e_c))
                 if img_ind == 169:
                     pdb.set_trace()
                 chosen_pic_ind += 1
-        t_ego_cam_ave /= N
-        quat_ego_cam_ave, _ = average_quaternions(Q=quat_ego_cam, w=None)
+        tf_e_c_ave /= N
+        quat_e_c_ave, _ = average_quaternions(Q=quat_e_c, w=None)
 
-        tf_ego_cam_final = np.eye(4)
-        tf_ego_cam_final[0:3, 0:3] = quat_to_rotm(quat_ego_cam_ave)
-        tf_ego_cam_final[0:3, 3] = t_ego_cam_ave
-        print("\n\nFINAL EXTRINSICS CALIBRATION RESULT:\n{}".format(tf_ego_cam_final))
+        tf_e_c_final = np.eye(4)
+        tf_e_c_final[0:3, 0:3] = quat_to_rotm(quat_e_c_ave)
+        tf_e_c_final[0:3, 3] = tf_e_c_ave
+        print("\n\nFINAL EXTRINSICS CALIBRATION RESULT:\n{}".format(tf_e_c_final))
 
-        tf_ego_cam_CAD = np.eye(4)
-        # tf_ego_cam_CAD[0:3, 0:3] = np.array([[ 0., -1.,  0.],
+        tf_e_c_CAD = np.eye(4)
+        # tf_e_c_CAD[0:3, 0:3] = np.array([[ 0., -1.,  0.],
         #                                      [ 0.,  0., -1.],
         #                                      [ 1.,  0.,  0.]])
-        tf_ego_cam_CAD[0:3, 0:3] = np.array([[ 0., -1.,  0.],
+        tf_e_c_CAD[0:3, 0:3] = np.array([[ 0., -1.,  0.],
                                              [ 0.,  0., -1.],
                                              [ 1.,  0.,  0.]]).T
-        tf_ego_cam_CAD[0:3, 3] = [0.13854437, -0.01504337, -0.06380886]
-        print("\n(expected result)\n{}".format(tf_ego_cam_CAD))
+        tf_e_c_CAD[0:3, 3] = [0.13854437, -0.01504337, -0.06380886]
+        print("\n(expected result)\n{}".format(tf_e_c_CAD))
         pdb.set_trace()
         # Adapted from https://github.com/christophhagen/averaging-quaternions/blob/master/averageQuaternions.py
         # Q is a Nx4 numpy matrix and contains the quaternions to average in the rows.
