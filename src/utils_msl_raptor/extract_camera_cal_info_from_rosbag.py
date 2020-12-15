@@ -56,53 +56,48 @@ class extract_camera_cal_info_from_rosbag:
         all_data = {}
         # MANUALLY ENTERED:
         used_imgs = [0, 86, 97, 169, 239, 260, 378, 414, 693, 757, 830, 921, 964, 981, 1074]
-        t_c_b_arr = np.array([
-                                [-204.57, -217.68,  990.03],
-                                [-191.24, -335.98,  845.45],
-                                [-49.576, -132.26,   936.3],
-                                [-511.24, -54.962,  824.34],
-                                [-291.34,  145.66,  822.04],
-                                [-282.89, -295.94,  931.88],
-                                [232.22,  -389.8,   893.8],
-                                [-203.1,  93.956,  935.06],
-                                [-486.3,  -264.3,  1343.1],
-                                [-191.82,  115.32,  763.79],
-                                [-241.55, -126.74,  709.89],
-                                [28.146,  -34.15,  882.53],
-                                [-371.2, -19.621,  503.97],
-                                [-85.631, -129.23,  686.26],
-                                [-278.61,  50.078,   517.1]]) / 1000.0
+        t_c_b_arr = np.array([[-204.57, -217.68,  990.03],
+                            [-191.24, -335.98,  845.45],
+                            [-49.576, -132.26,   936.3],
+                            [-511.24, -54.962,  824.34],
+                            [-291.34,  145.66,  822.04],
+                            [-282.89, -295.94,  931.88],
+                            [232.22,  -389.8,   893.8],
+                            [-203.1,  93.956,  935.06],
+                            [-486.3,  -264.3,  1343.1],
+                            [-191.82,  115.32,  763.79],
+                            [-241.55, -126.74,  709.89],
+                            [28.146,  -34.15,  882.53],
+                            [-371.2, -19.621,  503.97],
+                            [-85.631, -129.23,  686.26],
+                            [-278.61,  50.078,   517.1]]) / 1000.0
         rot_vec_c_b_arr = np.array([[0.001816,  0.026344, 0.0031563],
-                                [0.15452,  0.027444, -0.010806],
-                                [0.43315,  0.3572,  .18638],
-                                [0.48199,  -0.63426,  -0.13182],
-                                [0.20023,  -0.51965,  -0.17459],
-                                [0.51043,  .32159,  -0.25896],
-                                [0.69905,  .55085,   0.736],
-                                [0.027512,  .26331,  0.021262],
-                                [0.53707,  -0.45017,  -0.12076],
-                                [0.37872,  .08069, -0.041002],
-                                [0.21917,  .10182, 0.0089506],
-                                [0.42675,  .79288, -0.044611],
-                                [0.5388,  -0.27856, -0.039843],
-                                [0.21748,  0.2524,  0.040668],
-                                [0.41918,  0.5665,  -0.18436]])
+                                    [0.15452,  0.027444, -0.010806],
+                                    [0.43315,  0.3572,  .18638],
+                                    [0.48199,  -0.63426,  -0.13182],
+                                    [0.20023,  -0.51965,  -0.17459],
+                                    [0.51043,  .32159,  -0.25896],
+                                    [0.69905,  .55085,   0.736],
+                                    [0.027512,  .26331,  0.021262],
+                                    [0.53707,  -0.45017,  -0.12076],
+                                    [0.37872,  .08069, -0.041002],
+                                    [0.21917,  .10182, 0.0089506],
+                                    [0.42675,  .79288, -0.044611],
+                                    [0.5388,  -0.27856, -0.039843],
+                                    [0.21748,  0.2524,  0.040668],
+                                    [0.41918,  0.5665,  -0.18436]])
         chosen_pic_ind = 0
         tf_e_c_ave = np.zeros((3,))
         N = rot_vec_c_b_arr.shape[0]
         quat_e_c = np.zeros((N,4))
         perp_dist_board_to_center_optitrack_ball = 0.009  # its a little less than 1 cm
-        t_b_bo_offset = np.asarray([7*40.0/1000.0, 4.5*40.0/1000.0, -perp_dist_board_to_center_optitrack_ball])  # matlab assumes calibration board axis is in bottom right corner, each square is 40mm and board is 9 x 14
-        # R_w_cal_offset = np.array([[ 0.,  0.,  1.],
-        #                            [ 0., -1.,  0.],
-        #                            [ 1.,  0.,  0.]])  # FOR SOME REASON THIS IS NEEDED???
-        # R_cal_calmatlab = np.array([[ 0.,  0.,  1.],
-        #                             [ 1.,  0.,  0.],
-        #                             [ 0.,  1.,  0.]])  # matlabs x is our y, matlabs y is our z, matlabs z is our x
-        R_b_bo = np.eye(3)
+        t_b_bo = np.asarray([7*40.0/1000.0, 4.5*40.0/1000.0, -perp_dist_board_to_center_optitrack_ball])  # pointing to bo from b, expressed in b frame
         R_b_bo = np.array([[ 0.,  1.,  0.],
                            [-1.,  0.,  0.],
                            [ 0.,  0.,  1.]])  # matlabs x is our y, matlabs y is our z, matlabs z is our x
+        tf_b_bo = np.eye(4)
+        tf_b_bo[0:3, 0:3] = R_b_bo
+        tf_b_bo[0:3, 3] = t_b_bo
         for img_ind, img_time in enumerate(image_time_dict):
             image = cv_bridge.imgmsg_to_cv2(image_time_dict[img_time], desired_encoding="passthrough")
             # image = cv_bridge.imgmsg_to_cv2(image_time_dict[img_time], desired_encoding="bgr8")
@@ -135,12 +130,13 @@ class extract_camera_cal_info_from_rosbag:
                 t_c_b = t_c_b_arr[chosen_pic_ind, :]
                 ax_ang_c_b = rot_vec_c_b_arr[chosen_pic_ind, :]  # this is ax/ang format where |vec| = ang, vec/|vec| is axis
                 R_c_b = quat_to_rotm(axang_to_quat(ax_ang_c_b)[0])[0].T
+                tf_c_b = np.eye(4)
+                tf_c_b[0:3, 0:3] = R_c_b
+                tf_c_b[0:3, 3] = t_c_b
                 
-                t_c_bo = t_c_b + t_b_bo_offset
-                R_c_bo = R_c_b @ R_b_bo
-                tf_c_bo = np.eye(4)
-                tf_c_bo[0:3, 0:3] = R_c_bo
-                tf_c_bo[0:3, 3] = t_c_bo
+                # t_c_bo = t_c_b + t_b_bo
+                # R_c_bo = R_c_b @ R_b_bo
+                tf_c_bo = tf_c_b @ tf_b_bo
                 
                 tf_e_c = tf_e_bo @ inv_tf(tf_c_bo)
 
