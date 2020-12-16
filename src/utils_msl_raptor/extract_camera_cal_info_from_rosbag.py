@@ -157,7 +157,7 @@ class extract_camera_cal_info_from_rosbag:
         tf_e_c_final = np.eye(4)
         tf_e_c_final[0:3, 0:3] = quat_to_rotm(quat_e_c_ave)
         tf_e_c_final[0:3, 3] = tf_e_c_ave
-        print("\n\nFINAL EXTRINSICS CALIBRATION RESULT:\n{}".format(tf_e_c_final))
+        print("\n\nFINAL EXTRINSICS CALIBRATION RESULT (tf_e_c):\n{}".format(tf_e_c_final))
 
         tf_e_c_CAD = np.eye(4)
         # tf_e_c_CAD[0:3, 0:3] = np.array([[ 0., -1.,  0.],
