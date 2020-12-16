@@ -148,6 +148,7 @@ class extract_camera_cal_info_from_rosbag:
                 print("tf_e_bo:\n{}".format(tf_e_bo))
                 print("tf_c_bo:\n{}".format(tf_c_bo))
                 print("tf_e_c:\n{}".format(tf_e_c))
+                print("tf_c_e:\n{}".format(inv_tf(tf_e_c)))
                 if img_ind == 169:
                     pdb.set_trace()
                 chosen_pic_ind += 1
