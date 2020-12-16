@@ -26,11 +26,15 @@ class MSLRaptorSlamClass {
     {"quad4",                 obj_param_t("quad4",                 "mslquad", 7,  false, false, true )}, //true
     {"quad6",                 obj_param_t("quad6",                 "mslquad", 8,  false, false, true )}, //true
     {"swell_bottle",          obj_param_t("swell_bottle",          "bottle",  9,  false, false, false)}, //true
-    {"bowl_white_msl",        obj_param_t("bowl_white_msl",        "bowl",    10, false, false, false)}, //true
+    {"bowl_white_msl",        obj_param_t("bowl_white_msl",        "bowl",    10, false, false, false)}, //true// THIS IS AN ALTERANATE NAME FOR THIS BOWL
+    {"bowl_grey_msl",         obj_param_t("bowl_grey_msl",         "bowl",    10, false, false, false)}, //true 
     {"bowl_green_msl",        obj_param_t("bowl_green_msl",        "bowl",    11, false, false, false)}, //true
     {"mug_duke",              obj_param_t("mug_duke",              "cup",     12, false, false, false)},
     {"mug_black",             obj_param_t("mug_black",             "cup",     13, false, false, false)},
-    {"mug_yellow_black",      obj_param_t("mug_yellow_black",      "cup",     14, false, false, false)}  
+    {"mug_yellow_black",      obj_param_t("mug_yellow_black",      "cup",     14, false, false, false)},
+    {"bottle_swell_1",        obj_param_t("bottle_swell_1",        "bottle",  15, false, false, false)}, //true
+    {"bottle_swell_2",        obj_param_t("bottle_swell_2",        "bottle",  16, false, false, false)}, //true
+    {"bottle_swell_3",        obj_param_t("bottle_swell_3",        "bottle",  17, false, false, false)}  //true
   };
 
   double dt_thresh = 0.02; // how close a measurement is in time to ego pose to be "from" there - eventually should interpolate instead
