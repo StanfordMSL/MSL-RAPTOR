@@ -54,61 +54,65 @@ class extract_camera_cal_info_from_rosbag:
         
         cv_bridge = CvBridge()
         all_data = {}
-        # MANUALLY ENTERED:
+        ########################### DATA FROM MATLAB (MANUALLY ENTERED) ###########################
         used_imgs = [0, 86, 97, 169, 239, 260, 378, 414, 693, 757, 830, 921, 964, 981, 1074]
-        t_c_b_arr = np.array([[-204.57, -217.68,  990.03],
-                            [-191.24, -335.98,  845.45],
-                            [-49.576, -132.26,   936.3],
-                            [-511.24, -54.962,  824.34],
-                            [-291.34,  145.66,  822.04],
-                            [-282.89, -295.94,  931.88],
-                            [232.22,  -389.8,   893.8],
-                            [-203.1,  93.956,  935.06],
-                            [-486.3,  -264.3,  1343.1],
-                            [-191.82,  115.32,  763.79],
-                            [-241.55, -126.74,  709.89],
-                            [28.146,  -34.15,  882.53],
-                            [-371.2, -19.621,  503.97],
-                            [-85.631, -129.23,  686.26],
-                            [-278.61,  50.078,   517.1]]) / 1000.0
-        rot_vec_c_b_arr = np.array([[0.001816,  0.026344, 0.0031563],
-                                    [0.15452,  0.027444, -0.010806],
-                                    [0.43315,  0.3572,  .18638],
-                                    [0.48199,  -0.63426,  -0.13182],
-                                    [0.20023,  -0.51965,  -0.17459],
-                                    [0.51043,  .32159,  -0.25896],
-                                    [0.69905,  .55085,   0.736],
-                                    [0.027512,  .26331,  0.021262],
-                                    [0.53707,  -0.45017,  -0.12076],
-                                    [0.37872,  .08069, -0.041002],
-                                    [0.21917,  .10182, 0.0089506],
-                                    [0.42675,  .79288, -0.044611],
-                                    [0.5388,  -0.27856, -0.039843],
-                                    [0.21748,  0.2524,  0.040668],
-                                    [0.41918,  0.5665,  -0.18436]])
+        t_c_b_arr = np.array([[-204.567770034014, -217.677474042156, 990.032277314905],
+                              [-241.546404051251, -126.740236866132, 709.886713521358],
+                              [-85.6310311412221, -129.233327306724, 686.263588428402],
+                              [-49.5758053954742, -132.259975949021, 936.297851125760],
+                              [-511.236399979537, -54.9621466716082, 824.336873995614],
+                              [-291.335427801684,  145.662553091104, 822.042529467022],
+                              [-282.889886937005, -295.942293810267, 931.881235124768],
+                              [ 232.219150237119, -389.795359703377, 893.802257101281],
+                              [-203.098056959464,  93.9557920606624, 935.056631288139],
+                              [-486.302207460492, -264.304177557648, 1343.08246820740],
+                              [-191.822344253332,  115.321836772336, 763.790317208289],
+                              [ 28.1456326667861, -34.1502267383312, 882.525520256375],
+                              [-371.202271462141, -19.6213934697185, 503.971991759718],
+                              [-278.611678789423,  50.0776274325494, 517.101170783092],
+                              [-191.235658748160, -335.979228257803, 845.450627083922]]) / 1000.0
+        rot_vec_c_b_arr = np.array([[0.00181597261003776, 0.0263438296488361,  0.00315630643979066],
+                                    [0.219171868820300,   0.101821265610930,   0.00895061055771904],
+                                    [0.217482956771523,   0.252397193996283,   0.0406677022725875],
+                                    [0.433153576264349,   0.357197172355445,   0.186383416969125],
+                                    [0.481991088967751,  -0.634258056173375,  -0.131816233343635],
+                                    [0.200232296509818,  -0.519647497045448,  -0.174587275535448],
+                                    [0.510429140862375,   0.321592318974736,  -0.258958029181621],
+                                    [0.699048787090123,   0.550850565569477,   0.735999116910402],
+                                    [0.0275119582924590,  0.263313674840271,   0.0212619309388616],
+                                    [0.537074857096390,  -0.450167897583607,  -0.120763660764963],
+                                    [0.378723765564576,   0.0806904468493387, -0.0410019979583945],
+                                    [0.426746444624424,   0.792878667108163,  -0.0446109676724370],
+                                    [0.538798448045761,  -0.278556496690573,  -0.0398432508792724],
+                                    [0.419179991478450,  -0.566497313420050,  -0.184356571858263],
+                                    [0.154521328121619,   0.0274436590158075, -0.0108059370684502]])
+        ########################### END DATA FROM MATLAB ###########################
         chosen_pic_ind = 0
         tf_e_c_ave = np.zeros((3,))
         N = rot_vec_c_b_arr.shape[0]
         quat_e_c = np.zeros((N,4))
         perp_dist_board_to_center_optitrack_ball = 0.009  # its a little less than 1 cm
-        t_b_bo = np.asarray([7*40.0/1000.0, 4.5*40.0/1000.0, -perp_dist_board_to_center_optitrack_ball])  # pointing to bo from b, expressed in b frame
-        R_b_bo = np.array([[ 0.,  1.,  0.],
-                           [-1.,  0.,  0.],
-                           [ 0.,  0.,  1.]])  # matlabs x is our y, matlabs y is our z, matlabs z is our x
         tf_b_bo = np.eye(4)
-        tf_b_bo[0:3, 0:3] = R_b_bo
-        tf_b_bo[0:3, 3] = t_b_bo
+        tf_b_bo[0:3, 3] = np.asarray([7*40.0/1000.0, 
+                                      4.5*40.0/1000.0, 
+                                      -perp_dist_board_to_center_optitrack_ball])  # pointing to bo from b, expressed in b frame
+        tf_b_bo[0:3, 0:3] = np.array([[ 0.,  1.,  0.],
+                                      [-1.,  0.,  0.],
+                                      [ 0.,  0.,  1.]])  # matlabs x is our y, matlabs y is our z, matlabs z is our x
+        tf_w_bo_CONST = None # this value should be constant, but optitrack flips it due to symetry of the marker placement. Only use first value to be consistant
         for img_ind, img_time in enumerate(image_time_dict):
             image = cv_bridge.imgmsg_to_cv2(image_time_dict[img_time], desired_encoding="passthrough")
             # image = cv_bridge.imgmsg_to_cv2(image_time_dict[img_time], desired_encoding="bgr8")
             closest_ego_time, _ = find_closest_by_time(img_time, [*ego_pose_time_dict.keys()]) 
             closest_cal_board_time, _ = find_closest_by_time(img_time, [*cal_board_time_dict.keys()])  
             all_data[(img_time + closest_ego_time + closest_cal_board_time) / 3.0] = (image, ego_pose_time_dict[closest_ego_time], cal_board_time_dict[closest_cal_board_time])
-            fn_str = "cal_img_{}".format(img_ind)
+            fn_str = "cal_img_{:06}".format(img_ind)
+            # pdb.set_trace()
             if 0:
                 cv2.imwrite(('/').join(rb_path_and_name.split('/')[:-1]) + '/' + fn_str + ".jpg", image)
             
             if img_ind in used_imgs:
+                print("###############   ind {}  ({}/{})  ################".format(img_ind, chosen_pic_ind, N))
                 t_w_e = np.array([ego_pose_time_dict[closest_ego_time].pose.position.x, ego_pose_time_dict[closest_ego_time].pose.position.y, ego_pose_time_dict[closest_ego_time].pose.position.z])
                 t_w_bo = np.array([cal_board_time_dict[closest_cal_board_time].pose.position.x, cal_board_time_dict[closest_cal_board_time].pose.position.y, cal_board_time_dict[closest_cal_board_time].pose.position.z])
                 R_w_e = quat_to_rotm(np.array([ego_pose_time_dict[closest_ego_time].pose.orientation.w,
@@ -122,10 +126,12 @@ class extract_camera_cal_info_from_rosbag:
                 tf_w_e = np.eye(4)
                 tf_w_e[0:3, 0:3] = R_w_e
                 tf_w_e[0:3, 3] = t_w_e
-                tf_w_bo = np.eye(4)
-                tf_w_bo[0:3, 0:3] = R_w_bo
-                tf_w_bo[0:3, 3] = t_w_bo
-                tf_e_bo = inv_tf(tf_w_e) @ tf_w_bo
+                if tf_w_bo_CONST is None:
+                    tf_w_bo_CONST = np.eye(4)
+                    tf_w_bo_CONST[0:3, 0:3] = R_w_bo
+                    tf_w_bo_CONST[0:3, 3] = t_w_bo
+                    print("tf_w_bo_CONST:\n{}".format(tf_w_bo_CONST))
+                tf_e_bo = inv_tf(tf_w_e) @ tf_w_bo_CONST
                 
                 t_c_b = t_c_b_arr[chosen_pic_ind, :]
                 ax_ang_c_b = rot_vec_c_b_arr[chosen_pic_ind, :]  # this is ax/ang format where |vec| = ang, vec/|vec| is axis
@@ -142,15 +148,14 @@ class extract_camera_cal_info_from_rosbag:
 
                 tf_e_c_ave += tf_e_c[0:3, 3]
                 quat_e_c[chosen_pic_ind, :] = rotm_to_quat(tf_e_c[0:3, 0:3])
-                print("###############   ind {}  ({}/{})  ################".format(img_ind, chosen_pic_ind, N))
-                print("tf_w_bo (CONSTANT):\n{}".format(tf_w_bo))
+                
                 print("tf_w_e:\n{}".format(tf_w_e))
                 print("tf_e_bo:\n{}".format(tf_e_bo))
                 print("tf_c_bo:\n{}".format(tf_c_bo))
                 print("tf_e_c:\n{}".format(tf_e_c))
                 print("tf_c_e:\n{}".format(inv_tf(tf_e_c)))
-                if img_ind == 169:
-                    pdb.set_trace()
+                # if img_ind == 169:
+                #     pdb.set_trace()
                 chosen_pic_ind += 1
         tf_e_c_ave /= N
         quat_e_c_ave, _ = average_quaternions(Q=quat_e_c, w=None)
