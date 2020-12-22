@@ -8,6 +8,7 @@ import yaml
 import pdb
 # math
 import numpy as np
+from numpy import linalg as la
 from scipy.spatial.transform import Rotation as R
 
 from matplotlib import pyplot as plt
@@ -128,6 +129,8 @@ class extract_camera_cal_info_from_rosbag:
                 print("tf_e_bo:\n{}".format(tf_e_bo))
                 print("tf_c_b:\n{}".format(tf_c_b))
                 print("tf_c_bo:\n{}".format(tf_c_bo))
+                print("||tf_c_b||:\n{}".format(la.norm(tf_c_b[0:3, 3])))
+                print("||tf_c_bo||:\n{}".format(la.norm(tf_c_bo[0:3, 3])))
                 print("tf_e_c:\n{}".format(tf_e_c))
                 # print("tf_c_e:\n{}".format(inv_tf(tf_e_c)))
 
