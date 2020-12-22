@@ -55,15 +55,15 @@ class extract_camera_cal_info_from_rosbag:
         print("done reading in bag, now syncing times & calculating extrinics")
         
 
-        # Manually calculated fixed offset between optitrack board frame (bo) and matlab's assumed board frame (b)
+        # Manually calculate fixed offset between optitrack board frame (bo) and matlab's assumed board frame (b)
         perp_dist_board_to_center_optitrack_ball = 0.009  # its a little less than 1 cm
-        t_b_bo = np.asarray([7*40.0/1000.0, 
-                             4.5*40.0/1000.0, 
+        t_b_bo = np.asarray([  7 * 40.0 / 1000.0, 
+                             4.5 * 40.0 / 1000.0, 
                              -perp_dist_board_to_center_optitrack_ball])  # pointing to bo from b, expressed in b frame
         R_b_bo = np.array([[ 0.,  1.,  0.],
                            [-1.,  0.,  0.],
                            [ 0.,  0.,  1.]])  # matlabs x is our y, matlabs y is our z, matlabs z is our x
-        tf_b_bo = t_and_R_to_tf(t_b_bo, R_b_bo)
+        tf_b_bo_CONST = t_and_R_to_tf(t_b_bo, R_b_bo)
         ######################################################################################
 
         # Init loop variables
@@ -85,7 +85,7 @@ class extract_camera_cal_info_from_rosbag:
                 cv2.imwrite(('/').join(rb_path_and_name.split('/')[:-1]) + '/' + fn_str + ".jpg", image)
             
             if img_ind in matlab_data['used_img_inds']:
-                print("###############   ind {}  ({}/{})  ################".format(img_ind, chosen_pic_ind, num_cal_imgs))
+                print("\n###############   ind {}  ({}/{})  ################".format(img_ind, chosen_pic_ind, num_cal_imgs))
                 # Extract ego (and cal board) pose from optitrack data (matched by time to the image with correct index)
                 t_w_e = np.array([ego_pose_time_dict[closest_ego_time].pose.position.x, ego_pose_time_dict[closest_ego_time].pose.position.y, ego_pose_time_dict[closest_ego_time].pose.position.z])
                 R_w_e = quat_to_rotm(np.array([ego_pose_time_dict[closest_ego_time].pose.orientation.w,
@@ -101,6 +101,7 @@ class extract_camera_cal_info_from_rosbag:
                                                     cal_board_time_dict[closest_cal_board_time].pose.orientation.z]))
                     tf_w_bo_CONST = t_and_R_to_tf(t_w_bo, R_w_bo)
                     print("tf_w_bo_CONST:\n{}".format(tf_w_bo_CONST))
+                    print("tf_b_bo_CONST:\n{}".format(tf_b_bo_CONST))
                 
                 # Calculate board pose in ego frame
                 tf_e_bo = inv_tf(tf_w_e) @ tf_w_bo_CONST
@@ -112,7 +113,7 @@ class extract_camera_cal_info_from_rosbag:
                 tf_c_b = t_and_R_to_tf(t_c_b, R_c_b)
                 
                 # Apply manual offset to account for difference between optitrack board frame (bo) and matlab's assumed board frame (b)
-                tf_c_bo = tf_c_b @ tf_b_bo
+                tf_c_bo = tf_c_b @ tf_b_bo_CONST
                 
                 # Calculate the estimate of the constant offset between ego and camera frames
                 tf_e_c = tf_e_bo @ inv_tf(tf_c_bo)
@@ -125,9 +126,10 @@ class extract_camera_cal_info_from_rosbag:
                 # Print out debugging statements
                 print("tf_w_e:\n{}".format(tf_w_e))
                 print("tf_e_bo:\n{}".format(tf_e_bo))
+                print("tf_c_b:\n{}".format(tf_c_b))
                 print("tf_c_bo:\n{}".format(tf_c_bo))
                 print("tf_e_c:\n{}".format(tf_e_c))
-                print("tf_c_e:\n{}".format(inv_tf(tf_e_c)))
+                # print("tf_c_e:\n{}".format(inv_tf(tf_e_c)))
 
                 chosen_pic_ind += 1
         tf_e_c_ave /= num_cal_imgs
