@@ -56,6 +56,32 @@ RUN apt-get update && \
     apt-get install -y libsm6 libxext6 libxrender-dev && \
     rm -rf /var/lib/apt/lists/*
 
+# Install edgetpu detection stuff ############################
+RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" \
+    | tee /etc/apt/sources.list.d/coral-edgetpu.list && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6A030B21BA07F4FB && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8B57C5C2836F4BEB 
+
+RUN apt update && apt install -y \
+        curl \
+        libedgetpu1-std \
+        python3-pip \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt update && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
+    apt update
+
+# https://www.tensorflow.org/lite/guide/python  <-- different version for ARM
+RUN pip3 install https://github.com/google-coral/pycoral/releases/download/release-frogfish/tflite_runtime-2.5.0-cp36-cp36m-linux_x86_64.whl
+
+RUN mkdir msl_raptor_ws/coral && cd msl_raptor_ws/coral && \
+    git clone https://github.com/google-coral/tflite.git && \
+    cd /root/msl_raptor_ws/coral/tflite/python/examples/detection && \
+    bash install_requirements.sh
+# end edgetpu stuff #####################################
+
 # Clone OCAM github (and install dependences) --> this allows us to use our camera
 RUN apt-get update && \
     apt-get install -y libudev-dev && apt-get install -y libv4l-dev && \
