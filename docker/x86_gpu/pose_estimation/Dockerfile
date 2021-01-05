@@ -97,6 +97,7 @@ RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch"' >> 
 RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \
     git pull --recurse-submodules && \
+    git checkout slam_test && \
     catkin build
 
 # Set GIT config based on local env vars
