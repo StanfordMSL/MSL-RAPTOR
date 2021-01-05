@@ -5,6 +5,72 @@ from yolov3.models import *  # set ONNX_EXPORT in models.py
 from yolov3.utils.datasets import *
 from yolov3.utils.utils import *
 
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/coral/python')
+from coral.tflite.python.examples.detection import detect as tpu_detect
+from pycoral.utils import edgetpu
+from pycoral.adapters import common
+import numpy as np
+from PIL import Image
+from PIL import ImageDraw
+import pdb
+
+
+# based on https://github.com/google-coral/tflite/blob/master/python/examples/detection/detect.py
+# max_instances_per_class can be a list with a number for each class, or a number applied to all classes
+# Returns (x,y,w,h, object_conf, class_conf, class)
+class EdgeTPU:
+    def __init__(self, sample_im, model_dir='/mounted_folder/models', model_name='ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite', img_size=416, conf_thres=0.5, classes_ids=[80], max_instances_per_class=5):
+        # ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite   |   ssd_mobilenet_v2_coco_quant_postprocess_edgetpu.tflite
+        self.img_size = img_size
+        self.conf_thres = conf_thres
+        self.classes_ids = classes_ids
+        # if isinstance(max_instances_per_class, int):
+        #     self.max_instances_per_class = [max_instances_per_class]*len(classes_ids)
+        # elif len(max_instances_per_class)== len(classes_ids):
+        #     self.max_instances_per_class = max_instances_per_class
+        # else:
+        #     raise NameError('Inconsistent max instances per class and classes ids')
+        self.classes_ids = classes_ids
+        
+        # Initialize the TF interpreter
+        model_file_path_and_name = os.path.join(model_dir, model_name)
+        self.interpreter = edgetpu.make_interpreter(model_file_path_and_name)
+        self.interpreter.allocate_tensors()
+        self.size = common.input_size(self.interpreter)
+
+        
+
+        # self.label_file = os.path.join(model_dir, 'coco_labels.txt')
+        # image_file = os.path.join(script_dir, 'parrot.jpg')
+
+    def detect(self, img0):
+        # Image needs to be PIL?
+        print("in EDGE detector function")
+        image_PIL = Image.fromarray(img0) # PIL format
+        # image_PIL = Image.open("/mounted_folder/images/img_484.png")
+        # scale = tpu_detect.set_input(self.interpreter, image_PIL.size, lambda size: image_PIL.resize(size, Image.ANTIALIAS))
+        def tmp_func(size):
+            return image_PIL.resize(size, Image.ANTIALIAS)
+        scale = tpu_detect.set_input(self.interpreter, image_PIL.size, tmp_func)
+        objs = tpu_detect.get_output(self.interpreter, self.conf_thres, scale)
+
+        det = [o for o in objs if o.id in self.classes_ids]
+
+        if len(det) == 0:
+            print('No objects detected')
+            return np.array([])
+        pdb.set_trace()
+        det = np.stack(det)
+
+
+        # Reformat det to x,y,w,h (x and y are top left corner's position)
+
+        det[:,2] = det[:,2] - det[:,0]
+        det[:,3] = det[:,3] - det[:,1]
+        return det
+
+
+
 # Adapted from detect.py of https://github.com/ultralytics/yolov3
 # max_instances_per_class can be a list with a number for each class, or a number applied to all classes
 # Returns (x,y,w,h, object_conf, class_conf, class)
@@ -109,8 +175,6 @@ class YoloDetector:
         return det
 
 
-
-
 def letterbox(img, new_shape=(416, 416), color=(128, 128, 128),
             auto=True, scaleFill=False, scaleup=True, interp=cv2.INTER_AREA):
     # Resize image to a 32-pixel-multiple rectangle https://github.com/ultralytics/yolov3/issues/232
@@ -143,3 +207,31 @@ def letterbox(img, new_shape=(416, 416), color=(128, 128, 128),
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
     img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
     return img, ratio, (dw, dh)
+
+
+# if __name__ == '__main__':
+#     print("THIS IS FOR DEBUG ONLY")
+#     try:
+#         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
+
+#         d = EdgeTPU(model_dir='/mounted_folder/models/', 
+#                          model='ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite', 
+#                          classes_ids=[80], 
+#                          max_instances_per_class=5)
+
+
+#         # tmp_img = cv2.imread("/mounted_folder/images/img_556.png")
+#         image_file = os.path.join("/mounted_folder/images", 'img_556.png')
+#         # size = common.input_size(d.interpreter)
+#         tmp_img = Image.open(image_file).convert('RGB').resize(d.size, Image.ANTIALIAS)
+#         det = d.detect(tmp_img)
+
+#         pdb.set_trace()
+#         # Print the result
+#         labels = dataset.read_label_file(d.label_file)  # a dictionary the converts class id to string (e.g. '2' to 'car')
+#         for c in det:
+#             print('%s: %.5f' % (labels.get(c.id, c.id), c.score))
+#     except:
+#         import traceback
+#         traceback.print_exc()
+#     print("done with detect test!")

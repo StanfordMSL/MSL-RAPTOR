@@ -1,4 +1,5 @@
 from detector import YoloDetector
+from detector import EdgeTPU
 from tracker import SiammaskTracker
 import sys, os, time
 import numpy as np
@@ -18,7 +19,9 @@ class ImageSegmentor:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         print('Using classes '+str(detect_classes_names))
         if detector_name == 'yolov3':
-            self.detector = YoloDetector(sample_im,base_dir=base_dir, classes_ids=detect_classes_ids, cfg=detector_cfg, weights=detector_weights)
+            self.detector = YoloDetector(sample_im, base_dir=base_dir, classes_ids=detect_classes_ids, cfg=detector_cfg, weights=detector_weights)
+        if detector_name == 'edge_tpu_mobile_det':
+            self.detector = EdgeTPU(sample_im, classes_ids=detect_classes_ids)
         else:
             raise RuntimeError("Detector chosen not implemented")
 
@@ -255,6 +258,7 @@ class ImageSegmentor:
 
     def detect(self,image):
         tic = time.time()
+        print("calling general detection function")
         detections = self.detector.detect(image)
         if len(detections) == 0:
             return detections

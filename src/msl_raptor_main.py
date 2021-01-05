@@ -55,7 +55,8 @@ def run_execution_loop():
         print('Waiting for first image')
         im = ros.get_first_image()
         print('initializing image segmentor!!!!!!')
-        ros.im_seg = ImageSegmentor(im,use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose,detect_classes_ids=classes_ids,detect_classes_names=classes_names, use_track_checks=b_use_track_checks, use_gt_detect_bb=b_use_gt_detect_bb, detector_cfg=detector_cfg, detector_weights=detector_weights)
+        detector_name='edge_tpu_mobile_det'  #  detector_name='edge_tpu_mobile_det'  |  yolov3 (default)
+        ros.im_seg = ImageSegmentor(im, detector_name=detector_name, use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose,detect_classes_ids=classes_ids,detect_classes_names=classes_names, use_track_checks=b_use_track_checks, use_gt_detect_bb=b_use_gt_detect_bb, detector_weights=detector_weights)
         print('initializing DONE - PLAY BAG NOW!!!!!!')
         time.sleep(0.5)
     
