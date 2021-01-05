@@ -1,5 +1,6 @@
 FROM bramtoula/ros:melodic-trt-py3
 WORKDIR /root
+EXPOSE 8888
 
 # Change default shell for RUN per https://stackoverflow.com/questions/20635472/using-the-run-instruction-in-a-dockerfile-with-source-does-not-work/39777387#39777387
 SHELL ["/bin/bash", "-c"]
@@ -116,11 +117,13 @@ RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch"' >> 
     echo 'alias viz_go="roslaunch msl_raptor raptor_viz.launch"' >> ~/.bashrc && \
     echo 'alias logs_go="python3 ~/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor/rosbag_to_logs.py"' >> ~/.bashrc && \
     echo 'alias metrics_go="python3 ~/msl_raptor_ws/src/msl_raptor/src/viz_tools/result_analyser.py"' >> ~/.bashrc && \
-    echo 'alias weight_reset_go="rm ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt/*.pth"' >> ~/.bashrc
+    echo 'alias weight_reset_go="rm ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt/*.pth"' >> ~/.bashrc && \
+    echo 'alias detection_go="cd /root/msl_raptor_ws/src/msl_raptor/src/front_end/coral/tflite/python/examples/detection && python3 detect_image.py --model /mounted_folder/models/ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite --labels /mounted_folder/models/coco_labels.txt --input images/grace_hopper.bmp"' >> ~/.bashrc
 
 RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \
     git pull --recurse-submodules && \
+    git checkout detect_only && \
     catkin build
 
 # Set GIT config based on local env vars
