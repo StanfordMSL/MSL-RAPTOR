@@ -1,6 +1,5 @@
 FROM bramtoula/ros:melodic-trt-py3
 WORKDIR /root
-EXPOSE 8888
 
 # Change default shell for RUN per https://stackoverflow.com/questions/20635472/using-the-run-instruction-in-a-dockerfile-with-source-does-not-work/39777387#39777387
 SHELL ["/bin/bash", "-c"]
