@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gtsam/geometry/Pose3.h>
+using namespace std;
 
 // Type Defs
 typedef vector<tuple<double, gtsam::Pose3>> object_data_vec_t;  // vector of tuples(double, pose message)
