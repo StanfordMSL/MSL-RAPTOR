@@ -25,6 +25,7 @@ class rosbag_object_detector:
     def __init__(self):
         self.bridge = CvBridge()
         rb_path = '/mounted_folder/bags_to_test_coral_detect/'
+        # rb_name = '2021-06-12-20-12-00.bag'
         rb_name = '2021-06-12-20-29-39.bag'
         img_out_path = rb_path + rb_name[:-4] + '_output/'
         if not os.path.exists(img_out_path):
@@ -47,9 +48,6 @@ class rosbag_object_detector:
         b_first_loop = True
         ave_time = 0
         max_time = 0
-        
-        
-
 
         topics = '/camera/image_raw'
         im_idx = 0
@@ -61,9 +59,12 @@ class rosbag_object_detector:
             img_path_and_name_result = img_det_out_path + 'image_result_{:04d}'.format(im_idx) + '.jpg'
             image = Image.open(img_path_and_name)
             if b_first_loop:
+                b_first_loop = False
+                start = time.perf_counter()
                 scale = detect_coral.set_input(interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
                 interpreter.invoke()
                 objs = detect_coral.get_output(interpreter, thresh, scale)  # call this once in begining which will take longer as model is loaded onto device
+                print("Time to load model onto device: {:.2f} ms".format((time.perf_counter() - start)*1000))
 
             start = time.perf_counter()
             interpreter.invoke()
@@ -86,7 +87,6 @@ class rosbag_object_detector:
         print('Done with bag!')
         ave_time /= im_idx # already has extra +1 to account for 0 indexing
         print("Average detection time = {:.3f} ms, maximum detection time = {:.3f} ms".format(ave_time * 1000, max_time * 1000))
-        pdb.set_trace()
 
 if __name__ == '__main__':
     np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
