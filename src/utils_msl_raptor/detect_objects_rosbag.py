@@ -60,24 +60,25 @@ class rosbag_object_detector:
             
             img_path_and_name_result = img_det_out_path + 'image_result_{:04d}'.format(im_idx) + '.jpg'
             image = Image.open(img_path_and_name)
+            
             if b_first_loop:
                 b_first_loop = False
                 start = time.perf_counter()
                 scale = detect_coral.set_input(interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
                 interpreter.invoke()
                 objs = detect_coral.get_output(interpreter, thresh, scale)  # call this once in begining which will take longer as model is loaded onto device
-                objs = None  # reset
                 print("Time to load model onto device: {:.2f} ms".format((time.perf_counter() - start)*1000))
 
             start = time.perf_counter()
+            scale = detect_coral.set_input(interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
             interpreter.invoke()
+            objs = detect_coral.get_output(interpreter, thresh, scale)
             inference_time = time.perf_counter() - start
             ave_time += inference_time
             if inference_time > max_time:
                 max_time = inference_time
-            objs = detect_coral.get_output(interpreter, thresh, scale)
             # print('%.2f ms' % (inference_time * 1000))
-            pdb.set_trace()
+            #pdb.set_trace()
             if b_save_output:
                 image = image.convert('RGB')
                 if objs:
