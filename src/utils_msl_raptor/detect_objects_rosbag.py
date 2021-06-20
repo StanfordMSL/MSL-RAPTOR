@@ -26,7 +26,8 @@ class rosbag_object_detector:
         self.bridge = CvBridge()
         rb_path = '/mounted_folder/bags_to_test_coral_detect/'
         # rb_name = '2021-06-12-20-12-00.bag'
-        rb_name = '2021-06-12-20-29-39.bag'
+        # rb_name = '2021-06-12-20-29-39.bag'
+        rb_name = '2021-06-20-12-42-38.bag'
         img_out_path = rb_path + rb_name[:-4] + '_output/'
         if not os.path.exists(img_out_path):
              os.mkdir(img_out_path)
@@ -49,9 +50,10 @@ class rosbag_object_detector:
         ave_time = 0
         max_time = 0
 
-        topics = '/camera/image_raw'
+        # topic_str = '/camera/image_raw'
+        topic_str = '/quad7/camera/image_raw'
         im_idx = 0
-        for topic, msg, t in bag_in.read_messages(topics=topics):
+        for topic, msg, t in bag_in.read_messages(topics=topic_str):
             image_cv2 = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
             img_path_and_name = img_out_path + 'image_{:04d}'.format(im_idx) + '.jpg'
             cv2.imwrite(img_path_and_name, image_cv2)
@@ -64,6 +66,7 @@ class rosbag_object_detector:
                 scale = detect_coral.set_input(interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
                 interpreter.invoke()
                 objs = detect_coral.get_output(interpreter, thresh, scale)  # call this once in begining which will take longer as model is loaded onto device
+                objs = None  # reset
                 print("Time to load model onto device: {:.2f} ms".format((time.perf_counter() - start)*1000))
 
             start = time.perf_counter()
@@ -74,19 +77,24 @@ class rosbag_object_detector:
                 max_time = inference_time
             objs = detect_coral.get_output(interpreter, thresh, scale)
             # print('%.2f ms' % (inference_time * 1000))
-            
+            pdb.set_trace()
             if b_save_output:
                 image = image.convert('RGB')
-                detect_image_coral.draw_objects(ImageDraw.Draw(image), objs, labels)
+                if objs:
+                    detect_image_coral.draw_objects(ImageDraw.Draw(image), objs, labels)
                 image.save(img_path_and_name_result)
-                image.show()
+                # image.show()
             im_idx += 1
             # pdb.set_trace()
+            objs = None  # reset
             
         bag_in.close()
         print('Done with bag!')
-        ave_time /= im_idx # already has extra +1 to account for 0 indexing
-        print("Average detection time = {:.3f} ms, maximum detection time = {:.3f} ms".format(ave_time * 1000, max_time * 1000))
+        if im_idx > 0:
+            ave_time /= im_idx # already has extra +1 to account for 0 indexing
+            print("Average detection time = {:.3f} ms, maximum detection time = {:.3f} ms  ({:d} images)".format(ave_time * 1000, max_time * 1000, im_idx))
+        else:
+            print("WARNING: No images in rosbag with topic {}".format(topic_str))
 
 if __name__ == '__main__':
     np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
