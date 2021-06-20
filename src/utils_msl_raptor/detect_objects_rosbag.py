@@ -78,7 +78,7 @@ class rosbag_object_detector:
             if inference_time > max_time:
                 max_time = inference_time
             # print('%.2f ms' % (inference_time * 1000))
-            #pdb.set_trace()
+            
             if b_save_output:
                 image = image.convert('RGB')
                 if objs:
