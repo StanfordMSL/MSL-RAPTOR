@@ -15,6 +15,9 @@ RUN source /ros_python3_entrypoint.sh && \
     cd .. && \
     catkin build
 
+# Fix an issue with the ROS key - https://askubuntu.com/questions/1341378/invalid-signature-error-for-ros-repository-while-trying-to-do-sudo-apt-get-updat
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F42ED6FBAB17C654
+
 # Set up SiamMask
 RUN cd msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask && \
     pip3 install -r requirements.txt && \
@@ -111,13 +114,18 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 ##############################################
 
+RUN cd /root/msl_raptor_ws/src/msl_raptor/src/front_end/coral/tflite/python/examples/detection && \
+    cp detect.py detect_coral.py && \
+    cp detect_image.py detect_image_coral.py
+
 # Add aliases to bashrc in docker containers
 RUN echo 'alias raptor_go="clear && roslaunch msl_raptor msl_raptor.launch"' >> ~/.bashrc && \
     echo 'alias viz_go="roslaunch msl_raptor raptor_viz.launch"' >> ~/.bashrc && \
     echo 'alias logs_go="python3 ~/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor/rosbag_to_logs.py"' >> ~/.bashrc && \
     echo 'alias metrics_go="python3 ~/msl_raptor_ws/src/msl_raptor/src/viz_tools/result_analyser.py"' >> ~/.bashrc && \
     echo 'alias weight_reset_go="rm ~/msl_raptor_ws/src/msl_raptor/src/front_end/SiamMask/weights_trt/*.pth"' >> ~/.bashrc && \
-    echo 'alias detection_go="cd /root/msl_raptor_ws/src/msl_raptor/src/front_end/coral/tflite/python/examples/detection && python3 detect_image.py --model /mounted_folder/models/ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite --labels /mounted_folder/models/coco_labels.txt --input images/grace_hopper.bmp"' >> ~/.bashrc
+    echo 'alias detection_go="cd /root/msl_raptor_ws/src/msl_raptor/src/front_end/coral/tflite/python/examples/detection && python3 detect_image.py --model /mounted_folder/models/ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite --labels /mounted_folder/models/coco_labels.txt --input images/grace_hopper.bmp"' >> ~/.bashrc && \
+    echo 'alias rosbag_detect_go="python3 ~/msl_raptor_ws/src/msl_raptor/src/utils_msl_raptor/detect_objects_rosbag.py"' >> ~/.bashrc
 
 RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \
@@ -125,6 +133,12 @@ RUN source /ros_python3_entrypoint.sh && \
     git checkout detect_only && \
     catkin build
 
+# Add git aliases for convience
+RUN git config --global alias.co checkout && \
+    git config --global alias.br branch && \
+    git config --global alias.ci commit && \
+    git config --global alias.st status
+    
 # Set GIT config based on local env vars
 ARG GIT_NAME=
 ARG GIT_EMAIL=
