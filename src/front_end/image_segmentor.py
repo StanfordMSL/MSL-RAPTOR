@@ -104,6 +104,23 @@ class ImageSegmentor:
         The gt_boxes is an optional argument which is used when using ground-truth for the detected boxes
         gt_boxes format: list of tuples: [(x,y,w,h,class_conf,obj_conf,class_id),...] where x and y are top left corner positions.
         ''' 
+        # output appears to be [((x,y,w,h,ang), class_str,b_is_valid)...]
+        bbs_no_angle = self.detect(image) 
+        # format as if angled bounding box (but 0 for angle always)
+        # obj_id is the same if we think its the same object (need to know prior info for this). for now make it a new one each time?
+        output = {}
+        for bb in bbs_no_angle:
+            class_str = self.class_id_to_str[bb[6]]
+            obj_id = 0
+            if len(self.active_objects_ids_per_class) > 0: 
+                for obj_id_list in self.active_objects_ids_per_class:
+                    obj_id += len(obj_id_list)
+            if class_str in self.active_objects_ids_per_class:
+                self.active_objects_ids_per_class[class_str].append(obj_id)
+            else:
+                self.active_objects_ids_per_class[class_str] = [obj_id]
+            output[obj_id] = [(bb[0], bb[1], bb[2], bb[3], 0), class_str, True]
+        return output
         if self.mode == self.DETECT:
             if self.use_gt_detect_bb:
                 if gt_boxes is None:
@@ -258,7 +275,7 @@ class ImageSegmentor:
 
     def detect(self,image):
         tic = time.time()
-        print("calling general detection function")
+        # print("calling general detection function")
         detections = self.detector.detect(image)
         if len(detections) == 0:
             return detections

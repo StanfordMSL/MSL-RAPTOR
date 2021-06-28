@@ -1,5 +1,6 @@
 import argparse
 from sys import platform
+import sys
 
 from yolov3.models import *  # set ONNX_EXPORT in models.py
 from yolov3.utils.datasets import *
@@ -12,6 +13,10 @@ from pycoral.adapters import common
 import numpy as np
 from PIL import Image
 from PIL import ImageDraw
+import cv2
+sys.path.insert(1, '/root/msl_raptor_ws/src/msl_raptor/src/front_end/coral/tflite/python/examples/detection')
+import detect_image_coral
+import detect_coral
 import pdb
 
 
@@ -19,7 +24,7 @@ import pdb
 # max_instances_per_class can be a list with a number for each class, or a number applied to all classes
 # Returns (x,y,w,h, object_conf, class_conf, class)
 class EdgeTPU:
-    def __init__(self, sample_im, model_dir='/mounted_folder/models', model_name='ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite', img_size=416, conf_thres=0.5, classes_ids=[80], max_instances_per_class=5):
+    def __init__(self, sample_im, model_dir='/mounted_folder/models', model_name='ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite', img_size=416, conf_thres=0.3, classes_ids=[43, 50], max_instances_per_class=5):
         # ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite   |   ssd_mobilenet_v2_coco_quant_postprocess_edgetpu.tflite
         self.img_size = img_size
         self.conf_thres = conf_thres
@@ -34,9 +39,13 @@ class EdgeTPU:
         
         # Initialize the TF interpreter
         model_file_path_and_name = os.path.join(model_dir, model_name)
-        self.interpreter = edgetpu.make_interpreter(model_file_path_and_name)
+        # self.interpreter = edgetpu.make_interpreter(model_file_path_and_name)
+        # self.interpreter.allocate_tensors()
+        # self.size = common.input_size(self.interpreter)
+        
+        # labels = detect_image_coral.load_labels(label_file) if label_file else {}
+        self.interpreter = detect_image_coral.make_interpreter(model_file_path_and_name)
         self.interpreter.allocate_tensors()
-        self.size = common.input_size(self.interpreter)
 
         
 
@@ -44,29 +53,61 @@ class EdgeTPU:
         # image_file = os.path.join(script_dir, 'parrot.jpg')
 
     def detect(self, img0):
-        # Image needs to be PIL?
-        print("in EDGE detector function")
-        image_PIL = Image.fromarray(img0) # PIL format
-        # image_PIL = Image.open("/mounted_folder/images/img_484.png")
-        # scale = tpu_detect.set_input(self.interpreter, image_PIL.size, lambda size: image_PIL.resize(size, Image.ANTIALIAS))
-        def tmp_func(size):
-            return image_PIL.resize(size, Image.ANTIALIAS)
-        scale = tpu_detect.set_input(self.interpreter, image_PIL.size, tmp_func)
-        objs = tpu_detect.get_output(self.interpreter, self.conf_thres, scale)
+        # print("in EDGE detector function")
+        img_cv = img0
+        width_height_tuple = (img_cv.shape[1], img_cv.shape[0])
+        def my_resize(w_h_tup):
+            return cv2.resize(img_cv, w_h_tup)
+        scale = detect_coral.set_input(self.interpreter, width_height_tuple, my_resize)
+        self.interpreter.invoke()
+        objs = detect_coral.get_output(self.interpreter, self.conf_thres, scale)
 
-        det = [o for o in objs if o.id in self.classes_ids]
+        # # Image needs to be PIL?
+        # image_PIL = Image.fromarray(img0) # PIL format
+        # # image_PIL = Image.fromarray(cv2.cvtColor(img0, cv2.COLOR_BGR2RGB)) # PIL format
+        # image_PIL.save("/mounted_folder/tmp_pil_img3.jpg")
+        # # image_PIL = Image.open("/mounted_folder/images/img_484.png")
+        # # scale = tpu_detect.set_input(self.interpreter, image_PIL.size, lambda size: image_PIL.resize(size, Image.ANTIALIAS))
+        # def tmp_func(size):
+        #     return image_PIL.resize(size, Image.ANTIALIAS)
+        # # scale = tpu_detect.set_input(self.interpreter, image_PIL.size, tmp_func)
+        # # objs = tpu_detect.get_output(self.interpreter, self.conf_thres, scale)
+        # scale = detect_coral.set_input(self.interpreter, image_PIL.size, lambda size: image_PIL.resize(size, Image.ANTIALIAS))
+        # self.interpreter.invoke()
+        # objs = detect_coral.get_output(self.interpreter, self.conf_thres, scale)  # call this once in begining which will take longer as model is loaded onto device
+        # print("valid ids: {}".format(self.classes_ids))
+        # for o in objs:
+        #     print("o.id: {}".format(o.id))
+        # det = [o for o in objs if o.id in self.classes_ids]
 
+        # if len(det) == 0:
+        #     print('No objects detected ({} disqualified)'.format(len(objs)))
+        #     return np.array([])
+        # print(det)
+        
+        # det = np.stack(det)
+        # print("stacked det")
+
+
+        # # Reformat det to x,y,w,h (x and y are top left corner's position)
+
+        # det[:,2] = det[:,2] - det[:,0]
+        # det[:,3] = det[:,3] - det[:,1]
+
+        # goal: det as np array with each row being (bb, class conf, object conf, class_id)
+        # Object(id=43, score=0.546875, bbox=BBox(xmin=466, ymin=198, xmax=487, ymax=296))
+        det = []
+        for o in objs:
+            if o.id not in self.classes_ids:
+                continue
+            det.append([o.bbox.xmin, o.bbox.ymin, o.bbox.xmax - o.bbox.xmin, o.bbox.ymax - o.bbox.ymin, o.score, o.score, o.id])
+            
         if len(det) == 0:
-            print('No objects detected')
+            print('No objects detected ({} disqualified)'.format(len(objs)))
             return np.array([])
-        pdb.set_trace()
-        det = np.stack(det)
+        else:
+            det = np.stack(det)
 
-
-        # Reformat det to x,y,w,h (x and y are top left corner's position)
-
-        det[:,2] = det[:,2] - det[:,0]
-        det[:,3] = det[:,3] - det[:,1]
         return det
 
 

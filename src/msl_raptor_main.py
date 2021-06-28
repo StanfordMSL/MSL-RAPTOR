@@ -17,8 +17,12 @@ from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.math_utils import *
 from utils_msl_raptor.ukf_utils import state_to_tf, pose_to_3d_bb_proj, load_category_params
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/src/front_end')
+sys.path.insert(1, '/root/msl_raptor_ws/src/msl_raptor/src/front_end/coral/tflite/python/examples/detection')
 from image_segmentor import ImageSegmentor
+import detect_image_coral
+import detect_coral
 import yaml
+from PIL import Image as ImagePIL
 
 def run_execution_loop():
     b_use_gt_bb = rospy.get_param('~b_use_gt_bb')
@@ -59,6 +63,28 @@ def run_execution_loop():
         ros.im_seg = ImageSegmentor(im, detector_name=detector_name, use_trt=rospy.get_param('~b_use_tensorrt'), detection_period=detection_period_ros,verbose=b_verbose,detect_classes_ids=classes_ids,detect_classes_names=classes_names, use_track_checks=b_use_track_checks, use_gt_detect_bb=b_use_gt_detect_bb, detector_weights=detector_weights)
         print('initializing DONE - PLAY BAG NOW!!!!!!')
         time.sleep(0.5)
+        det = ros.im_seg.detect(im)
+
+
+    ##########################
+    # # image_cv2 = im
+    # label_file = '/mounted_folder/models/coco_labels.txt'
+    # model_file = '/mounted_folder/models/ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite'
+
+    # labels = detect_image_coral.load_labels(label_file) if label_file else {}
+    # interpreter = detect_image_coral.make_interpreter(model_file)
+    # interpreter.allocate_tensors()
+    # image_PIL = ImagePIL.fromarray(cv2.cvtColor(im, cv2.COLOR_BGR2RGB)) # PIL format
+
+    # thresh = 0.4
+    # def tmp_func(size):
+    #     return image_PIL.resize(size, ImagePIL.ANTIALIAS)
+    # pdb.set_trace()
+    # # scale = detect_coral.set_input(interpreter, ImagePIL.size, lambda size: image_PIL.resize(size, Image.ANTIALIAS))
+    # scale = detect_coral.set_input(interpreter, image_PIL.size, lambda size: image_PIL.resize(size, tmp_func))
+    # interpreter.invoke()
+    # objs = detect_coral.get_output(interpreter, thresh, scale)  # call this once in begining which will take longer as model is loaded onto device
+    ##########################
     
     rate = rospy.Rate(30) # max filter rate
     ukf_dict = {}  # key: object_id value: ukf object
