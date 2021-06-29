@@ -37,6 +37,7 @@ class ros_interface:
         self.latest_img_time = -1
         self.front_end_time = None
         self.b_publish_gt_3d_projections = b_publish_gt_3d_projections
+        self.b_detect_only = True # we are using the coral accelerator
         ####################################################################
 
         self.ns = rospy.get_param('~ns')  # robot namespace
@@ -140,13 +141,17 @@ class ros_interface:
         # undistort the fisheye effect in the image
         if self.camera is not None:
             image = cv2.undistort(image, self.camera.K, self.camera.dist_coefs, None, self.camera.new_camera_matrix)
+
         
+        if self.b_detect_only:
+            self.im_seg.mode = self.im_seg.DETECT
         self.latest_bb_method = self.im_seg.mode
+        
         if self.b_use_gt_detect_bb:
             gt_bbs = self.get_gt_boxes()
             self.im_process_output = self.im_seg.process_image(image,my_time,gt_bbs)
         else:
-            self.im_process_output = self.im_seg.process_image(image,my_time)
+            self.im_process_output = self.im_seg.process_image(image,my_time, b_detect_only=self.b_detect_only)
         self.front_end_time = time.time() - t_fe_start
         self.num_imgs_processed += 1
         self.latest_img_time = my_time  # DO THIS LAST
