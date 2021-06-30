@@ -69,7 +69,7 @@ class ImageSegmentor:
         self.min_pix_from_edge = 5
         # Dicts containing each class
         self.min_aspect_ratio = {'person':0.1,'mslquad':1,'bowl':0.5,'cup':0.2,'laptop':0.3,'bottle':0.1}
-        self.max_aspect_ratio = {'person':0.4,'mslquad':5,'bowl':2,'cup':1.3,'laptop':3,'bottle':1.0}
+        self.max_aspect_ratio = {'person':0.4,'mslquad':5,'bowl':2.5,'cup':1.3,'laptop':3,'bottle':1.1}
 
         self.chi2_03 = 6.06
         self.chi2_005 = 11.07
@@ -112,7 +112,25 @@ class ImageSegmentor:
             # obj_id is the same if we think its the same object (need to know prior info for this). for now make it a new one each time?
             output = {}
             for bb in bbs_no_angle:
+                if not self.valid_detection:
+                    continue
                 class_str = self.class_id_to_str[bb[6]]
+
+                # loop through known objects to find matches
+                for prev_obj_id in self.active_objects_ids_per_class[class_str]:
+                    prev_pos= self.tracked_objects[prev_obj_id].latest_tracked_state['target_pos']
+                    if prev_obj_id in self.ukf_dict:
+                        b_is_new_object = not self.valid_tracking(self.ukf_dict[prev_obj_id], bb, self.tracked_objects[prev_obj_id].latest_tracked_state['score'], prev_obj_id)
+                    else:  # If this is a new object it has already passed the detection check, it is considered valid for now
+                        b_is_new_object = True
+                    
+                    if b_is_new_object:
+                        obj_id = self.new_tracked_object(class_str)
+                        self.active_objects_ids_per_class[class_str] = [obj_id]
+                    else:
+                        pass
+                raise RuntimeError
+
                 obj_id = 0
                 if len(self.active_objects_ids_per_class) > 0: 
                     for obj_id_list in self.active_objects_ids_per_class:

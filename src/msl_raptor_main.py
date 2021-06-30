@@ -146,6 +146,7 @@ def run_execution_loop():
         if b_use_gt_bb:
             raise RuntimeError("b_use_gt_bb option NOT YET IMPLEMENTED")
 
+
         # handle each object seen
         obj_ids_tracked = []
         for obj_id, (abb, class_str, valid) in processed_image.items():
@@ -175,7 +176,7 @@ def run_execution_loop():
                         tf_w_ado_gt[0:3, 3] = tf_w_ado_gt_array[0:3]
                         tf_w_ado_gt[0:3, 0:3] = quat_to_rotm(tf_w_ado_gt_array[3:7])
                         ukf_dict[obj_id].projected_3d_bb = np.vstack( (np.fliplr(pose_to_3d_bb_proj(tf_w_ado, tf_w_ego, ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera)), 
-                                                                       np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, tf_w_ego_gt, ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera)) ) )
+                                                                    np.fliplr(pose_to_3d_bb_proj(tf_w_ado_gt, tf_w_ego_gt, ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera)) ) )
                     else:
                         ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, tf_w_ego, ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
                     if class_str in connected_inds:
