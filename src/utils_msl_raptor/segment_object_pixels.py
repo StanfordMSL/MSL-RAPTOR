@@ -31,6 +31,7 @@ from utils_msl_raptor.ukf_utils import bb_corners_to_angled_bb
 
 class segment_object_pixels:
     def __init__(self):
+        b_mask = True
         self.bridge = CvBridge()
         rb_path = '/mounted_folder/bags_to_test_coral_detect/'
         # rb_name = 'grey_bowl_msl/bowl_grey_msl_nerf_with_markers.bag'  
@@ -41,6 +42,14 @@ class segment_object_pixels:
         img_det_out_path = img_out_path + 'img_with_detection/'
         if not os.path.exists(img_det_out_path):
              os.mkdir(img_det_out_path)
+
+        seg_im_out_path = img_out_path + 'segmentation_masks/'
+        seg_np_out_path = seg_im_out_path + "seg_as_numpy/"
+        if b_mask and not os.path.exists(seg_im_out_path):
+            os.mkdir(seg_im_out_path)
+        if b_mask and not os.path.exists(seg_np_out_path):
+            os.mkdir(seg_np_out_path)
+
 
         bag_in = rosbag.Bag(rb_path + rb_name, 'r')
         base_dir = '/root/msl_raptor_ws/src/msl_raptor/src/front_end/'
@@ -90,11 +99,15 @@ class segment_object_pixels:
                     cv2.drawContours(image_cv2_modified, [box0], 0, (255,0,0), 2)  # draw init box
                 cv2.drawContours(image_cv2_modified, [box], 0, (0,255,0), 2)
                 
-                b_mask = True
                 if b_mask:
-                    redMask = cv2.bitwise_and(redImg, redImg, mask=np.array(mask, dtype=np.uint8))
+                    np_mask = np.array(mask, dtype=np.uint8)
+                    redMask = cv2.bitwise_and(redImg, redImg, mask=np_mask)
                     alpha = 0.3
                     cv2.addWeighted(redMask, alpha, image_cv2_modified, 1-alpha, 0, image_cv2_modified)
+                    seg_path_and_name_result = seg_im_out_path + 'seg_image_{:04d}'.format(im_idx) + '.jpg'
+                    cv2.imwrite(seg_path_and_name_result, np_mask)
+                    seg_path_and_name_result = seg_np_out_path + 'seg_image_{:04d}'.format(im_idx) + '.npy'
+                    np.save(seg_path_and_name_result, np_mask, allow_pickle=False)
             
             cv2.imwrite(img_path_and_name_result, image_cv2_modified)
             im_idx += 1
