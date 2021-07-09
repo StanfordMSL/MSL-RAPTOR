@@ -152,23 +152,28 @@ class segment_object_pixels:
                 
                 cv2.imwrite(img_path_and_name_result, image_cv2_modified)
                 im_idx += 1
-            continue
+                if im_idx == 30:
+                    break
         bag_in.close()
 
         im_idx = 0
         for im_time in im_times:
             quad_pose, quad_idx = find_closest_by_time(time_to_match=im_time, time_list=quad_pose_times, message_list=quad_poses)
             obj_pose, obj_idx = find_closest_by_time(time_to_match=im_time, time_list=obj_pose_times, message_list=obj_poses)
-            quad_pose_name = pose_out_path + 'quad_pose_{:04d}'.format(im_idx) + '.npy'
+            cam_pose_name = pose_out_path + 'cam_pose_{:04d}'.format(im_idx) + '.npy'
             obj_pose_name = pose_out_path + 'obj_pose_{:04d}'.format(im_idx) + '.npy'
-            np.save(quad_pose_name, quad_pose, allow_pickle=False)
-            np.save(obj_pose_name, obj_pose, allow_pickle=False)
+            T_w_ego = quad_pose
+            T_w_cam = T_w_ego @ T_ego_cam
+            T_obj_w = inv_tf(obj_pose)
+            np.save(cam_pose_name, T_w_cam, allow_pickle=False)
+            np.save(obj_pose_name, T_obj_w, allow_pickle=False)
             if proj_mat is not None:
-                T_world_ego = quad_pose  # pose_to_tf(quad_pose)
-                cam_proj_mat = proj_mat @ inv_tf(T_world_ego)
+                cam_proj_mat = proj_mat @ inv_tf(T_w_ego)
                 cam_proj_path_and_name = cam_param_path + 'projection_matrix_{:04d}'.format(im_idx) + '.npy'
                 np.save(cam_proj_path_and_name, cam_proj_mat, allow_pickle=False)
             im_idx += 1
+            if im_idx == 30:
+                break
 
 
         # find corresponding time to find which poses correspond to which images
