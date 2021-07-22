@@ -36,12 +36,21 @@ class segment_object_pixels:
         b_mask = True
         R_cam_ego = np.reshape([-0.0246107,  -0.99869617, -0.04472445,  -0.05265648,  0.0459709,  -0.99755399, 0.99830938, -0.02219547, -0.0537192], (3,3))
         t_cam_ego = np.asarray([0.11041654, 0.06015242, -0.07401183])
+        # this assumes camera axis is +z and y is down. OpenGL assumes cam axis is -z and y is up
         T_cam_ego = np.eye(4)
         T_cam_ego[0:3, 0:3] = R_cam_ego
         T_cam_ego[0:3, 3] = t_cam_ego
         T_ego_cam = np.eye(4)
         T_ego_cam[0:3, 0:3] = R_cam_ego.T
         T_ego_cam[0:3, 3] = -R_cam_ego.T @ t_cam_ego
+
+        # T_cam_camGL = np.eye(4)
+        T_cam_camGL = np.array([[ 1,  0,  0, 0],
+                                [ 0, -1,  0, 0],
+                                [ 0,  0, -1, 0],
+                                [ 0,  0,  0, 1]])
+        T_ego_cam = T_ego_cam @ T_cam_camGL
+        T_cam_ego = inv_tf(T_cam_camGL) @ T_cam_ego
         self.bridge = CvBridge()
         rb_path = '/mounted_folder/bags_to_test_coral_detect/'
         # rb_name = 'grey_bowl_msl/bowl_grey_msl_nerf_with_markers.bag'  
@@ -152,6 +161,7 @@ class segment_object_pixels:
                 
                 cv2.imwrite(img_path_and_name_result, image_cv2_modified)
                 im_idx += 1
+                break
                 if im_idx == 30:
                     break
         bag_in.close()
@@ -168,9 +178,17 @@ class segment_object_pixels:
             np.save(cam_pose_name, T_w_cam, allow_pickle=False)
             np.save(obj_pose_name, T_obj_w, allow_pickle=False)
             if proj_mat is not None:
-                cam_proj_mat = proj_mat @ inv_tf(T_w_ego)
+                cam_proj_mat = proj_mat @ inv_tf(T_w_cam)
                 cam_proj_path_and_name = cam_param_path + 'projection_matrix_{:04d}'.format(im_idx) + '.npy'
                 np.save(cam_proj_path_and_name, cam_proj_mat, allow_pickle=False)
+                # pdb.set_trace()
+
+                # world_origin_px = cam_proj_mat @ np.array([[0],[0],[0],[1]])
+                # world_origin_px = np.array([world_origin_px[0,0], world_origin_px[1,0]]) / world_origin_px[2,0]
+                # (x, y) = world_origin_px  # note I am not sure if world_origin_px is (row, col) or (col,row)
+                # image_cv2 = cv2.circle(image_cv2, (np.round(x), np.round(y)), radius=2, color=(255, 0, 0), thickness=1)
+                # cv2.imwrite("/mounted_folder/testtestest.png", image_cv2)
+                # pdb.set_trace()
             im_idx += 1
             if im_idx == 30:
                 break
