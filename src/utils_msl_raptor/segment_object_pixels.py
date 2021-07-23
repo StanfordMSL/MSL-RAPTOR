@@ -32,77 +32,43 @@ from utils_msl_raptor.ukf_utils import bb_corners_to_angled_bb
 
 
 class segment_object_pixels:
-    def __init__(self):
-        b_mask = True
-        R_cam_ego = np.reshape([-0.0246107,  -0.99869617, -0.04472445,  -0.05265648,  0.0459709,  -0.99755399, 0.99830938, -0.02219547, -0.0537192], (3,3))
-        t_cam_ego = np.asarray([0.11041654, 0.06015242, -0.07401183])
-        # this assumes camera axis is +z and y is down. OpenGL assumes cam axis is -z and y is up
-        T_cam_ego = np.eye(4)
-        T_cam_ego[0:3, 0:3] = R_cam_ego
-        T_cam_ego[0:3, 3] = t_cam_ego
-        T_ego_cam = np.eye(4)
-        T_ego_cam[0:3, 0:3] = R_cam_ego.T
-        T_ego_cam[0:3, 3] = -R_cam_ego.T @ t_cam_ego
 
-        # T_cam_camGL = np.eye(4)
-        T_cam_camGL = np.array([[ 1,  0,  0, 0],
-                                [ 0, -1,  0, 0],
-                                [ 0,  0, -1, 0],
-                                [ 0,  0,  0, 1]])
-        T_ego_cam = T_ego_cam @ T_cam_camGL
-        T_cam_ego = inv_tf(T_cam_camGL) @ T_cam_ego
-        self.bridge = CvBridge()
+    def __init__(self):
+        # INPUTS
+        max_num_images = 1
+        b_save_images_with_masks = False
+        b_output_debug_image = False
+        topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', '/vrpn_client_node/bowl_green_msl/pose']
         rb_path = '/mounted_folder/bags_to_test_coral_detect/'
         # rb_name = 'grey_bowl_msl/bowl_grey_msl_nerf_with_markers.bag'  
         rb_name = 'green_bowl_msl/bowl_green_msl_nerf_with_markers.bag'
-        img_out_path = rb_path + rb_name[:-4] + '_output/'
-        if not os.path.exists(img_out_path):
-             os.mkdir(img_out_path)
-        img_det_out_path = img_out_path + 'img_with_detection/'
-        if not os.path.exists(img_det_out_path):
-             os.mkdir(img_det_out_path)
+        # # GREY BOWL: 285, 275  | 395, 275  | 395, 330  | 285, 330
+        # init_bb = ((285 + 395)/2, (275+ 330)/2, 395 - 285, 330 - 275)  # box format: x,y,w,h (where x,y correspond to the top left corner)
+        # init_bb_up_left = (285, 275, 395 - 285, 330 - 275)  # box format: x,y,w,h (where x,y correspond to the top left corner)
+        # GREEN BOWL: 290, 255  | 335, 255  | 335, 277  | 290, 277
+        init_bb = ((290 + 335)/2, (255+ 277)/2, 335 - 290, 277 - 255)  # box format: x,y,w,h (where x,y correspond to the top left corner)
+        init_bb_up_left = (290, 255, 335 - 290, 277 - 255)  # box format: x,y,w,h (where x,y correspond to the top left corner)
+        ########################################
+        
+        base_directory_path = rb_path + rb_name[:-4] + '_output/'
+        my_dirs = self.construct_directory_structure(base_directory_path, b_save_images_with_masks)
+        T_cam_ego, T_ego_cam = self.construct_camera_transform() # note this is using hardcoded values calculated offline
 
-        seg_im_out_path = img_out_path + 'segmentation_masks/'
-        seg_np_out_path = seg_im_out_path + "seg_as_numpy/"
-        if b_mask and not os.path.exists(seg_im_out_path):
-            os.mkdir(seg_im_out_path)
-        if b_mask and not os.path.exists(seg_np_out_path):
-            os.mkdir(seg_np_out_path)
-
-        cam_param_path = img_out_path + 'camera_params/'
-        if not os.path.exists(cam_param_path):
-            os.mkdir(cam_param_path)
-
-        pose_out_path = img_out_path + 'poses/'
-        if not os.path.exists(pose_out_path):
-            os.mkdir(pose_out_path)
-
-
-        bag_in = rosbag.Bag(rb_path + rb_name, 'r')
-        base_dir = '/root/msl_raptor_ws/src/msl_raptor/src/front_end/'
-
-        # label_file = '/mounted_folder/models/coco_labels.txt'
-        # model_file = '/mounted_folder/models/ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite'
-
-        # labels = detect_image_coral.load_labels(label_file) if label_file else {}
-        # interpreter = detect_image_coral.make_interpreter(model_file)
-        # interpreter.allocate_tensors()
-        # scale = None
-        # thresh = 0.4
-        b_save_output = True
+        
+        # definitions for loop
+        self.bridge = CvBridge()
         b_first_loop = True
-        ave_time = 0
-        max_time = 0
-
-        # topic_str = '/camera/image_raw'
-        topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', '/vrpn_client_node/bowl_green_msl/pose']
         im_idx = 0
         im_times = []
         quad_pose_times = []
         obj_pose_times = []
         quad_poses = []
         obj_poses = []
-        proj_mat = None
+        ave_time = 0
+        max_time = 0
+        bag_in = rosbag.Bag(rb_path + rb_name, 'r')
+
+        # first read the camera instrinsics and distortion params so we can undistort the images as they are read
         for topic, msg, t in bag_in.read_messages(topics='/quad7/camera/camera_info'):
             K = np.reshape(msg.K, (3, 3))
             dist_coefs = np.reshape(msg.D, (5,))
@@ -119,67 +85,53 @@ class segment_object_pixels:
                 obj_pose_times.append(t)
                 obj_poses.append(pose_to_tf(msg.pose))
                 continue
-            # elif proj_mat is None and topic == '/quad7/camera/camera_info':
-            #     K = np.reshape(msg.K, (3, 3))
-            #     K_3_4 = np.concatenate((K.T, np.zeros((1,3)))).T 
-            #     # proj_mat = K_3_4 @ T_cam_ego 
-            #     if False:
-            #         np.save(cam_param_path + 'camera_projection_matrix_3_by_4.npy', proj_mat, allow_pickle=False)
             elif topic == '/quad7/camera/image_raw':
                 im_times.append(t)
                 image_cv2 = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
                 image_cv2 = cv2.undistort(image_cv2, K, dist_coefs, None, K_undistorted)
-                img_path_and_name = img_out_path + 'image_{:04d}'.format(im_idx) + '.jpg'
+                img_path_and_name = my_dirs["images"] + 'image_{:04d}'.format(im_idx) + '.jpg'
+                cv2.imwrite(img_path_and_name, image_cv2)
                 
                 if b_first_loop:
                     b_first_loop = False
-                    self.tracker = SiammaskTracker(image_cv2, base_dir=base_dir, use_tensorrt=False)
-                    # # GREY BOWL: 285, 275  | 395, 275  | 395, 330  | 285, 330
-                    # init_bb = ((285 + 395)/2, (275+ 330)/2, 395 - 285, 330 - 275)  # box format: x,y,w,h (where x,y correspond to the top left corner)
-                    # init_bb_up_left = (285, 275, 395 - 285, 330 - 275)  # box format: x,y,w,h (where x,y correspond to the top left corner)
-                    # GREEN BOWL: 290, 255  | 335, 255  | 335, 277  | 290, 277
-                    init_bb = ((290 + 335)/2, (255+ 277)/2, 335 - 290, 277 - 255)  # box format: x,y,w,h (where x,y correspond to the top left corner)
-                    init_bb_up_left = (290, 255, 335 - 290, 277 - 255)  # box format: x,y,w,h (where x,y correspond to the top left corner)
+                    self.tracker = SiammaskTracker(image_cv2, base_dir='/root/msl_raptor_ws/src/msl_raptor/src/front_end/', use_tensorrt=False)
                     box0 = np.int0(cv2.boxPoints( ( (init_bb[0], init_bb[1]), (init_bb[2], init_bb[3]), 0)) )
                     next_state = self.tracker.reinit(init_bb_up_left, image_cv2)
                     redImg = np.zeros(image_cv2.shape, image_cv2.dtype)
                     redImg[:,:] = (0, 0, 255)
                     
                 next_state, abb, mask = self.tracker.track(image_cv2, next_state)
-                abb = bb_corners_to_angled_bb(abb.reshape(-1,2))
+                seg_path_and_name_result = my_dirs["seg_masks"] + 'seg_image_{:04d}'.format(im_idx) + '.npy'
+                np.save(seg_path_and_name_result, mask, allow_pickle=False)
 
-                if b_save_output:
-                    img_path_and_name_result = img_det_out_path + 'image_result_{:04d}'.format(im_idx) + '.jpg'
+                if b_save_images_with_masks:
+                    abb = bb_corners_to_angled_bb(abb.reshape(-1,2))
                     box = np.int0(cv2.boxPoints( ( (abb[0], abb[1]), (abb[2], abb[3]), -np.degrees(abb[4]))) )
                     image_cv2_modified = copy(image_cv2)
                     if b_first_loop:
                         cv2.drawContours(image_cv2_modified, [box0], 0, (255,0,0), 2)  # draw init box
                     cv2.drawContours(image_cv2_modified, [box], 0, (0,255,0), 2)
                     
-                    if b_mask:
-                        np_mask = np.array(mask, dtype=np.uint8)
-                        redMask = cv2.bitwise_and(redImg, redImg, mask=np_mask)
-                        alpha = 0.3
-                        cv2.addWeighted(redMask, alpha, image_cv2_modified, 1-alpha, 0, image_cv2_modified)
-                        seg_path_and_name_result = seg_im_out_path + 'seg_image_{:04d}'.format(im_idx) + '.jpg'
-                        cv2.imwrite(seg_path_and_name_result, np_mask)
-                        seg_path_and_name_result = seg_np_out_path + 'seg_image_{:04d}'.format(im_idx) + '.npy'
-                        np.save(seg_path_and_name_result, mask, allow_pickle=False)
+                    np_mask = np.array(mask, dtype=np.uint8)
+                    redMask = cv2.bitwise_and(redImg, redImg, mask=np_mask)
+                    alpha = 0.3
+                    cv2.addWeighted(redMask, alpha, image_cv2_modified, 1-alpha, 0, image_cv2_modified)
+                    # seg_path_and_name_result = seg_im_out_path + 'seg_image_{:04d}'.format(im_idx) + '.jpg'
+                    # cv2.imwrite(seg_path_and_name_result, np_mask)
+                    img_path_and_name_result = my_dirs["masked_images"] + 'masked_image_{:04d}'.format(im_idx) + '.jpg'
+                    cv2.imwrite(img_path_and_name_result, image_cv2_modified)
 
-                
-                cv2.imwrite(img_path_and_name_result, image_cv2_modified)
                 im_idx += 1
-                break
-                if im_idx == 30:
+                if im_idx == max_num_images:
                     break
         bag_in.close()
 
         im_idx = 0
         for im_time in im_times:
-            quad_pose, quad_idx = find_closest_by_time(time_to_match=im_time, time_list=quad_pose_times, message_list=quad_poses)
-            T_w_obj, obj_idx = find_closest_by_time(time_to_match=im_time, time_list=obj_pose_times, message_list=obj_poses)
-            cam_pose_name = pose_out_path + 'cam_pose_{:04d}'.format(im_idx) + '.npy'
-            obj_pose_name = pose_out_path + 'obj_pose_{:04d}'.format(im_idx) + '.npy'
+            quad_pose, _ = find_closest_by_time(time_to_match=im_time, time_list=quad_pose_times, message_list=quad_poses)
+            T_w_obj, _ = find_closest_by_time(time_to_match=im_time, time_list=obj_pose_times, message_list=obj_poses)
+            cam_pose_name = my_dirs["camera_poses"] + 'cam_pose_{:04d}'.format(im_idx) + '.npy'
+            obj_pose_name = my_dirs["bowl_green_msl_poses"] + 'obj_pose_{:04d}'.format(im_idx) + '.npy'
             T_w_ego = quad_pose
             T_w_cam = T_w_ego @ T_ego_cam
             T_obj_w = inv_tf(T_w_obj)
@@ -187,10 +139,9 @@ class segment_object_pixels:
             np.save(obj_pose_name, T_obj_w, allow_pickle=False)
 
             cam_proj_mat = K_3_4 @ T_cam_ego @ inv_tf(T_w_ego) 
-            cam_proj_path_and_name = cam_param_path + 'projection_matrix_{:04d}'.format(im_idx) + '.npy'
+            cam_proj_path_and_name = my_dirs["projection_matrices"] + 'projection_matrix_{:04d}'.format(im_idx) + '.npy'
             np.save(cam_proj_path_and_name, cam_proj_mat, allow_pickle=False)
 
-            b_output_debug_image = True
             if b_output_debug_image and im_idx==0:
                 T_cam_w = inv_tf(T_w_cam)
                 T_cam_obj = T_cam_w @ T_w_obj
@@ -222,6 +173,44 @@ class segment_object_pixels:
         else:
             print("WARNING: No images in rosbag with topic {}".format(topic_str))
 
+
+    def construct_directory_structure(self, base_directory_path, b_save_images_with_masks=False):
+        my_dir_dict = {}
+        my_dir_dict["base"] = base_directory_path
+        my_dir_dict["images"] = base_directory_path + 'images/'
+        my_dir_dict["seg_masks"] = base_directory_path + 'seg_masks/'
+        my_dir_dict["camera_poses"] = base_directory_path + 'camera_poses/'
+        my_dir_dict["bowl_green_msl_poses"] = base_directory_path + 'bowl_green_msl_poses/'
+        my_dir_dict["projection_matrices"] = base_directory_path + 'projection_matrices/'
+        if b_save_images_with_masks:
+            my_dir_dict["masked_images"] = base_directory_path + 'masked_images/'
+
+        for path in my_dir_dict:
+            if not os.path.exists(my_dir_dict[path]):
+                os.mkdir(my_dir_dict[path])
+        print("done making directory structure")
+        return my_dir_dict
+
+    def construct_camera_transform(self):
+        # this assumes camera axis is +z and y is down. OpenGL assumes cam axis is -z and y is up
+        R_cam_ego = np.reshape([-0.0246107,  -0.99869617, -0.04472445,  -0.05265648,  0.0459709,  -0.99755399, 0.99830938, -0.02219547, -0.0537192], (3,3))
+        t_cam_ego = np.asarray([0.11041654, 0.06015242, -0.07401183])
+        
+        T_cam_ego = np.eye(4)
+        T_cam_ego[0:3, 0:3] = R_cam_ego
+        T_cam_ego[0:3, 3] = t_cam_ego
+        T_ego_cam = np.eye(4)
+        T_ego_cam[0:3, 0:3] = R_cam_ego.T
+        T_ego_cam[0:3, 3] = -R_cam_ego.T @ t_cam_ego
+
+        # T_cam_camGL = np.eye(4)
+        T_cam_camGL = np.array([[ 1,  0,  0, 0],
+                                [ 0, -1,  0, 0],
+                                [ 0,  0, -1, 0],
+                                [ 0,  0,  0, 1]])
+        T_ego_cam = T_ego_cam @ T_cam_camGL
+        T_cam_ego = inv_tf(T_cam_camGL) @ T_cam_ego
+        return T_cam_ego, T_ego_cam
 
 if __name__ == '__main__':
     np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
