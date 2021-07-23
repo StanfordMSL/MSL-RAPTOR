@@ -95,7 +95,7 @@ class segment_object_pixels:
         max_time = 0
 
         # topic_str = '/camera/image_raw'
-        topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', '/vrpn_client_node/bowl_green_msl/pose', '/quad7/camera/camera_info']
+        topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', '/vrpn_client_node/bowl_green_msl/pose']
         im_idx = 0
         im_times = []
         quad_pose_times = []
@@ -103,6 +103,13 @@ class segment_object_pixels:
         quad_poses = []
         obj_poses = []
         proj_mat = None
+        for topic, msg, t in bag_in.read_messages(topics='/quad7/camera/camera_info'):
+            K = np.reshape(msg.K, (3, 3))
+            dist_coefs = np.reshape(msg.D, (5,))
+            K_undistorted, _ = cv2.getOptimalNewCameraMatrix(K, dist_coefs, (msg.width, msg.height), 0, (msg.width, msg.height))
+            K_3_4 = np.concatenate((K_undistorted.T, np.zeros((1,3)))).T
+            break
+
         for topic, msg, t in bag_in.read_messages(topics=topic_str):
             if topic == '/vrpn_client_node/quad7/pose':
                 quad_pose_times.append(t)
@@ -112,15 +119,16 @@ class segment_object_pixels:
                 obj_pose_times.append(t)
                 obj_poses.append(pose_to_tf(msg.pose))
                 continue
-            elif proj_mat is None and topic == '/quad7/camera/camera_info':
-                K = np.reshape(msg.K, (3, 3))
-                K_3_4 = np.concatenate((K.T, np.zeros((1,3)))).T 
-                proj_mat = K_3_4 @ T_cam_ego
-                if False:
-                    np.save(cam_param_path + 'camera_projection_matrix_3_by_4.npy', proj_mat, allow_pickle=False)
+            # elif proj_mat is None and topic == '/quad7/camera/camera_info':
+            #     K = np.reshape(msg.K, (3, 3))
+            #     K_3_4 = np.concatenate((K.T, np.zeros((1,3)))).T 
+            #     # proj_mat = K_3_4 @ T_cam_ego 
+            #     if False:
+            #         np.save(cam_param_path + 'camera_projection_matrix_3_by_4.npy', proj_mat, allow_pickle=False)
             elif topic == '/quad7/camera/image_raw':
                 im_times.append(t)
                 image_cv2 = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+                image_cv2 = cv2.undistort(image_cv2, K, dist_coefs, None, K_undistorted)
                 img_path_and_name = img_out_path + 'image_{:04d}'.format(im_idx) + '.jpg'
                 
                 if b_first_loop:
@@ -169,26 +177,38 @@ class segment_object_pixels:
         im_idx = 0
         for im_time in im_times:
             quad_pose, quad_idx = find_closest_by_time(time_to_match=im_time, time_list=quad_pose_times, message_list=quad_poses)
-            obj_pose, obj_idx = find_closest_by_time(time_to_match=im_time, time_list=obj_pose_times, message_list=obj_poses)
+            T_w_obj, obj_idx = find_closest_by_time(time_to_match=im_time, time_list=obj_pose_times, message_list=obj_poses)
             cam_pose_name = pose_out_path + 'cam_pose_{:04d}'.format(im_idx) + '.npy'
             obj_pose_name = pose_out_path + 'obj_pose_{:04d}'.format(im_idx) + '.npy'
             T_w_ego = quad_pose
             T_w_cam = T_w_ego @ T_ego_cam
-            T_obj_w = inv_tf(obj_pose)
+            T_obj_w = inv_tf(T_w_obj)
             np.save(cam_pose_name, T_w_cam, allow_pickle=False)
             np.save(obj_pose_name, T_obj_w, allow_pickle=False)
-            if proj_mat is not None:
-                cam_proj_mat = proj_mat @ inv_tf(T_w_cam)
-                cam_proj_path_and_name = cam_param_path + 'projection_matrix_{:04d}'.format(im_idx) + '.npy'
-                np.save(cam_proj_path_and_name, cam_proj_mat, allow_pickle=False)
-                # pdb.set_trace()
 
-                # world_origin_px = cam_proj_mat @ np.array([[0],[0],[0],[1]])
-                # world_origin_px = np.array([world_origin_px[0,0], world_origin_px[1,0]]) / world_origin_px[2,0]
-                # (x, y) = world_origin_px  # note I am not sure if world_origin_px is (row, col) or (col,row)
-                # image_cv2 = cv2.circle(image_cv2, (np.round(x), np.round(y)), radius=2, color=(255, 0, 0), thickness=1)
-                # cv2.imwrite("/mounted_folder/testtestest.png", image_cv2)
-                # pdb.set_trace()
+            cam_proj_mat = K_3_4 @ T_cam_ego @ inv_tf(T_w_ego) 
+            cam_proj_path_and_name = cam_param_path + 'projection_matrix_{:04d}'.format(im_idx) + '.npy'
+            np.save(cam_proj_path_and_name, cam_proj_mat, allow_pickle=False)
+
+            b_output_debug_image = True
+            if b_output_debug_image and im_idx==0:
+                T_cam_w = inv_tf(T_w_cam)
+                T_cam_obj = T_cam_w @ T_w_obj
+                pnt_c = np.concatenate((T_cam_obj[0:3, 3], [1]))
+                
+                org_px = K_3_4 @ pnt_c
+                (x, y) = np.round(np.array([org_px[0], org_px[1]]) / org_px[2]).astype(np.int)  # pixel of origin of bowl in image:  313 from left, 270 from top
+                image_cv2 = cv2.circle(image_cv2, (x, y), radius=2, color=(0, 0, 255), thickness=-1)
+
+                pnt_w = np.concatenate((T_w_obj[0:3, 3], [1]))
+                world_origin_px = cam_proj_mat @ pnt_w
+                world_origin_px = np.array([world_origin_px[0], world_origin_px[1]]) / world_origin_px[2]
+                (x, y) = np.round(world_origin_px).astype(np.int)  # note I am not sure if world_origin_px is (row, col) or (col,row)
+                image_cv2 = cv2.circle(image_cv2, (x, y), radius=1, color=(0, 255, 0), thickness=-1)
+
+                cv2.imwrite("/mounted_folder/testtestest.png", image_cv2)
+                pdb.set_trace()
+            
             im_idx += 1
             if im_idx == 30:
                 break
