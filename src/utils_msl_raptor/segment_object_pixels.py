@@ -130,22 +130,27 @@ class segment_object_pixels:
         for im_time in im_times:
             quad_pose, _ = find_closest_by_time(time_to_match=im_time, time_list=quad_pose_times, message_list=quad_poses)
             T_w_obj, _ = find_closest_by_time(time_to_match=im_time, time_list=obj_pose_times, message_list=obj_poses)
+            T_w_obj[2,3] = (67.5/1000)/2  # shift the origin of the bowl to the center of it's bounding box. It's dims are 1770 x 170, x 67.5 (mm)
+
             cam_pose_name = my_dirs["camera_poses"] + 'cam_pose_{:04d}'.format(im_idx) + '.npy'
             obj_pose_name = my_dirs["bowl_green_msl_poses"] + 'obj_pose_{:04d}'.format(im_idx) + '.npy'
             T_w_ego = quad_pose
             T_w_cam = T_w_ego @ T_ego_cam
-            T_obj_w = inv_tf(T_w_obj)
             np.save(cam_pose_name, T_w_cam, allow_pickle=False)
-            np.save(obj_pose_name, T_obj_w, allow_pickle=False)
+            np.save(obj_pose_name, T_w_obj, allow_pickle=False)
 
-            K_3_4_mod = copy(K_3_4)
-            K_3_4_mod[0:3, 2] *= -1
-            cam_proj_mat = K_3_4_mod @ T_cam_ego @ inv_tf(T_w_ego) 
+            K_3_4_openGL = copy(K_3_4)
+            K_3_4_openGL[0,2] = 640 - K_3_4_openGL[0,2]
+            K_3_4_openGL[1,2] = 480 - K_3_4_openGL[1,2]
+            K_3_4_openGL[0:3, 2] *= -1
+            cam_proj_matK_3_4_openGL = K_3_4_openGL @ T_cam_ego @ inv_tf(T_w_ego) 
             cam_proj_path_and_name = my_dirs["projection_matrices"] + 'projection_matrix_{:04d}'.format(im_idx) + '.npy'
-            np.save(cam_proj_path_and_name, cam_proj_mat, allow_pickle=False)
+            np.save(cam_proj_path_and_name, cam_proj_matK_3_4_openGL, allow_pickle=False)
 
             if b_output_debug_image and im_idx==0:
+                cam_proj_mat = K_3_4 @ T_cam_ego @ inv_tf(T_w_ego) 
                 T_cam_w = inv_tf(T_w_cam)
+
                 T_cam_obj = T_cam_w @ T_w_obj
                 pnt_c = np.concatenate((T_cam_obj[0:3, 3], [1]))
                 
@@ -157,11 +162,14 @@ class segment_object_pixels:
                 world_origin_px = cam_proj_mat @ pnt_w
                 world_origin_px = np.array([world_origin_px[0], world_origin_px[1]]) / world_origin_px[2]
                 (x, y) = np.round(world_origin_px).astype(np.int)  # note I am not sure if world_origin_px is (row, col) or (col,row)
-                x = 640 - x
+                x = 640 - x  # WHY???
                 image_cv2 = cv2.circle(image_cv2, (x, y), radius=1, color=(0, 255, 0), thickness=-1)
 
                 cv2.imwrite("/mounted_folder/testtestest.png", image_cv2)
-                pdb.set_trace()
+
+            cam_fov_x = 2 * np.arctan(640/(2*K[0,0]))
+            cam_fov_y = 2 * np.arctan(480/(2*K[1,1]))
+            pdb.set_trace()
             
             im_idx += 1
             if im_idx == 30:
