@@ -138,7 +138,9 @@ class segment_object_pixels:
             np.save(cam_pose_name, T_w_cam, allow_pickle=False)
             np.save(obj_pose_name, T_obj_w, allow_pickle=False)
 
-            cam_proj_mat = K_3_4 @ T_cam_ego @ inv_tf(T_w_ego) 
+            K_3_4_mod = copy(K_3_4)
+            K_3_4_mod[0:3, 2] *= -1
+            cam_proj_mat = K_3_4_mod @ T_cam_ego @ inv_tf(T_w_ego) 
             cam_proj_path_and_name = my_dirs["projection_matrices"] + 'projection_matrix_{:04d}'.format(im_idx) + '.npy'
             np.save(cam_proj_path_and_name, cam_proj_mat, allow_pickle=False)
 
@@ -155,6 +157,7 @@ class segment_object_pixels:
                 world_origin_px = cam_proj_mat @ pnt_w
                 world_origin_px = np.array([world_origin_px[0], world_origin_px[1]]) / world_origin_px[2]
                 (x, y) = np.round(world_origin_px).astype(np.int)  # note I am not sure if world_origin_px is (row, col) or (col,row)
+                x = 640 - x
                 image_cv2 = cv2.circle(image_cv2, (x, y), radius=1, color=(0, 255, 0), thickness=-1)
 
                 cv2.imwrite("/mounted_folder/testtestest.png", image_cv2)
