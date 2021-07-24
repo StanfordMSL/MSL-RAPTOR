@@ -35,7 +35,8 @@ class segment_object_pixels:
 
     def __init__(self):
         # INPUTS
-        max_num_images = 1
+        max_num_images = 30  # set to -1 to have no limit
+        image_skip_rate = 50  # set to 1 to use every image, 2 to use every other, etc etc
         b_save_images_with_masks = False
         b_output_debug_image = False
         topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', '/vrpn_client_node/bowl_green_msl/pose']
@@ -59,6 +60,7 @@ class segment_object_pixels:
         self.bridge = CvBridge()
         b_first_loop = True
         im_idx = 0
+        im_save_idx = 0
         im_times = []
         quad_pose_times = []
         obj_pose_times = []
@@ -86,10 +88,13 @@ class segment_object_pixels:
                 obj_poses.append(pose_to_tf(msg.pose))
                 continue
             elif topic == '/quad7/camera/image_raw':
+                if im_idx % image_skip_rate > 0:
+                    im_idx += 1
+                    continue
                 im_times.append(t)
                 image_cv2 = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
                 image_cv2 = cv2.undistort(image_cv2, K, dist_coefs, None, K_undistorted)
-                img_path_and_name = my_dirs["images"] + 'image_{:04d}'.format(im_idx) + '.jpg'
+                img_path_and_name = my_dirs["images"] + 'image_{:04d}'.format(im_save_idx) + '.jpg'
                 cv2.imwrite(img_path_and_name, image_cv2)
                 
                 if b_first_loop:
@@ -101,7 +106,7 @@ class segment_object_pixels:
                     redImg[:,:] = (0, 0, 255)
                     
                 next_state, abb, mask = self.tracker.track(image_cv2, next_state)
-                seg_path_and_name_result = my_dirs["seg_masks"] + 'seg_image_{:04d}'.format(im_idx) + '.npy'
+                seg_path_and_name_result = my_dirs["seg_masks"] + 'seg_image_{:04d}'.format(im_save_idx) + '.npy'
                 np.save(seg_path_and_name_result, mask, allow_pickle=False)
 
                 if b_save_images_with_masks:
@@ -116,24 +121,25 @@ class segment_object_pixels:
                     redMask = cv2.bitwise_and(redImg, redImg, mask=np_mask)
                     alpha = 0.3
                     cv2.addWeighted(redMask, alpha, image_cv2_modified, 1-alpha, 0, image_cv2_modified)
-                    # seg_path_and_name_result = seg_im_out_path + 'seg_image_{:04d}'.format(im_idx) + '.jpg'
+                    # seg_path_and_name_result = seg_im_out_path + 'seg_image_{:04d}'.format(im_save_idx) + '.jpg'
                     # cv2.imwrite(seg_path_and_name_result, np_mask)
-                    img_path_and_name_result = my_dirs["masked_images"] + 'masked_image_{:04d}'.format(im_idx) + '.jpg'
+                    img_path_and_name_result = my_dirs["masked_images"] + 'masked_image_{:04d}'.format(im_save_idx) + '.jpg'
                     cv2.imwrite(img_path_and_name_result, image_cv2_modified)
 
                 im_idx += 1
-                if im_idx == max_num_images:
+                im_save_idx += 1
+                if max_num_images > 0 and im_save_idx >= max_num_images:
                     break
         bag_in.close()
 
-        im_idx = 0
+        im_save_idx = 0
         for im_time in im_times:
             quad_pose, _ = find_closest_by_time(time_to_match=im_time, time_list=quad_pose_times, message_list=quad_poses)
             T_w_obj, _ = find_closest_by_time(time_to_match=im_time, time_list=obj_pose_times, message_list=obj_poses)
             T_w_obj[2,3] = (67.5/1000)/2  # shift the origin of the bowl to the center of it's bounding box. It's dims are 1770 x 170, x 67.5 (mm)
 
-            cam_pose_name = my_dirs["camera_poses"] + 'cam_pose_{:04d}'.format(im_idx) + '.npy'
-            obj_pose_name = my_dirs["bowl_green_msl_poses"] + 'obj_pose_{:04d}'.format(im_idx) + '.npy'
+            cam_pose_name = my_dirs["camera_poses"] + 'cam_pose_{:04d}'.format(im_save_idx) + '.npy'
+            obj_pose_name = my_dirs["bowl_green_msl_poses"] + 'obj_pose_{:04d}'.format(im_save_idx) + '.npy'
             T_w_ego = quad_pose
             T_w_cam = T_w_ego @ T_ego_cam
             np.save(cam_pose_name, T_w_cam, allow_pickle=False)
@@ -144,10 +150,10 @@ class segment_object_pixels:
             K_3_4_openGL[1,2] = 480 - K_3_4_openGL[1,2]
             K_3_4_openGL[0:3, 2] *= -1
             cam_proj_matK_3_4_openGL = K_3_4_openGL @ T_cam_ego @ inv_tf(T_w_ego) 
-            cam_proj_path_and_name = my_dirs["projection_matrices"] + 'projection_matrix_{:04d}'.format(im_idx) + '.npy'
+            cam_proj_path_and_name = my_dirs["projection_matrices"] + 'projection_matrix_{:04d}'.format(im_save_idx) + '.npy'
             np.save(cam_proj_path_and_name, cam_proj_matK_3_4_openGL, allow_pickle=False)
 
-            if b_output_debug_image and im_idx==0:
+            if b_output_debug_image and im_save_idx==0:
                 cam_proj_mat = K_3_4 @ T_cam_ego @ inv_tf(T_w_ego) 
                 T_cam_w = inv_tf(T_w_cam)
 
@@ -169,12 +175,10 @@ class segment_object_pixels:
 
             cam_fov_x = 2 * np.arctan(640/(2*K[0,0]))
             cam_fov_y = 2 * np.arctan(480/(2*K[1,1]))
-            pdb.set_trace()
             
-            im_idx += 1
-            if im_idx == 30:
-                break
+            im_save_idx += 1
 
+        pdb.set_trace()
 
         # find corresponding time to find which poses correspond to which images
         print('Done with bag!')
