@@ -1,0 +1,38 @@
+<launch>
+  <arg name="id"               default="7" />
+  <arg name="robot_type"       default="quad" />
+  <arg name="ns"               value="/$(arg robot_type)$(arg id)" />
+  <arg name="b_camera"         default="true" />
+  <arg name="b_use_gt_bb"      default="false" />
+  <arg name="b_enforce_0_yaw"  default="true" />
+  <arg name="detection_period" default="5" /> <!-- period to use to redo safety detection in seconds -->
+  <arg name="b_rosbag"         default="false" />  <!-- boolean if we are reading data from a rosbag -->
+  <arg name="rb_out_path"      default="/mounted_folder/rosbags_for_post_process/" />  <!-- path to the rosbag -->
+  <arg name="rb_name_prefix"   default="rosbag_for_post_process" /> <!-- name of the rosbag -->
+  <arg name="rb_start_delay"   default="2.0" /> <!-- how long to delay the start of the rosbag -->
+  
+  <param name="use_sim_time" value="false" />
+  
+  <node pkg="tf" type="static_transform_publisher" name="trans_pub_map_world"
+        args="0 0 0 0 0 0 /map /world 10"> 
+  </node>
+
+  <!-- IF using camera, launch our node -->
+  <group ns="$(arg ns)">
+    <include file="$(find ocam_msl)/launch/ocam_ros.launch" >
+        <arg name="resolution"       value="0"/> <!-- These are the default cropping configurations from Ocam:  resolution: 0: 1280x960, 1: 1280x720, 2: 640x480, 3: 640x360    frame_rate: USB3.0 - 1280x960@45fps, 1280x720@60fps, 640x480@80fps, 320x240@160fps   USB2.0 - 1280x960@22.5fps, 1280x720@30fps, 640x480@80fps, 320x240@160fps -->
+        <arg name="frame_rate"       value="22.5"/>
+        <arg name="image_width"      value="640"/>
+        <arg name="image_height"     value="480" />
+        <arg name="camera_frame_id"  value="$(arg ns)/camera" />
+    </include>
+  </group>
+
+  <!-- Launch our main node -->
+  <node name="camera_cal_test_node_$(arg robot_type)$(arg id)" pkg="msl_raptor" type="camera_cal_test.py" output="screen">
+    <param name="ns"  value="$(arg ns)"/> 
+    <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
+  </node>
+
+</launch>
+
