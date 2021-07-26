@@ -29,7 +29,7 @@
   </group>
 
   <!-- Launch our main node -->
-  <node name="camera_cal_test_node_$(arg robot_type)$(arg id)" pkg="msl_raptor" type="camera_cal_test_node.py" output="screen">
+  <node name="camera_cal_test_node_$(arg robot_type)$(arg id)" pkg="msl_raptor" type="camera_cal_test.py" output="screen">
     <param name="ns"  value="$(arg ns)"/> 
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
   </node>

@@ -14,8 +14,10 @@ from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
 import tf
 # libs & utils
-# from utils_msl_raptor.ros_utils import *
-# from utils_msl_raptor.ukf_utils import *
+sys.path.insert(1, '/root/msl_raptor_ws/src/msl_raptor/src')
+from utils_msl_raptor.ros_utils import pose_to_tf, get_ros_time
+from utils_msl_raptor.ukf_utils import inv_tf
+from utils_msl_raptor.viz_utils import draw_2d_proj_of_3D_bounding_box
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -28,24 +30,28 @@ class camera_cal_test_node:
 
     def __init__(self):
         rospy.init_node('camera_cal_test_node', anonymous=True)
-        self.itr = 0
         self.bridge = CvBridge()
-
         self.ns = rospy.get_param('~ns')  # robot namespace
-        self.overlaid_img = None
         
         camera_info = rospy.wait_for_message(self.ns + '/camera/camera_info', CameraInfo, 30)
-        self.K = np.reshape(camera_info.K, (3, 3))
-        
+        if False:
+            self.K = np.reshape(camera_info.K, (3, 3))
+            if len(camera_info.D) == 5:
+                self.dist_coefs = np.reshape(camera_info.D, (5,))
+                self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
+            else:
+                self.dist_coefs = None
+                self.new_camera_matrix = self.K
+        else:
+           self.dist_coefs = np.array([-0.40031982,  0.14257124,  0.00020686,  0.00030526,  0.        ])
+           self.K = np.array([[483.50426183,   0.        , 318.29104565],
+                              [  0.        , 483.89448247, 248.02496288],
+                              [  0.        ,   0.        ,   1.        ]])
+           self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
+
+        self.K_3_4_undistorted = np.concatenate((self.new_camera_matrix.T, np.zeros((1,3)))).T
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1, buff_size=2**21)
         self.img_overlay_pub = rospy.Publisher(self.ns + '/image_bb_overlay', Image, queue_size=5)
-
-        if len(camera_info.D) == 5:
-            self.dist_coefs = np.reshape(camera_info.D, (5,))
-            self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
-        else:
-            self.dist_coefs = None
-            self.new_camera_matrix = self.K
 
         self.img_buffer = ([], [])
         self.img_rosmesg_buffer_len = 500
@@ -59,14 +65,28 @@ class camera_cal_test_node:
         self.ado_pose_rosmesg_buffer_gt = ([], [])
         self.ado_pose_rosmesg_buffer_len = 50
         self.ado_pose_gt_rosmsg = None
-        
-        rospy.Subscriber('/vrpn_client_node/' + self.ns + 'pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
+
+        test_ego_object_name = 'quad7'
+        # test_ego_object_name = 'AAA'
+        test_ego_object_topic = '/vrpn_client_node/' + test_ego_object_name + '/pose'
+        rospy.Subscriber(test_ego_object_topic, PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
 
         test_ado_object_name = 'bowl_green_msl'
-        test_ado_object_topic = '/vrpn_client_node/' + test_ado_object_name + 'pose'
+        # test_ado_object_name = 'BBB'
+        test_ado_object_topic = '/vrpn_client_node/' + test_ado_object_name + '/pose'
         rospy.Subscriber(test_ado_object_topic, PoseStamped, self.ado_pose_gt_cb, queue_size=10)
-        # self.all_white_image = 255 * np.ones((camera_info.height, camera_info.width, 3), np.uint8)
-        # self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(self.all_white_image, "bgr8"))
+        self.ado_3d_bb_dims = np.array([170, 170, 67.5])/1000  # x, y, z dim in meters (local frame)
+
+
+        self.R_cam_ego = np.reshape([-0.0246107,  -0.99869617, -0.04472445,  -0.05265648,  0.0459709,  -0.99755399, 0.99830938, -0.02219547, -0.0537192], (3,3))
+        self.t_cam_ego = np.asarray([0.11041654, 0.06015242, -0.07401183])
+        
+        self.T_cam_ego = np.eye(4)
+        self.T_cam_ego[0:3, 0:3] = self.R_cam_ego
+        self.T_cam_ego[0:3, 3] = self.t_cam_ego
+        self.T_ego_cam = np.eye(4)
+        self.T_ego_cam[0:3, 0:3] = self.R_cam_ego.T
+        self.T_ego_cam[0:3, 3] = -self.R_cam_ego.T @ self.t_cam_ego
 
     
     def ado_pose_gt_cb(self, msg):
@@ -143,90 +163,96 @@ class camera_cal_test_node:
         else:
             return message_list[pos - 1], pos - 1
 
-
-    def bb_viz_cb(self, bb_list_msg):
-        """
-        custom list of angled bb message type:
-            Header header  # ros timestamp etc
-            float64 x  # x coordinate of center of bounding box
-            float64 y  # y coordinate of center of bounding box
-            float64 width  # width (long axis) of bounding box
-            float64 height  # height (short axis) of bounding box
-            float64 angle  # angle in radians
-            uint8 im_seg_mode  # self.DETECT = 1  self.TRACK = 2  self.FAKED_BB = 3  self.IGNORE = 4
-        """
-        num_abbs = len(bb_list_msg.boxes)
-        if num_abbs == 0 or (self.b_overlay and (not self.img_buffer or len(self.img_buffer[0]) == 0)):
-            return
-        elif self.b_overlay:
-            my_time = bb_list_msg.header.stamp.to_sec()
-            im_msg, pos_in_queue = self.find_closest_by_time_ros2(my_time, self.img_buffer[1], self.img_buffer[0])
-            print("queue pos: {}".format(pos_in_queue))
-            image = self.bridge.imgmsg_to_cv2(im_msg, desired_encoding="bgr8")
-            image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
-        else:
-            image = copy(self.all_white_image)
-
-        for bb_msg in bb_list_msg.boxes:
-            
-            im_seg_mode = bb_msg.im_seg_mode
-            if im_seg_mode == self.DETECT:
-                box_color = (0,0,255)  # RED
-            elif im_seg_mode == self.TRACK:
-                box_color = (0,255,0)  # GREEN
-            elif im_seg_mode == self.FAKED_BB:
-                box_color = (255,0,0)  # BLUE
-                if self.itr % 50 == 0:
-                    print("simulating bounding box - DEBUGGING ONLY")
-            else:
-                print("not detecting nor tracking! (seg mode: {})".format(im_seg_mode))
-                box_color = (255,0,0)
-            # bb_data = msg.data[0:-2]
-
-            box = np.int0(cv2.boxPoints( ( (bb_msg.x, bb_msg.y), (bb_msg.width, bb_msg.height), -np.degrees(bb_msg.angle))) )
-            cv2.drawContours(image, [box], 0, box_color, 2)
-        self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(image, "bgr8"))
-        if False:
-            cv2.imwrite('/mounted_folder/front_end_imgs/front_end_{}.png'.format(self.itr), image)
-        self.itr += 1
-        # pdb.set_trace()
-
-
     def run(self):
         rate = rospy.Rate(15)
 
         while not rospy.is_shutdown():
-            if len(self.img_buffer[0]) > 0:
+            # print("{} and {} and {}".format(len(self.img_buffer[0]), len(self.ego_pose_rosmesg_buffer_gt[0]), len(self.ado_pose_rosmesg_buffer_gt[0])))
+            if len(self.img_buffer[0]) > 0 and len(self.ego_pose_rosmesg_buffer_gt[0]) > 0 and len(self.ado_pose_rosmesg_buffer_gt[0]) > 0:
+                # get & undistort image
                 img_msg = self.img_buffer[0][-1]
-                img_time = self.img_buffer[1][-1]
-                ego_pose_msg, pos_in_queue_ego = self.find_closest_by_time_ros2(img_time, self.ego_pose_rosmesg_buffer_gt[1], self.ego_pose_rosmesg_buffer_gt[0])
-                ado_pose_msg, pos_in_queue_ado = self.find_closest_by_time_ros2(img_time, self.ado_pose_rosmesg_buffer_gt[1], self.ado_pose_rosmesg_buffer_gt[0])
+                open_cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
+                open_cv_image = cv2.undistort(open_cv_image, self.K, self.dist_coefs, None, self.new_camera_matrix)
 
-                # generate corners in ado frame
-                corners = []
-                for x in [-0.5, 0.5]:
-                    for y in [-0.5, 0.5]:
-                        for z in [-0.5, 0.5]:
-                            corners.append(np.array([x, y, z, 1]))
-                corners = np.stack(corners, axis=-1)
+                if True:
+                    # get pose data
+                    img_time = self.img_buffer[1][-1]
+                    T_w_ego_gt = pose_to_tf(self.find_closest_by_time_ros2(img_time, self.ego_pose_rosmesg_buffer_gt[1], self.ego_pose_rosmesg_buffer_gt[0])[0])
+                    T_w_ado_gt = pose_to_tf(self.find_closest_by_time_ros2(img_time, self.ado_pose_rosmesg_buffer_gt[1], self.ado_pose_rosmesg_buffer_gt[0])[0])
+                    T_w_ado_gt[2,3] = self.ado_3d_bb_dims[2]/2  # shift the origin of the bowl to the center of it's bounding box. It's dims are 170 x 170, x 67.5 (mm)
+                    T_ego_ado = inv_tf(T_w_ego_gt) @ T_w_ado_gt
+                    T_cam_ado = self.T_cam_ego @ T_ego_ado
 
-                corners_cam_frame = T_c_a @ corners
-                bb_pix = self.new_camera_matrix @ corners_cam_frame
+                    # draw bounding box
+                    # generate corners in ado frame
+                    # corners = []
+                    # for x in [-0.5, 0.5]:
+                    #     for y in [-0.5, 0.5]:
+                    #         for z in [-0.5, 0.5]:
+                    #             corners.append(np.array([x, y, z, 1]))
+                    # corners = np.stack(corners, axis=-1)
+                    box_length, box_width, box_height = self.ado_3d_bb_dims
+                    vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
+                                         [ box_length/2, box_width/2,-box_height/2, 1.],
+                                         [ box_length/2,-box_width/2,-box_height/2, 1.],
+                                         [ box_length/2,-box_width/2, box_height/2, 1.],
+                                         [-box_length/2,-box_width/2, box_height/2, 1.],
+                                         [-box_length/2,-box_width/2,-box_height/2, 1.],
+                                         [-box_length/2, box_width/2,-box_height/2, 1.],
+                                         [-box_length/2, box_width/2, box_height/2, 1.]]).T
+
+
+                    corners_cam_frame = T_cam_ado @ vertices
+                    corners2D_scaled = self.K_3_4_undistorted @ corners_cam_frame
+                    corners2D = np.empty((corners2D_scaled.shape[1], 2))
+                    for idx, corner_scaled in enumerate(corners2D_scaled.T):
+                        corners2D[idx, :] = np.asarray((corner_scaled[0], corner_scaled[1])/corner_scaled[2])
+
+
+                    # connected_inds = np.array([[0, 1], [1, 2], [2, 3], [3, 0],  # edges of front surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
+                    #                            [7, 4], [4, 5], [5, 6], [6, 7],  # edges of back surface of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
+                    #                            [0, 7], [1, 6], [2, 5], [3, 4]]) # horizontal edges of 3D bb (starting at "upper left" and going counter-clockwise while facing the way the object is)
+
+                    inds_to_connect = [[0, 3], [3, 2], [2, 1], [1, 0], [7, 4], [4, 5], 
+                                    [5, 6], [6, 7], [3, 4], [2, 5], [0, 7], [1, 6]]
+                    cv_image_with_box = draw_2d_proj_of_3D_bounding_box(open_cv_image, corners2D, corners2D_gt=None, color_pr=(0,0,255), linewidth=1, inds_to_connect=inds_to_connect, b_verts_only=False)
+                    cv2.imwrite("/mounted_folder/testtestest4.png", cv_image_with_box)
+                    # pdb.set_trace()
+                else:
+                    cv_image_with_box = open_cv_image
+                    open_cv_image2 = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
+                    cv2.imwrite("/mounted_folder/testtestest3.png", open_cv_image2)
+                    cv2.imwrite("/mounted_folder/testtestest2.png", open_cv_image)
                 
-
-                image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
-                image = cv2.undistort(image, self.K, self.dist_coefs, None, self.new_camera_matrix)
-
-
-                self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(image, "bgr8"))
+                self.img_overlay_pub.publish(self.bridge.cv2_to_imgmsg(cv_image_with_box, "bgr8"))
+                # pdb.set_trace()
             rate.sleep()
 
 
 if __name__ == '__main__':
+    np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
     try:
         program = camera_cal_test_node()
         program.run()
     except:
         import traceback
         traceback.print_exc()
+    print("--------------- FINISHED ---------------")
 
+
+
+# # new thing
+# array([-0.44591373,  0.27564584,  0.        ,  0.        , -0.112326  ])
+
+
+# ## seg
+# array([-0.40031982,  0.14257124,  0.00020686,  0.00030526,  0.        ])
+
+# (Pdb) K
+# array([[483.50426183,   0.        , 318.29104565],
+#        [  0.        , 483.89448247, 248.02496288],
+#        [  0.        ,   0.        ,   1.        ]])
+# (Pdb) K_undistorted
+# array([[381.80621338,   0.        , 317.82922388],
+#        [  0.        , 430.04415894, 250.37380723],
+#        [  0.        ,   0.        ,   1.        ]])
