@@ -29,6 +29,7 @@ class calibrate_camera:
     """
 
     def __init__(self):
+        b_show_checkerboards = False
 
         path_to_imgs = "/mounted_folder/rosbags_for_post_process/camera_cal/2021_07_26/chosen_images/"
 
@@ -55,6 +56,7 @@ class calibrate_camera:
 
         images = glob.glob(path_to_imgs + "*.jpg")
         image = None
+        found_ckbrd = 0 
         for filename in images:
             image = cv2.imread(filename)
             grayColor = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -80,18 +82,20 @@ class calibrate_camera:
         
                 twodpoints.append(corners2)
         
-                # Draw and display the corners
-                image = cv2.drawChessboardCorners(image, CHECKERBOARD, corners2, ret)
+                if b_show_checkerboards:
+                    # Draw and display the corners
+                    image = cv2.drawChessboardCorners(image, CHECKERBOARD, corners2, ret)
+                found_ckbrd +=1
                 
 
- 
-            cv2.imshow('img', image)
-            cv2.waitKey(0)
+            if b_show_checkerboards:
+                cv2.imshow('img', image)
+                cv2.waitKey(0)
+        if b_show_checkerboards:
+            cv2.destroyAllWindows()
 
-        cv2.destroyAllWindows()
+        print("Found checkerboard pattern in {} images out of {}".format(found_ckbrd, len(images)))
 
-        pdb.set_trace()
-    
         h, w = image.shape[:2]
 
         # Perform camera calibration by
@@ -122,7 +126,6 @@ if __name__ == '__main__':
     np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
     try:
         program = calibrate_camera()
-        program.run()
     except:
         import traceback
         traceback.print_exc()
