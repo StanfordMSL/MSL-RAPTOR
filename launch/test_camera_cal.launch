@@ -2,16 +2,21 @@
   <arg name="id"               default="7" />
   <arg name="robot_type"       default="quad" />
   <arg name="ns"               value="/$(arg robot_type)$(arg id)" />
-  <arg name="b_camera"         default="true" />
+  <arg name="b_camera"         default="false" />
   <arg name="b_use_gt_bb"      default="false" />
   <arg name="b_enforce_0_yaw"  default="true" />
   <arg name="detection_period" default="5" /> <!-- period to use to redo safety detection in seconds -->
-  <arg name="b_rosbag"         default="false" />  <!-- boolean if we are reading data from a rosbag -->
-  <arg name="rb_out_path"      default="/mounted_folder/rosbags_for_post_process/" />  <!-- path to the rosbag -->
-  <arg name="rb_name_prefix"   default="rosbag_for_post_process" /> <!-- name of the rosbag -->
+  <arg name="b_rosbag"         default="true" />  <!-- boolean if we are reading data from a rosbag -->
+  <arg name="rb_path_in"       default="/mounted_folder/rosbags_for_post_process/camera_cal/" />  <!-- path to the rosbag -->
+  <arg name="rb_name"          default="rosbag_for_post_process_2021-07-26-14-35-32" /> <!-- name of the rosbag -->
   <arg name="rb_start_delay"   default="2.0" /> <!-- how long to delay the start of the rosbag -->
   
-  <param name="use_sim_time" value="false" />
+  <group if="$(arg b_rosbag)">
+    <param name="use_sim_time" value="true" />   <!--use the rosbag time instead of the computer's time. If using this use clock option in rosbag-->
+  </group>
+  <group unless="$(arg b_rosbag)">
+    <param name="use_sim_time" value="false" />
+  </group>
   
   <node pkg="tf" type="static_transform_publisher" name="trans_pub_map_world"
         args="0 0 0 0 0 0 /map /world 10"> 
@@ -33,5 +38,10 @@
     <param name="ns"  value="$(arg ns)"/> 
     <rosparam command="load" file="$(find msl_raptor)/params/$(arg robot_type)$(arg id).yaml" />
   </node>
+
+  <!-- IF using rosbag, launch our node then play the rosbag (using a delay to ensure msl_raptor starts first) -->
+  <group if="$(arg b_rosbag)">
+    <node pkg="rosbag" type="play" name="player" args="--clock $(arg rb_path_in)/$(arg rb_name).bag" launch-prefix="bash -c 'sleep $(arg rb_start_delay); $0 $@' " />
+  </group>
 
 </launch>

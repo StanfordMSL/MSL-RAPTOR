@@ -22,12 +22,6 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
 class camera_cal_test_node:
-    """
-    This rosnode has two modes. In mode 1 it publishes a white background with the bounding boxes drawn (green when tracking, red when detecting). 
-    This is faster and less likely to slow down the network. Mode 2 publishes the actual image. This is good for debugging, but is slower.
-    If rosparam b_overlay is false (default), it will be mode 1, else mode 2.
-    """
-
     def __init__(self):
         rospy.init_node('camera_cal_test_node', anonymous=True)
         self.bridge = CvBridge()
@@ -43,11 +37,31 @@ class camera_cal_test_node:
                 self.dist_coefs = None
                 self.new_camera_matrix = self.K
         else:
-           self.dist_coefs = np.array([-0.40031982,  0.14257124,  0.00020686,  0.00030526,  0.        ])
-           self.K = np.array([[483.50426183,   0.        , 318.29104565],
-                              [  0.        , 483.89448247, 248.02496288],
-                              [  0.        ,   0.        ,   1.        ]])
-           self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
+            # current best:
+            # self.dist_coefs = np.array([-0.40031982,  0.14257124,  0.00020686,  0.00030526,  0.        ])
+            # self.K = np.array([[483.50426183,   0.        , 318.29104565],
+            #                   [  0.        , 483.89448247, 248.02496288],
+            #                   [  0.        ,   0.        ,   1.        ]])
+            # self.R_cam_ego = np.reshape([-0.0246107,  -0.99869617, -0.04472445,  -0.05265648,  0.0459709,  -0.99755399, 0.99830938, -0.02219547, -0.0537192], (3,3))
+            # self.t_cam_ego = np.asarray([0.11041654, 0.06015242, -0.07401183])
+            # new candidates (matlab):
+            self.dist_coefs = np.array([-0.4489306 ,  0.28033736, -0.00006914,  0.00007105, 0.11475715])
+            self.K = np.array([[486.12588397,    0.        , 328.90870824],
+                                [  0.        , 486.18350238, 250.9030576],
+                                [  0.        ,   0.        ,   1.        ]])
+            self.R_cam_ego = np.reshape([ 0.02495941, -0.99952024, -0.01833889,  -0.04791799,  0.01712734, -0.99870442, 0.99853938,  0.02580584, -0.04746751], (3,3))
+            self.t_cam_ego = np.asarray([0.012847, 0.0223505, -0.08445964])
+
+            # # new candidates (opencv):
+            # self.dist_coefs = np.array([-0.34815919,  0.0241843 ,  0.00191134, -0.01075474,  0.15009677])
+            # self.K = np.array([[429.580175,    0.        , 354.48064136],
+            #                     [  0.        , 429.7198749, 248.24300402],
+            #                     [  0.        ,   0.        ,   1.        ]])
+            # self.R_cam_ego = np.reshape([ -0.03109442, -0.99945557,  0.0110314, -0.07460463, -0.00868518, -0.99717537, 0.99672829, -0.03182958, -0.07429395], (3,3))
+            # self.t_cam_ego = np.asarray([-0.03357424, -0.01989868, -0.01550179])
+
+
+            self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
 
         self.K_3_4_undistorted = np.concatenate((self.new_camera_matrix.T, np.zeros((1,3)))).T
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1, buff_size=2**21)
@@ -77,9 +91,6 @@ class camera_cal_test_node:
         rospy.Subscriber(test_ado_object_topic, PoseStamped, self.ado_pose_gt_cb, queue_size=10)
         self.ado_3d_bb_dims = np.array([170, 170, 67.5])/1000  # x, y, z dim in meters (local frame)
 
-
-        self.R_cam_ego = np.reshape([-0.0246107,  -0.99869617, -0.04472445,  -0.05265648,  0.0459709,  -0.99755399, 0.99830938, -0.02219547, -0.0537192], (3,3))
-        self.t_cam_ego = np.asarray([0.11041654, 0.06015242, -0.07401183])
         
         self.T_cam_ego = np.eye(4)
         self.T_cam_ego[0:3, 0:3] = self.R_cam_ego
