@@ -35,8 +35,8 @@ class segment_object_pixels:
 
     def __init__(self):
         # INPUTS
-        max_num_images = 30  # set to -1 to have no limit
-        image_skip_rate = 50  # set to 1 to use every image, 2 to use every other, etc etc
+        max_num_images = -1  # set to -1 to have no limit
+        image_skip_rate = 1  # set to 1 to use every image, 2 to use every other, etc etc
         b_save_images_with_masks = False
         b_output_debug_image = False
         topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', '/vrpn_client_node/bowl_green_msl/pose']
@@ -70,13 +70,19 @@ class segment_object_pixels:
         max_time = 0
         bag_in = rosbag.Bag(rb_path + rb_name, 'r')
 
-        # first read the camera instrinsics and distortion params so we can undistort the images as they are read
-        for topic, msg, t in bag_in.read_messages(topics='/quad7/camera/camera_info'):
-            K = np.reshape(msg.K, (3, 3))
-            dist_coefs = np.reshape(msg.D, (5,))
-            K_undistorted, _ = cv2.getOptimalNewCameraMatrix(K, dist_coefs, (msg.width, msg.height), 0, (msg.width, msg.height))
-            K_3_4 = np.concatenate((K_undistorted.T, np.zeros((1,3)))).T
-            break
+        # # first read the camera instrinsics and distortion params so we can undistort the images as they are read
+        # for topic, msg, t in bag_in.read_messages(topics='/quad7/camera/camera_info'):
+        #     K = np.reshape(msg.K, (3, 3))
+        #     dist_coefs = np.reshape(msg.D, (5,))
+        #     K_undistorted, _ = cv2.getOptimalNewCameraMatrix(K, dist_coefs, (msg.width, msg.height), 0, (msg.width, msg.height))
+        #     K_3_4 = np.concatenate((K_undistorted.T, np.zeros((1,3)))).T
+        #     break
+        K = np.array([[486.12588397  , 0.   ,      328.90870824],
+                        [  0.  ,       486.18350238, 250.9030576 ],
+                        [  0. ,          0. ,          1.        ]])
+        dist_coefs = np.array([-0.4489306 ,  0.28033736 ,-0.00006914,  0.00007105 , 0.11475715])
+        K_undistorted, _ = cv2.getOptimalNewCameraMatrix(K, dist_coefs, (640,480), 0, (640,480))
+        K_3_4 = np.concatenate((K_undistorted.T, np.zeros((1,3)))).T
 
         for topic, msg, t in bag_in.read_messages(topics=topic_str):
             if topic == '/vrpn_client_node/quad7/pose':
@@ -208,8 +214,10 @@ class segment_object_pixels:
 
     def construct_camera_transform(self):
         # this assumes camera axis is +z and y is down. OpenGL assumes cam axis is -z and y is up
-        R_cam_ego = np.reshape([-0.0246107,  -0.99869617, -0.04472445,  -0.05265648,  0.0459709,  -0.99755399, 0.99830938, -0.02219547, -0.0537192], (3,3))
-        t_cam_ego = np.asarray([0.11041654, 0.06015242, -0.07401183])
+        # R_cam_ego = np.reshape([-0.0246107,  -0.99869617, -0.04472445,  -0.05265648,  0.0459709,  -0.99755399, 0.99830938, -0.02219547, -0.0537192], (3,3))
+        # t_cam_ego = np.asarray([0.11041654, 0.06015242, -0.07401183])
+        R_cam_ego = np.reshape([ 0.02495941, -0.99952024, -0.01833889, -0.04791799,  0.01712734, -0.99870442,  0.99853938,  0.02580584, -0.04746751], (3,3))
+        t_cam_ego = np.array([ 0.012847,    0.0223505,  -0.08445964])
         
         T_cam_ego = np.eye(4)
         T_cam_ego[0:3, 0:3] = R_cam_ego
