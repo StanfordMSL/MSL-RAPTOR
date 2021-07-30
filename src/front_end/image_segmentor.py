@@ -16,6 +16,8 @@ class TrackedObject:
 
 class ImageSegmentor:
     def __init__(self,sample_im,detector_name='yolov3',tracker_name='siammask', detect_classes_ids=[0,39,41,45,63,80], detect_classes_names = ['person','bottle','cup','bowl','laptop','mslquad'],use_trt=False, im_width=640, im_height=480, detection_period = 5,verbose=False, use_track_checks=True, use_gt_detect_bb=False, detector_cfg='yolov3/cfg/yolov3.cfg', detector_weights='yolov3/weights/yolov3.weights'):
+        self.last_object_id = -1
+        
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
         print('Using classes '+str(detect_classes_names))
         if detector_name == 'yolov3':
@@ -106,6 +108,39 @@ class ImageSegmentor:
         ''' 
 
         if b_detect_only:
+            if self.use_gt_detect_bb:
+                if gt_boxes is None:
+                    RuntimeError('Trying to use groundtruth boxes for detection, but none were given')
+                bbs_no_angle = gt_boxes
+            else:
+                bbs_no_angle = self.detect(image)  # returns a list of tuples: [(bb, class conf, object conf, class_id), ...]
+            self.last_detection_time = time
+            # No detections
+            if len(bbs_no_angle) == 0:
+                print("Did not detect object")
+                self.stop_tracking_lost_objects()
+                return {}
+            
+            # # Add buffer around detections
+            # bbs_no_angle[:,2:4] += self.box_buffer
+            # # Detections to reinit tracker
+            # self.reinit_tracker(bbs_no_angle, image)
+            # self.mode = self.TRACK
+            # output = self.track(image)
+
+            output = {}
+            for bb in bbs_no_angle:
+                if not self.valid_detection:
+                    continue
+                class_str = self.class_id_to_str[bb[6]]
+                obj_id = self.last_object_id + 1
+                self.last_object_id = obj_id
+                output[obj_id] = [(bb[0], bb[1], bb[2], bb[3], 0), class_str, True]
+            
+            return output
+
+
+
             # output appears to be [((x,y,w,h,ang), class_str,b_is_valid)...]
             bbs_no_angle = self.detect(image) 
             # format as if angled bounding box (but 0 for angle always)
