@@ -181,7 +181,7 @@ def run_execution_loop():
                         ukf_dict[obj_id].projected_3d_bb = np.fliplr(pose_to_3d_bb_proj(tf_w_ado, tf_w_ego, ukf_dict[obj_id].bb_3d, ukf_dict[obj_id].camera))
                     if class_str in connected_inds:
                         ukf_dict[obj_id].connected_inds = connected_inds[ukf_dict[obj_id].class_str]
-        
+        # pdb.set_trace()
         be_time_hist.append(time.time() - t_be_start)
         ros.publish_filter_state(obj_ids_tracked, ukf_dict)
         ros.publish_bb_msg(processed_image, im_seg_mode, loop_time)
@@ -233,12 +233,12 @@ class camera:
         ns = rospy.get_param('~ns')
         camera_info = rospy.wait_for_message(ns + '/camera/camera_info', CameraInfo,500)
         # self.K = np.reshape(camera_info.K, (3, 3))
-        self.K = np.array([[486.12588397,   0.        , 328.90870824],
-                           [  0.        , 486.18350238, 250.9030576 ],
+        self.K = np.array([[484.8736766221664425, 0.0, 328.8659077998956946],
+                           [  0.0, 485.0083372463163869, 248.7795411952131985],
                            [  0.        ,   0.        ,   1.        ]])
         if len(camera_info.D) == 5:
             # self.dist_coefs = np.reshape(camera_info.D, (5,))
-            self.dist_coefs = np.reshape(np.array([-0.4489306 ,  0.28033736, -0.00006914,  0.00007105, 0.11475715]), (5,))
+            self.dist_coefs = np.reshape(np.array([-0.4386515220507515, 0.2428983830196395, 0.0000845660752867, 0.0002387445493008, 0.0764542030357198]), (5,))
             self.new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.K, self.dist_coefs, (camera_info.width, camera_info.height), 0, (camera_info.width, camera_info.height))
         else:
             self.dist_coefs = None
