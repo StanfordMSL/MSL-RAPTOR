@@ -121,8 +121,8 @@ class ImageSegmentor:
             self.last_detection_time = time
             # No detections
             if len(bbs_no_angle) == 0:
-                print("Did not detect object")
-                self.stop_tracking_lost_objects()
+                # print("Did not detect object")
+                # self.stop_tracking_lost_objects()
                 return {}
             
             # # Add buffer around detections
@@ -140,7 +140,7 @@ class ImageSegmentor:
 
                 # to detect if its a new object, check objects in our list
                 bb_as_abb = np.concatenate([bb[:4],[0]])  # pretent our bounding box is angled
-                min_t_val = 10**100
+                min_t_val = np.inf
                 matched_id = None
                 obj_id_to_rm = []
                 if class_str in self.obj_id_last_active_times_by_class and len(self.obj_id_last_active_times_by_class[class_str].keys()) > 0:
@@ -153,10 +153,13 @@ class ImageSegmentor:
                             obj_id_to_rm.append(obj_id_match_candidate)
                             continue
                         t = self.compute_mahalanobis_dist(self.ukf_dict[obj_id_match_candidate], bb_as_abb)
-                        if t < 10*self.chi2_001 and t < min_t_val:
+                        if t < min_t_val:
+                        # if t < 10*self.chi2_001 and t < min_t_val:
                             # if t is less than some probablistic threshold AND it is our closest match
                             min_t_val = t
                             matched_id = obj_id_match_candidate
+                            # pdb.set_trace()
+
 
                     if len(obj_id_to_rm) > 0:
                         for id in obj_id_to_rm:
@@ -166,10 +169,10 @@ class ImageSegmentor:
                 
                 b_new_object = matched_id is None   
                 if not b_new_object:
-                    print("Re-found object")
+                    # print("Re-found object")
                     obj_id = matched_id
                 else:
-                    print("found new object")
+                    # print("found new object")
                     obj_id = self.last_object_id + 1
 
                 if not class_str in self.obj_id_last_active_times_by_class:
@@ -385,7 +388,7 @@ class ImageSegmentor:
                 valid_detections_ids.append(i)
         detections = detections[valid_detections_ids,:]
 
-        print("detect time = {:.4f}".format(time.time() - tic))
+        # print("detect time = {:.4f}".format(time.time() - tic))
         self.num_detections += 1
         return detections
 
