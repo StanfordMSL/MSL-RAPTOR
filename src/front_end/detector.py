@@ -54,6 +54,7 @@ class EdgeTPU:
 
     def detect(self, img0):
         # print("in EDGE detector function")
+        tic = time.time()
         img_cv = img0
         width_height_tuple = (img_cv.shape[1], img_cv.shape[0])
         def my_resize(w_h_tup):
@@ -100,13 +101,20 @@ class EdgeTPU:
         for o in objs:
             if o.id not in self.classes_ids:
                 continue
-            det.append([o.bbox.xmin, o.bbox.ymin, o.bbox.xmax - o.bbox.xmin, o.bbox.ymax - o.bbox.ymin, o.score, o.score, o.id])
+            # det.append([o.bbox.xmin, o.bbox.ymin, o.bbox.xmax - o.bbox.xmin, o.bbox.ymax - o.bbox.ymin, o.score, o.score, o.id])
+            x_center = (o.bbox.xmax + o.bbox.xmin) / 2
+            y_center = (o.bbox.ymax + o.bbox.ymin) / 2
+            width = o.bbox.xmax - o.bbox.xmin
+            height = o.bbox.ymax - o.bbox.ymin
+            det.append([x_center, y_center, width, height, o.score, o.score, o.id])
             
         if len(det) == 0:
             print('No objects detected ({} disqualified)'.format(len(objs)))
             return np.array([])
         else:
             det = np.stack(det)
+
+        print("raw detect querry time: {}".format(time.time() - tic))
 
         return det
 

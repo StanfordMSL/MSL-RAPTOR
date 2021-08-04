@@ -410,8 +410,8 @@ class UKF:
         Initialize a state with approximations using a single bounding box
         """
         pos,quat = self.approx_pose_from_bb(bb,tf_w_ego)
-        print(pos)
-        print(quat)
+        # print(pos)
+        # print(quat)
         mu = np.array([pos[0],pos[1],pos[2],0.,0.,0.,quat[0],quat[1],quat[2],quat[3],0.,0.,0.])
         self.init_filter_elements(mu)
 

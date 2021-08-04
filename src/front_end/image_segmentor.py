@@ -1,7 +1,8 @@
+from typing import DefaultDict
 from detector import YoloDetector
 from detector import EdgeTPU
 from tracker import SiammaskTracker
-import sys, os, time
+import sys, os, time, pdb
 import numpy as np
 import math
 import numpy.linalg as la
@@ -90,6 +91,9 @@ class ImageSegmentor:
         
         self.num_detections = 0
 
+        self.obj_id_last_active_times_by_class = {} #DefaultDict(dict)  # [my_class_str][my_obj_id] = time_last_seen
+        self.stale_detect_time_thresh = 5  # seconds since we last detected an object beyond which we dont try to match to it again and call it new
+
     def stop_tracking_lost_objects(self):
         # Remove objects that triggered detection and were not matched to new detections
         self.last_lost_objects = set(self.last_lost_objects)
@@ -133,9 +137,48 @@ class ImageSegmentor:
                 if not self.valid_detection:
                     continue
                 class_str = self.class_id_to_str[bb[6]]
-                obj_id = self.last_object_id + 1
+
+                # to detect if its a new object, check objects in our list
+                bb_as_abb = np.concatenate([bb[:4],[0]])  # pretent our bounding box is angled
+                min_t_val = 10**100
+                matched_id = None
+                obj_id_to_rm = []
+                if class_str in self.obj_id_last_active_times_by_class and len(self.obj_id_last_active_times_by_class[class_str].keys()) > 0:
+                    for obj_id_match_candidate in self.obj_id_last_active_times_by_class[class_str].keys():
+                        if not obj_id_match_candidate in self.ukf_dict:
+                            # if this is the second loop of this function on the first call, there could have been something added in the previous 
+                            #     loop to the obj_id_last_active_times_by_class dict() that isnt yet in the ukf_dict - skip it
+                            continue
+                        if abs(time - self.obj_id_last_active_times_by_class[class_str][obj_id_match_candidate]) > self.stale_detect_time_thresh:
+                            obj_id_to_rm.append(obj_id_match_candidate)
+                            continue
+                        t = self.compute_mahalanobis_dist(self.ukf_dict[obj_id_match_candidate], bb_as_abb)
+                        if t < 10*self.chi2_001 and t < min_t_val:
+                            # if t is less than some probablistic threshold AND it is our closest match
+                            min_t_val = t
+                            matched_id = obj_id_match_candidate
+
+                    if len(obj_id_to_rm) > 0:
+                        for id in obj_id_to_rm:
+                            del self.obj_id_last_active_times_by_class[class_str][id] # remove this obj_id from our dict
+                            if len(self.obj_id_last_active_times_by_class[class_str].keys()) == 0:
+                                del self.obj_id_last_active_times_by_class[class_str]
+                
+                b_new_object = matched_id is None   
+                if not b_new_object:
+                    print("Re-found object")
+                    obj_id = matched_id
+                else:
+                    print("found new object")
+                    obj_id = self.last_object_id + 1
+
+                if not class_str in self.obj_id_last_active_times_by_class:
+                    self.obj_id_last_active_times_by_class[class_str] = {}
+                self.obj_id_last_active_times_by_class[class_str][obj_id] = time
+
                 self.last_object_id = obj_id
-                output[obj_id] = [(bb[0], bb[1], bb[2], bb[3], 0), class_str, True]
+                output[obj_id] = [bb_as_abb, class_str, True]
+                # output[obj_id] = [(bb[0], bb[1], bb[2], bb[3], 0), class_str, True]
             
             return output
 
