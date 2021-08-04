@@ -48,7 +48,8 @@ class ros_interface:
         # DEBUGGGGGGGGG
         if True or b_use_gt_bb:
             self.ado_pose_gt_rosmsg = None
-            rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.ado_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
+            rospy.Subscriber('/vrpn_client_node'+'/quad4' + '/pose', PoseStamped, self.ado_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
+            # rospy.Subscriber('/quad4' + '/mavros/vision_pose/pose', PoseStamped, self.ado_pose_gt_cb, queue_size=10)  # DEBUG ONLY - optitrack pose
         ##########################
 
         # Just used for initializing from groundtruth
@@ -66,8 +67,10 @@ class ros_interface:
     def create_subs_and_pubs(self):
         # Subscribers / Listeners & Publishers #############################   
         rospy.Subscriber(self.ns + '/camera/image_raw', Image, self.image_cb, queue_size=1,buff_size=2**21)
-        rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
-        rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
+        rospy.Subscriber('/vrpn_client_node'+self.ns + '/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
+        rospy.Subscriber('/vrpn_client_node'+self.ns + '/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
+        # rospy.Subscriber(self.ns + '/mavros/local_position/pose', PoseStamped, self.ego_pose_ekf_cb, queue_size=10)  # internal ekf pose
+        # rospy.Subscriber(self.ns + '/mavros/vision_pose/pose', PoseStamped, self.ego_pose_gt_cb, queue_size=10)  # optitrack pose
         self.state_pub = rospy.Publisher(self.ns + '/msl_raptor_state', TrackedObjects, queue_size=5)
         self.bb_data_pub = rospy.Publisher(self.ns + '/bb_data', AngledBboxes, queue_size=5)
 
@@ -75,7 +78,8 @@ class ros_interface:
             # Create dict to store pose for each object
             self.latest_tracked_poses = {}
             for obj_name in sum(self.objects_names_per_class.values(),[]):
-                rospy.Subscriber(obj_name + '/mavros/vision_pose/pose', PoseStamped, self.tracked_objects_poses_cb, obj_name,queue_size=5)
+                rospy.Subscriber('/vrpn_client_node'+obj_name + '/pose', PoseStamped, self.tracked_objects_poses_cb, obj_name,queue_size=5)
+                # rospy.Subscriber(obj_name + '/mavros/vision_pose/pose', PoseStamped, self.tracked_objects_poses_cb, obj_name,queue_size=5)
         ####################################################################
 
     def ado_pose_gt_cb(self, msg):
@@ -161,7 +165,7 @@ class ros_interface:
 
 
 
-    def publish_filter_state(self, obj_ids,ukf_dict):# state_est, my_time, itr):
+    def publish_filter_state(self, obj_ids, ukf_dict):# state_est, my_time, itr):
         """
         Broadcast the estimated state of the filter. 
         State assumed to be a Nx1 numpy array of floats
