@@ -6,8 +6,7 @@ import sys, os, time, pdb
 import numpy as np
 import math
 import numpy.linalg as la
-from utils_msl_raptor.ukf_utils import bb_corners_to_angled_bb
-from utils_msl_raptor.ukf_utils import condensed_to_square
+from utils_msl_raptor.ukf_utils import bb_corners_to_angled_bb, condensed_to_square, state_to_tf
 from scipy.spatial.distance import pdist,squareform
 class TrackedObject:
     def __init__(self, object_id, class_str):
@@ -93,6 +92,7 @@ class ImageSegmentor:
 
         self.obj_id_last_active_times_by_class = {} #DefaultDict(dict)  # [my_class_str][my_obj_id] = time_last_seen
         self.stale_detect_time_thresh = 5  # seconds since we last detected an object beyond which we dont try to match to it again and call it new
+        self.trans_diff_thresh_for_bb_match = 0.2 # [m] distance in space for which we consider a new detection a match
 
     def stop_tracking_lost_objects(self):
         # Remove objects that triggered detection and were not matched to new detections
@@ -104,7 +104,7 @@ class ImageSegmentor:
         self.last_lost_objects = []
 
 
-    def process_image(self,image,time,gt_boxes=None, b_detect_only=False):
+    def process_image(self,image,time,gt_boxes=None, b_detect_only=False, tf_w_ego=None):
         '''
         Process an image by running detection and/or tracking and returning the bouding box, according to the state of the image segmentor.
         The gt_boxes is an optional argument which is used when using ground-truth for the detected boxes
@@ -143,6 +143,7 @@ class ImageSegmentor:
                 min_t_val = np.inf
                 matched_id = None
                 obj_id_to_rm = []
+                new_potential_matches = []
                 if class_str in self.obj_id_last_active_times_by_class and len(self.obj_id_last_active_times_by_class[class_str].keys()) > 0:
                     for obj_id_match_candidate in self.obj_id_last_active_times_by_class[class_str].keys():
                         if not obj_id_match_candidate in self.ukf_dict:
@@ -153,12 +154,25 @@ class ImageSegmentor:
                             obj_id_to_rm.append(obj_id_match_candidate)
                             continue
                         t = self.compute_mahalanobis_dist(self.ukf_dict[obj_id_match_candidate], bb_as_abb)
-                        if t < min_t_val:
-                        # if t < 10*self.chi2_001 and t < min_t_val:
+                        if not hasattr(self.ukf_dict[obj_id_match_candidate], 'mu_obs'):
+                            # this means we only just made the UKF (the update step hasnt been called yet). In this case do the check by translation only
+                            guessed_candidate_pose = self.ukf_dict[obj_id_match_candidate].approx_pose_from_bb(bb, tf_w_ego)
+                            new_potential_matches.append((obj_id_match_candidate, self.ukf_dict[obj_id_match_candidate], guessed_candidate_pose))
+                        if t < min_t_val: # if t < 10*self.chi2_001 and t < min_t_val:
                             # if t is less than some probablistic threshold AND it is our closest match
                             min_t_val = t
                             matched_id = obj_id_match_candidate
                             # pdb.set_trace()
+                    
+                    if min_t_val is np.inf and len(new_potential_matches) > 0:
+                        min_t_diff = np.Inf
+                        for (obj_id_match_candidate, ukf_cand, guessed_candidate_pose) in new_potential_matches:
+                            t_w_ado_bb_guess = guessed_candidate_pose[0]
+                            t_w_ado_ukf = state_to_tf(ukf_cand.mu)[0:3, 3]
+                            trans_diff = la.norm(t_w_ado_ukf - t_w_ado_bb_guess)
+                            if trans_diff < self.trans_diff_thresh_for_bb_match and trans_diff < min_t_val:
+                                min_t_val = trans_diff
+                                matched_id = obj_id_match_candidate
 
 
                     if len(obj_id_to_rm) > 0:
@@ -407,29 +421,29 @@ class ImageSegmentor:
         class_str = self.class_id_to_str[detection[-1]]
         # Left side in image
         if (bb[0]) < self.min_pix_from_edge:
-            print('Rejected measurement, too close to the left edge')
+            # print('Rejected measurement, too close to the left edge')
             return False
         
         # Right side in image
         if (bb[0] + bb[2]) > self.im_width - self.min_pix_from_edge:
-            print('Rejected measurement, too close to the right edge')
+            # print('Rejected measurement, too close to the right edge')
             return False
 
         # Top in image
         if (bb[1] ) < self.min_pix_from_edge:
-            print('Rejected measurement, too close to the top edge')
+            # print('Rejected measurement, too close to the top edge')
             return False
         
         # Bottom in image
         if (bb[1] + bb[3]) > self.im_height - self.min_pix_from_edge:
-            print('Rejected measurement, too close to the bottom')
+            # print('Rejected measurement, too close to the bottom')
             return False
 
-        # Aspect ratio valid
-        ar = bb[2]/bb[3]
-        if ar < self.min_aspect_ratio[class_str] or ar > self.max_aspect_ratio[class_str]:
-            print("rejecting measurement: INVALID ASPECT RATIO for "+class_str+": "+str(ar))
-            return False
+        # # Aspect ratio valid
+        # ar = bb[2]/bb[3]
+        # if ar < self.min_aspect_ratio[class_str] or ar > self.max_aspect_ratio[class_str]:
+        #     print("rejecting measurement: INVALID ASPECT RATIO for "+class_str+": "+str(ar))
+        #     return False
 
         return True
 

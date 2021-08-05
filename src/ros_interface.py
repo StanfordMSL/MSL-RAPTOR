@@ -155,7 +155,7 @@ class ros_interface:
             gt_bbs = self.get_gt_boxes()
             self.im_process_output = self.im_seg.process_image(image,my_time,gt_bbs)
         else:
-            self.im_process_output = self.im_seg.process_image(image,my_time, b_detect_only=self.b_detect_only)
+            self.im_process_output = self.im_seg.process_image(image,my_time, b_detect_only=self.b_detect_only, tf_w_ego=self.tf_w_ego)
         self.front_end_time = time.time() - t_fe_start
         self.num_imgs_processed += 1
         self.latest_img_time = my_time  # DO THIS LAST
