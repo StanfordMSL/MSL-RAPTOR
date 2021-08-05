@@ -131,6 +131,8 @@ RUN source /ros_python3_entrypoint.sh && \
     cd msl_raptor_ws/src/msl_raptor && \
     git pull --recurse-submodules && \
     git checkout detect_only && \
+    cd ../ocam_msl && \
+    git pull && \
     catkin build
 
 # Add git aliases for convience
