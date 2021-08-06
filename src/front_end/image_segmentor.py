@@ -158,11 +158,10 @@ class ImageSegmentor:
                             # this means we only just made the UKF (the update step hasnt been called yet). In this case do the check by translation only
                             guessed_candidate_pose = self.ukf_dict[obj_id_match_candidate].approx_pose_from_bb(bb, tf_w_ego)
                             new_potential_matches.append((obj_id_match_candidate, self.ukf_dict[obj_id_match_candidate], guessed_candidate_pose))
-                        if t < min_t_val: # if t < 10*self.chi2_001 and t < min_t_val:
+                        if t < 2*self.chi2_001 and t < min_t_val:
                             # if t is less than some probablistic threshold AND it is our closest match
                             min_t_val = t
                             matched_id = obj_id_match_candidate
-                            # pdb.set_trace()
                     
                     if min_t_val is np.inf and len(new_potential_matches) > 0:
                         min_t_diff = np.Inf
@@ -173,6 +172,8 @@ class ImageSegmentor:
                             if trans_diff < self.trans_diff_thresh_for_bb_match and trans_diff < min_t_val:
                                 min_t_val = trans_diff
                                 matched_id = obj_id_match_candidate
+                        if matched_id is not None:
+                            print("Matched via 3D space")
 
 
                     if len(obj_id_to_rm) > 0:
