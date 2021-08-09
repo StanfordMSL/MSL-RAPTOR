@@ -2,6 +2,8 @@ import argparse
 from sys import platform
 import sys
 
+from numpy.lib.function_base import disp
+
 from yolov3.models import *  # set ONNX_EXPORT in models.py
 from yolov3.utils.datasets import *
 from yolov3.utils.utils import *
@@ -98,8 +100,10 @@ class EdgeTPU:
         # goal: det as np array with each row being (bb, class conf, object conf, class_id)
         # Object(id=43, score=0.546875, bbox=BBox(xmin=466, ymin=198, xmax=487, ymax=296))
         det = []
+        disq_ids = []
         for o in objs:
             if o.id not in self.classes_ids:
+                disq_ids.append(o.id)
                 continue
             # det.append([o.bbox.xmin, o.bbox.ymin, o.bbox.xmax - o.bbox.xmin, o.bbox.ymax - o.bbox.ymin, o.score, o.score, o.id])
             x_center = (o.bbox.xmax + o.bbox.xmin) / 2
@@ -109,12 +113,12 @@ class EdgeTPU:
             det.append([x_center, y_center, width, height, o.score, o.score, o.id])
             
         if len(det) == 0:
-            print('No objects detected ({} disqualified)'.format(len(objs)))
+            print('No objects detected ({} disqualified, rejected ids: {})'.format(len(objs), str(disq_ids)))
             return np.array([])
         else:
             det = np.stack(det)
 
-        print("raw detect querry time: {}".format(time.time() - tic))
+        # print("raw detect querry time: {}".format(time.time() - tic))
 
         return det
 

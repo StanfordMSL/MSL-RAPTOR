@@ -19,7 +19,9 @@ class ImageSegmentor:
         self.last_object_id = -1
         
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/front_end/'
-        print('Using classes '+str(detect_classes_names))
+        self.class_id_to_str = dict(zip(detect_classes_ids, detect_classes_names))
+        self.class_str_to_id = dict(zip(detect_classes_names,detect_classes_ids))
+        print('Using classes ' + str(self.class_id_to_str))
         if detector_name == 'yolov3':
             self.detector = YoloDetector(sample_im, base_dir=base_dir, classes_ids=detect_classes_ids, cfg=detector_cfg, weights=detector_weights)
         if detector_name == 'edge_tpu_mobile_det':
@@ -33,8 +35,6 @@ class ImageSegmentor:
             raise RuntimeError("Tracker chosen not implemented")
 
 
-        self.class_id_to_str = dict(zip(detect_classes_ids, detect_classes_names))
-        self.class_str_to_id = dict(zip(detect_classes_names,detect_classes_ids))
 
         self.active_objects_ids_per_class = {}
         self.tracked_objects = []
