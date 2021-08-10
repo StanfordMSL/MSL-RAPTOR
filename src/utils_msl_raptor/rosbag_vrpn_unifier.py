@@ -50,7 +50,8 @@ if __name__ == '__main__':
     try:
         np.set_printoptions(linewidth=160, suppress=True)  # format numpy so printing matrices is more clear
         # program = rosbags_to_logs(rb_name=my_rb_name, data_source=my_data_source, ego_yaml=my_ego_yaml, ado_yaml=my_ado_yaml, b_save_3dbb_imgs=my_b_save_3dbb_imgs)
-        rb_path_and_name_ = "/mounted_folder/rosbags_for_post_process/rosbag_for_post_process_2020-09-01-12-29-11"
+        # rb_path_and_name_ = "/mounted_folder/rosbags_for_post_process/rosbag_for_post_process_2020-09-01-12-29-11"
+        rb_path_and_name_ = "/mounted_folder/raptor_processed_bags/msl_raptor_output_from_bag_rosbag_for_post_process_2020-12-03-11-53-14"
         ego_ns_ = "quad7"
         b_ego_pose_est_ = True
 
