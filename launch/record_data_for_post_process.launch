@@ -2,14 +2,9 @@
   <arg name="id"               default="7" />
   <arg name="robot_type"       default="quad" />
   <arg name="ns"               value="/$(arg robot_type)$(arg id)" />
-  <arg name="b_camera"         default="true" />
-  <arg name="b_use_gt_bb"      default="false" />
-  <arg name="b_enforce_0_yaw"  default="true" />
-  <arg name="detection_period" default="5" /> <!-- period to use to redo safety detection in seconds -->
-  <arg name="b_rosbag"         default="false" />  <!-- boolean if we are reading data from a rosbag -->
+  <arg name="b_record"         default="true" />  <!-- boolean if we are saving data to a rosbag -->
   <arg name="rb_out_path"      default="/mounted_folder/rosbags_for_post_process/" />  <!-- path to the rosbag -->
   <arg name="rb_name_prefix"   default="rosbag_for_post_process" /> <!-- name of the rosbag -->
-  <arg name="rb_start_delay"   default="2.0" /> <!-- how long to delay the start of the rosbag -->
   
   <param name="use_sim_time" value="false" />
   
@@ -28,6 +23,8 @@
     </include>
   </group>
 
- <node pkg="rosbag" type="record" name="record_data_for_post_process" args="-o $(arg rb_out_path)$(arg rb_name_prefix) -e (.*)pose(.*) (.*)mavros(.*) --topic /tf --topic /tf_static --topic /quad7/camera/camera_info --topic /quad7/camera/image_raw "/> <!-- the regex captures all topics with the word 'pose' in it which works for both quad-vrpn and default vrpn -->
+ <group if="$(arg b_record)">
+  <node pkg="rosbag" type="record" name="record_data_for_post_process" args="-o $(arg rb_out_path)$(arg rb_name_prefix) -e (.*)pose(.*) (.*)mavros(.*) --topic /tf --topic /tf_static --topic /quad7/camera/camera_info --topic /quad7/camera/image_raw "/> <!-- the regex captures all topics with the word 'pose' in it which works for both quad-vrpn and default vrpn -->
+ </group>
 
 </launch>
