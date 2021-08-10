@@ -19,6 +19,7 @@ sys.path.insert(1, '/root/msl_raptor_ws/src/msl_raptor/src')
 from tracker import SiammaskTracker
 from utils_msl_raptor.ros_utils import *
 from utils_msl_raptor.math_utils import *
+from utils_msl_raptor.viz_utils import draw_2d_proj_of_3D_bounding_box
 
 
 import argparse
@@ -35,10 +36,10 @@ class segment_object_pixels:
 
     def __init__(self):
         # INPUTS
-        max_num_images = -1  # set to -1 to have no limit
-        image_skip_rate = 1  # set to 1 to use every image, 2 to use every other, etc etc
-        b_save_images_with_masks = False
-        b_output_debug_image = False
+        max_num_images = 40  # set to -1 to have no limit
+        image_skip_rate = 30  # set to 1 to use every image, 2 to use every other, etc etc
+        b_save_images_with_masks = True
+        b_output_debug_image = True
         object_name = "bowl_green_msl"   #    # "bottle_swell_1"  # "bowl_green_msl"  # "bowl_grey_msl"
         topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', "/vrpn_client_node/" + object_name  + "/pose"]
         rb_path = '/mounted_folder/bags_to_test_coral_detect/'
@@ -47,6 +48,7 @@ class segment_object_pixels:
             rb_name = 'grey_bowl_msl/bowl_grey_msl_nerf_with_markers.bag'
             x_range = (285, 395) # min and max x pixel for image-aligned bounding box
             y_range = (275, 330) # min and max y pixel for image-aligned bounding box
+            obj_3d_bb_dims = np.array([170, 170, 67.5])/1000  # x, y, z dim in meters (local frame)
         elif object_name == "bowl_green_msl":
             # GREEN BOWL: 290, 255  | 335, 255  | 335, 277  | 290, 277
             # rb_name = 'green_bowl_msl/bowl_green_msl_nerf_with_markers.bag'  
@@ -56,6 +58,7 @@ class segment_object_pixels:
             rb_name = 'green_bowl_msl_close/bowl_green_msl_nerf_with_markers.bag'  
             x_range = (244, 426) # min and max x pixel for image-aligned bounding box
             y_range = (302, 407) # min and max y pixel for image-aligned bounding box
+            obj_3d_bb_dims = np.array([170, 170, 67.5])/1000  # x, y, z dim in meters (local frame)
         elif object_name == "bottle_swell_1":
             # BOTTLE SWELL 1: 244, 302  | 426, 302  | 426, 407  | 244, 407
             rb_name = 'bottle_swell_1/bottle_swell_1_nerf_with_markers.bag'
@@ -68,10 +71,9 @@ class segment_object_pixels:
         init_bb_up_left = (x_range[0], y_range[0], x_range[1] - x_range[0], y_range[1] - y_range[0])  # box format: x,y,w,h (where x,y correspond to the top left corner)
         
         base_directory_path = rb_path + rb_name[:-4] + '_output/'
-        my_dirs = self.construct_directory_structure(base_directory_path, b_save_images_with_masks)
+        my_dirs = self.construct_directory_structure(base_directory_path, b_save_images_with_masks, b_output_debug_image)
         T_cam_ego, T_ego_cam = self.construct_camera_transform() # note this is using hardcoded values calculated offline
-
-        
+ 
         # definitions for loop
         self.bridge = CvBridge()
         b_first_loop = True
@@ -175,7 +177,8 @@ class segment_object_pixels:
             cam_proj_path_and_name = my_dirs["projection_matrices"] + 'projection_matrix_{:04d}'.format(im_save_idx) + '.npy'
             np.save(cam_proj_path_and_name, cam_proj_matK_3_4_openGL, allow_pickle=False)
 
-            if b_output_debug_image and im_save_idx==0:
+            if b_output_debug_image:
+                
                 cam_proj_mat = K_3_4 @ T_cam_ego @ inv_tf(T_w_ego) 
                 T_cam_w = inv_tf(T_w_cam)
 
@@ -183,24 +186,44 @@ class segment_object_pixels:
                 pnt_c = np.concatenate((T_cam_obj[0:3, 3], [1]))
                 
                 org_px = K_3_4 @ pnt_c
-                (x, y) = np.round(np.array([org_px[0], org_px[1]]) / org_px[2]).astype(np.int)  # pixel of origin of bowl in image:  313 from left, 270 from top
-                image_cv2 = cv2.circle(image_cv2, (x, y), radius=2, color=(0, 0, 255), thickness=-1)
+                (x, y) = np.round(np.array([org_px[0], org_px[1]]) / org_px[2]).astype(np.int)  
+                image_cv2 = cv2.imread(my_dirs["images"] + 'image_{:04d}'.format(im_save_idx) + '.jpg')
+                # image_cv2 = cv2.circle(image_cv2, (x, y), radius=2, color=(0, 0, 255), thickness=-1)
 
                 pnt_w = np.concatenate((T_w_obj[0:3, 3], [1]))
                 world_origin_px = cam_proj_mat @ pnt_w
                 world_origin_px = np.array([world_origin_px[0], world_origin_px[1]]) / world_origin_px[2]
-                (x, y) = np.round(world_origin_px).astype(np.int)  # note I am not sure if world_origin_px is (row, col) or (col,row)
+                (x, y) = np.round(world_origin_px).astype(np.int)
                 x = 640 - x  # WHY???
                 image_cv2 = cv2.circle(image_cv2, (x, y), radius=1, color=(0, 255, 0), thickness=-1)
 
-                cv2.imwrite("/mounted_folder/testtestest.png", image_cv2)
+                box_length, box_width, box_height = obj_3d_bb_dims
+                vertices = np.array([[ box_length/2, box_width/2, box_height/2, 1.],
+                                     [ box_length/2, box_width/2,-box_height/2, 1.],
+                                     [ box_length/2,-box_width/2,-box_height/2, 1.],
+                                     [ box_length/2,-box_width/2, box_height/2, 1.],
+                                     [-box_length/2,-box_width/2, box_height/2, 1.],
+                                     [-box_length/2,-box_width/2,-box_height/2, 1.],
+                                     [-box_length/2, box_width/2,-box_height/2, 1.],
+                                     [-box_length/2, box_width/2, box_height/2, 1.]]).T  # corners in object frame
+
+                corners_cam_frame = T_cam_obj @ vertices # corners in camera frame
+                corners2D_scaled = K_3_4 @ corners_cam_frame  # note: K_3_4 is the undistorted K
+                corners2D = np.empty((corners2D_scaled.shape[1], 2))
+                for idx, corner_scaled in enumerate(corners2D_scaled.T):
+                    corners2D[idx, :] = np.asarray((corner_scaled[0], corner_scaled[1])/corner_scaled[2])
+
+                inds_to_connect = [[0, 3], [3, 2], [2, 1], [1, 0], [7, 4], [4, 5], 
+                                   [5, 6], [6, 7], [3, 4], [2, 5], [0, 7], [1, 6]]
+                cv_image_with_box = draw_2d_proj_of_3D_bounding_box(image_cv2, corners2D, corners2D_gt=None, color_pr=(0,0,255), linewidth=1, inds_to_connect=inds_to_connect, b_verts_only=False)
+                cv2.imwrite(my_dirs["images_with_3d_box_projections"] + 'cam_proj_debug_image_{:04d}'.format(im_save_idx) + '.jpg', cv_image_with_box)
 
             cam_fov_x = 2 * np.arctan(640/(2*K[0,0]))
             cam_fov_y = 2 * np.arctan(480/(2*K[1,1]))
             
             im_save_idx += 1
 
-        pdb.set_trace()
+        # pdb.set_trace()
 
         # find corresponding time to find which poses correspond to which images
         print('Done with bag!')
@@ -211,7 +234,7 @@ class segment_object_pixels:
             print("WARNING: No images in rosbag with topic {}".format(topic_str))
 
 
-    def construct_directory_structure(self, base_directory_path, b_save_images_with_masks=False):
+    def construct_directory_structure(self, base_directory_path, b_save_images_with_masks=False, b_output_debug_image=False):
         my_dir_dict = {}
         my_dir_dict["base"] = base_directory_path
         my_dir_dict["images"] = base_directory_path + 'images/'
@@ -221,6 +244,8 @@ class segment_object_pixels:
         my_dir_dict["projection_matrices"] = base_directory_path + 'projection_matrices/'
         if b_save_images_with_masks:
             my_dir_dict["masked_images"] = base_directory_path + 'masked_images/'
+        if b_output_debug_image:
+            my_dir_dict["images_with_3d_box_projections"] = base_directory_path + "images_with_3d_box_projections/"
 
         for path in my_dir_dict:
             if not os.path.exists(my_dir_dict[path]):
