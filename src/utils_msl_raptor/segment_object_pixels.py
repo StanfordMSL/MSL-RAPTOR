@@ -39,17 +39,33 @@ class segment_object_pixels:
         image_skip_rate = 1  # set to 1 to use every image, 2 to use every other, etc etc
         b_save_images_with_masks = False
         b_output_debug_image = False
-        topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', '/vrpn_client_node/bowl_green_msl/pose']
+        object_name = "bowl_green_msl"   #    # "bottle_swell_1"  # "bowl_green_msl"  # "bowl_grey_msl"
+        topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', "/vrpn_client_node/" + object_name  + "/pose"]
         rb_path = '/mounted_folder/bags_to_test_coral_detect/'
-        # rb_name = 'grey_bowl_msl/bowl_grey_msl_nerf_with_markers.bag'  
-        rb_name = 'green_bowl_msl/bowl_green_msl_nerf_with_markers.bag'
-        # # GREY BOWL: 285, 275  | 395, 275  | 395, 330  | 285, 330
-        # init_bb = ((285 + 395)/2, (275+ 330)/2, 395 - 285, 330 - 275)  # box format: x,y,w,h (where x,y correspond to the top left corner)
-        # init_bb_up_left = (285, 275, 395 - 285, 330 - 275)  # box format: x,y,w,h (where x,y correspond to the top left corner)
-        # GREEN BOWL: 290, 255  | 335, 255  | 335, 277  | 290, 277
-        init_bb = ((290 + 335)/2, (255+ 277)/2, 335 - 290, 277 - 255)  # box format: x,y,w,h (where x,y correspond to the top left corner)
-        init_bb_up_left = (290, 255, 335 - 290, 277 - 255)  # box format: x,y,w,h (where x,y correspond to the top left corner)
+        if object_name == "bowl_grey_msl":
+            # GREY BOWL: 285, 275  | 395, 275  | 395, 330  | 285, 330
+            rb_name = 'grey_bowl_msl/bowl_grey_msl_nerf_with_markers.bag'
+            x_range = (285, 395) # min and max x pixel for image-aligned bounding box
+            y_range = (275, 330) # min and max y pixel for image-aligned bounding box
+        elif object_name == "bowl_green_msl":
+            # GREEN BOWL: 290, 255  | 335, 255  | 335, 277  | 290, 277
+            # rb_name = 'green_bowl_msl/bowl_green_msl_nerf_with_markers.bag'  
+            # x_range = (290, 335) # min and max x pixel for image-aligned bounding box
+            # y_range = (255, 277) # min and max y pixel for image-aligned bounding box
+            # GREEN BOWL CLOSE: 244, 302  | 426, 302  | 426, 407  | 244, 407
+            rb_name = 'green_bowl_msl_close/bowl_green_msl_nerf_with_markers.bag'  
+            x_range = (244, 426) # min and max x pixel for image-aligned bounding box
+            y_range = (302, 407) # min and max y pixel for image-aligned bounding box
+        elif object_name == "bottle_swell_1":
+            # BOTTLE SWELL 1: 244, 302  | 426, 302  | 426, 407  | 244, 407
+            rb_name = 'bottle_swell_1/bottle_swell_1_nerf_with_markers.bag'
+            x_range = (268, 338) # min and max x pixel for image-aligned bounding box
+            y_range = (129, 394) # min and max y pixel for image-aligned bounding box
+        else:
+            raise RuntimeError("Object name not recognized")
         ########################################
+        init_bb = ((x_range[0] + x_range[1])/2, (y_range[0] + y_range[1])/2, x_range[1] - x_range[0], y_range[1] - y_range[0])  # box format: x,y,w,h (where x,y correspond to the center of the bounding box)
+        init_bb_up_left = (x_range[0], y_range[0], x_range[1] - x_range[0], y_range[1] - y_range[0])  # box format: x,y,w,h (where x,y correspond to the top left corner)
         
         base_directory_path = rb_path + rb_name[:-4] + '_output/'
         my_dirs = self.construct_directory_structure(base_directory_path, b_save_images_with_masks)
@@ -89,7 +105,7 @@ class segment_object_pixels:
                 quad_pose_times.append(t)
                 quad_poses.append(pose_to_tf(msg.pose))
                 continue
-            elif topic == '/vrpn_client_node/bowl_green_msl/pose':
+            elif topic == "/vrpn_client_node/" + object_name  + "/pose":
                 obj_pose_times.append(t)
                 obj_poses.append(pose_to_tf(msg.pose))
                 continue
