@@ -64,6 +64,7 @@ class segment_object_pixels:
             rb_name = 'bottle_swell_1/bottle_swell_1_nerf_with_markers.bag'
             x_range = (268, 338) # min and max x pixel for image-aligned bounding box
             y_range = (129, 394) # min and max y pixel for image-aligned bounding box
+            obj_3d_bb_dims = np.array([70, 70, 260])/1000  # x, y, z dim in meters (local frame)
         else:
             raise RuntimeError("Object name not recognized")
         ########################################
@@ -95,10 +96,10 @@ class segment_object_pixels:
         #     K_undistorted, _ = cv2.getOptimalNewCameraMatrix(K, dist_coefs, (msg.width, msg.height), 0, (msg.width, msg.height))
         #     K_3_4 = np.concatenate((K_undistorted.T, np.zeros((1,3)))).T
         #     break
-        K = np.array([[486.12588397  , 0.   ,      328.90870824],
-                        [  0.  ,       486.18350238, 250.9030576 ],
-                        [  0. ,          0. ,          1.        ]])
-        dist_coefs = np.array([-0.4489306 ,  0.28033736 ,-0.00006914,  0.00007105 , 0.11475715])
+        K = np.array([[484.87367662,   0.        , 328.8659078 ],
+                      [  0.        , 485.00833725, 248.7795412 ],
+                      [  0.        ,   0.        ,   1.        ]])
+        dist_coefs = np.array([-0.43865152,  0.24289838,  0.00008457,  0.00023874,  0.0764542])
         K_undistorted, _ = cv2.getOptimalNewCameraMatrix(K, dist_coefs, (640,480), 0, (640,480))
         K_3_4 = np.concatenate((K_undistorted.T, np.zeros((1,3)))).T
 
@@ -160,7 +161,7 @@ class segment_object_pixels:
         for im_time in im_times:
             quad_pose, _ = find_closest_by_time(time_to_match=im_time, time_list=quad_pose_times, message_list=quad_poses)
             T_w_obj, _ = find_closest_by_time(time_to_match=im_time, time_list=obj_pose_times, message_list=obj_poses)
-            T_w_obj[2,3] = (67.5/1000)/2  # shift the origin of the bowl to the center of it's bounding box. It's dims are 1770 x 170, x 67.5 (mm)
+            T_w_obj[2,3] = obj_3d_bb_dims[2]/2  # shift the origin of the bowl to the center of it's bounding box. It's dims are 1770 x 170, x 67.5 (mm)
 
             cam_pose_name = my_dirs["camera_poses"] + 'cam_pose_{:04d}'.format(im_save_idx) + '.npy'
             obj_pose_name = my_dirs["bowl_green_msl_poses"] + 'obj_pose_{:04d}'.format(im_save_idx) + '.npy'
@@ -194,7 +195,7 @@ class segment_object_pixels:
                 world_origin_px = cam_proj_mat @ pnt_w
                 world_origin_px = np.array([world_origin_px[0], world_origin_px[1]]) / world_origin_px[2]
                 (x, y) = np.round(world_origin_px).astype(np.int)
-                x = 640 - x  # WHY???
+                image_cv2 = cv2.flip(image_cv2, 1)  # WHY???
                 image_cv2 = cv2.circle(image_cv2, (x, y), radius=1, color=(0, 255, 0), thickness=-1)
 
                 box_length, box_width, box_height = obj_3d_bb_dims
@@ -257,8 +258,10 @@ class segment_object_pixels:
         # this assumes camera axis is +z and y is down. OpenGL assumes cam axis is -z and y is up
         # R_cam_ego = np.reshape([-0.0246107,  -0.99869617, -0.04472445,  -0.05265648,  0.0459709,  -0.99755399, 0.99830938, -0.02219547, -0.0537192], (3,3))
         # t_cam_ego = np.asarray([0.11041654, 0.06015242, -0.07401183])
-        R_cam_ego = np.reshape([ 0.02495941, -0.99952024, -0.01833889, -0.04791799,  0.01712734, -0.99870442,  0.99853938,  0.02580584, -0.04746751], (3,3))
-        t_cam_ego = np.array([ 0.012847,    0.0223505,  -0.08445964])
+        # R_cam_ego = np.reshape([ 0.02495941, -0.99952024, -0.01833889, -0.04791799,  0.01712734, -0.99870442,  0.99853938,  0.02580584, -0.04746751], (3,3))
+        # t_cam_ego = np.array([ 0.012847,    0.0223505,  -0.08445964])
+        R_cam_ego = np.reshape([ 0.02435766, -0.99953732, -0.01821654, -0.03712431,  0.01730499, -0.99916081,  0.99901376,  0.02501349, -0.03668562], (3,3))
+        t_cam_ego = np.array([ 0.00666853,  0.01268759, -0.05903087])
         
         T_cam_ego = np.eye(4)
         T_cam_ego[0:3, 0:3] = R_cam_ego
