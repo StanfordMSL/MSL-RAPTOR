@@ -36,11 +36,12 @@ class segment_object_pixels:
 
     def __init__(self):
         # INPUTS
-        max_num_images = 40  # set to -1 to have no limit
-        image_skip_rate = 30  # set to 1 to use every image, 2 to use every other, etc etc
+        max_num_images = -1  # set to -1 to have no limit
+        image_skip_rate = 1  # set to 1 to use every image, 2 to use every other, etc etc
+        b_whiteout_background = True
         b_save_images_with_masks = True
         b_output_debug_image = True
-        object_name = "bottle_swell_1"   #    # "bottle_swell_1"  # "bowl_green_msl"  # "bowl_grey_msl"
+        object_name = "bowl_green_msl"   #    # "bottle_swell_1"  # "bowl_green_msl"  # "bowl_grey_msl"
         topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', "/vrpn_client_node/" + object_name  + "/pose"]
         rb_path = '/mounted_folder/bags_to_test_coral_detect/'
         if object_name == "bowl_grey_msl":
@@ -119,8 +120,6 @@ class segment_object_pixels:
                 im_times.append(t)
                 image_cv2 = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
                 image_cv2 = cv2.undistort(image_cv2, K, dist_coefs, None, K_undistorted)
-                img_path_and_name = my_dirs["images"] + 'image_{:04d}'.format(im_save_idx) + '.jpg'
-                cv2.imwrite(img_path_and_name, image_cv2)
                 
                 if b_first_loop:
                     b_first_loop = False
@@ -129,10 +128,26 @@ class segment_object_pixels:
                     next_state = self.tracker.reinit(init_bb_up_left, image_cv2)
                     redImg = np.zeros(image_cv2.shape, image_cv2.dtype)
                     redImg[:,:] = (0, 0, 255)
-                    
+                    whiteImg = np.zeros(image_cv2.shape, image_cv2.dtype)
+                    whiteImg[:,:] = (255, 255, 255)
+
+                
                 next_state, abb, mask = self.tracker.track(image_cv2, next_state)
                 seg_path_and_name_result = my_dirs["seg_masks"] + 'seg_image_{:04d}'.format(im_save_idx) + '.npy'
                 np.save(seg_path_and_name_result, mask, allow_pickle=False)
+
+                
+                img_path_and_name = my_dirs["images"] + 'image_{:04d}'.format(im_save_idx) + '.jpg'
+                if b_whiteout_background:
+                    image_whitebackground = copy(image_cv2)
+                    np_mask = np.array(mask, dtype=np.uint8)
+                    just_bowl = cv2.bitwise_and(image_whitebackground, image_whitebackground, mask=np_mask)
+                    white_bowl_only = cv2.bitwise_or(whiteImg, whiteImg, mask=np_mask)
+                    black_bowl_white_bkgrnd = cv2.bitwise_and(whiteImg, whiteImg, mask=(1-np_mask))
+                    image_whitebackground = cv2.bitwise_or(black_bowl_white_bkgrnd, just_bowl)
+                    cv2.imwrite(img_path_and_name, image_whitebackground)
+                else:
+                    cv2.imwrite(img_path_and_name, image_cv2)                    
 
                 if b_save_images_with_masks:
                     abb = bb_corners_to_angled_bb(abb.reshape(-1,2))
@@ -146,8 +161,6 @@ class segment_object_pixels:
                     redMask = cv2.bitwise_and(redImg, redImg, mask=np_mask)
                     alpha = 0.3
                     cv2.addWeighted(redMask, alpha, image_cv2_modified, 1-alpha, 0, image_cv2_modified)
-                    # seg_path_and_name_result = seg_im_out_path + 'seg_image_{:04d}'.format(im_save_idx) + '.jpg'
-                    # cv2.imwrite(seg_path_and_name_result, np_mask)
                     img_path_and_name_result = my_dirs["masked_images"] + 'masked_image_{:04d}'.format(im_save_idx) + '.jpg'
                     cv2.imwrite(img_path_and_name_result, image_cv2_modified)
 
