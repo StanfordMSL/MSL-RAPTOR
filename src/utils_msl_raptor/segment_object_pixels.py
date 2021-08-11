@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys, os, time
 from copy import copy
+import shutil
 import pdb
 
 import numpy as np
@@ -36,11 +37,12 @@ class segment_object_pixels:
 
     def __init__(self):
         # INPUTS
-        max_num_images = -1  # set to -1 to have no limit
-        image_skip_rate = 1  # set to 1 to use every image, 2 to use every other, etc etc
+        max_num_images = 40  # set to -1 to have no limit
+        image_skip_rate = 30  # set to 1 to use every image, 2 to use every other, etc etc
         b_whiteout_background = True
         b_save_images_with_masks = True
         b_output_debug_image = True
+        b_create_subset_dataset = True
         object_name = "bowl_green_msl"   #    # "bottle_swell_1"  # "bowl_green_msl"  # "bowl_grey_msl"
         topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', "/vrpn_client_node/" + object_name  + "/pose"]
         rb_path = '/mounted_folder/bags_to_test_coral_detect/'
@@ -114,9 +116,9 @@ class segment_object_pixels:
                 obj_poses.append(pose_to_tf(msg.pose))
                 continue
             elif topic == '/quad7/camera/image_raw':
-                if im_idx % image_skip_rate > 0:
-                    im_idx += 1
-                    continue
+                # if im_idx % image_skip_rate > 0:
+                #     im_idx += 1
+                #     continue
                 im_times.append(t)
                 image_cv2 = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
                 image_cv2 = cv2.undistort(image_cv2, K, dist_coefs, None, K_undistorted)
@@ -166,8 +168,8 @@ class segment_object_pixels:
 
                 im_idx += 1
                 im_save_idx += 1
-                if max_num_images > 0 and im_save_idx >= max_num_images:
-                    break
+                # if max_num_images > 0 and im_save_idx >= max_num_images:
+                #     break
         bag_in.close()
 
         im_save_idx = 0
@@ -177,7 +179,7 @@ class segment_object_pixels:
             T_w_obj[2,3] = obj_3d_bb_dims[2]/2  # shift the origin of the bowl to the center of it's bounding box. It's dims are 1770 x 170, x 67.5 (mm)
 
             cam_pose_name = my_dirs["camera_poses"] + 'cam_pose_{:04d}'.format(im_save_idx) + '.npy'
-            obj_pose_name = my_dirs["bowl_green_msl_poses"] + 'obj_pose_{:04d}'.format(im_save_idx) + '.npy'
+            obj_pose_name = my_dirs[object_name + "_poses"] + 'obj_pose_{:04d}'.format(im_save_idx) + '.npy'
             T_w_ego = quad_pose
             T_w_cam = T_w_ego @ T_ego_cam
             np.save(cam_pose_name, T_w_cam, allow_pickle=False)
@@ -239,6 +241,13 @@ class segment_object_pixels:
 
         # pdb.set_trace()
 
+        if b_create_subset_dataset:
+            subset_directory_path = rb_path + rb_name[:-4] + '_output_subset/'
+            my_sub_dirs = self.construct_directory_structure(subset_directory_path, object_name, b_save_images_with_masks, b_output_debug_image)
+            subset_idx_arr = [i*image_skip_rate for i in range(max_num_images) if i < len(im_times)]
+            self.copy_subset_of_data(my_dirs, my_sub_dirs, subset_idx_arr, object_name)
+
+
         # find corresponding time to find which poses correspond to which images
         print('Done with bag!')
         if im_idx > 0:
@@ -247,6 +256,19 @@ class segment_object_pixels:
         else:
             print("WARNING: No images in rosbag with topic {}".format(topic_str))
 
+    def copy_subset_of_data(self, src_dir_dict, dest_dir_dict, subset_idx_arr, object_name):
+        for sub_idx in subset_idx_arr:
+            shutil.copyfile(src_dir_dict["images"] + 'image_{:04d}'.format(sub_idx) + '.jpg', dest_dir_dict["images"] + 'image_{:04d}'.format(sub_idx) + '.jpg')
+            shutil.copyfile(src_dir_dict["seg_masks"] + 'seg_image_{:04d}'.format(sub_idx) + '.npy', dest_dir_dict["seg_masks"] + 'seg_image_{:04d}'.format(sub_idx) + '.npy')
+            shutil.copyfile(src_dir_dict["camera_poses"] + 'cam_pose_{:04d}'.format(sub_idx) + '.npy', dest_dir_dict["camera_poses"] + 'cam_pose_{:04d}'.format(sub_idx) + '.npy')
+            shutil.copyfile(src_dir_dict[object_name + "_poses"] + 'obj_pose_{:04d}'.format(sub_idx) + '.npy', dest_dir_dict[object_name + "_poses"] + 'obj_pose_{:04d}'.format(sub_idx) + '.npy')
+            shutil.copyfile(src_dir_dict["projection_matrices"] + 'projection_matrix_{:04d}'.format(sub_idx) + '.npy', dest_dir_dict["projection_matrices"] + 'projection_matrix_{:04d}'.format(sub_idx) + '.npy')
+            if "masked_images" in src_dir_dict:
+                shutil.copyfile(src_dir_dict["masked_images"] + 'masked_image_{:04d}'.format(sub_idx) + '.jpg', dest_dir_dict["masked_images"] + 'masked_image_{:04d}'.format(sub_idx) + '.jpg')
+            if "images_with_3d_box_projections" in src_dir_dict:
+                shutil.copyfile(src_dir_dict["images_with_3d_box_projections"] + 'cam_proj_debug_image_{:04d}'.format(sub_idx) + '.jpg', dest_dir_dict["images_with_3d_box_projections"] + 'cam_proj_debug_image_{:04d}'.format(sub_idx) + '.jpg')
+            
+
 
     def construct_directory_structure(self, base_directory_path, object_name, b_save_images_with_masks=False, b_output_debug_image=False):
         my_dir_dict = {}
@@ -254,7 +276,7 @@ class segment_object_pixels:
         my_dir_dict["images"] = base_directory_path + 'images/'
         my_dir_dict["seg_masks"] = base_directory_path + 'seg_masks/'
         my_dir_dict["camera_poses"] = base_directory_path + 'camera_poses/'
-        my_dir_dict["bowl_green_msl_poses"] = base_directory_path + object_name + '_poses/'
+        my_dir_dict[object_name + "_poses"] = base_directory_path + object_name + '_poses/'
         my_dir_dict["projection_matrices"] = base_directory_path + 'projection_matrices/'
         if b_save_images_with_masks:
             my_dir_dict["masked_images"] = base_directory_path + 'masked_images/'
