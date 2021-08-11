@@ -40,7 +40,7 @@ class segment_object_pixels:
         image_skip_rate = 30  # set to 1 to use every image, 2 to use every other, etc etc
         b_save_images_with_masks = True
         b_output_debug_image = True
-        object_name = "bowl_green_msl"   #    # "bottle_swell_1"  # "bowl_green_msl"  # "bowl_grey_msl"
+        object_name = "bottle_swell_1"   #    # "bottle_swell_1"  # "bowl_green_msl"  # "bowl_grey_msl"
         topic_str = ['/quad7/camera/image_raw', '/vrpn_client_node/quad7/pose', "/vrpn_client_node/" + object_name  + "/pose"]
         rb_path = '/mounted_folder/bags_to_test_coral_detect/'
         if object_name == "bowl_grey_msl":
@@ -72,7 +72,7 @@ class segment_object_pixels:
         init_bb_up_left = (x_range[0], y_range[0], x_range[1] - x_range[0], y_range[1] - y_range[0])  # box format: x,y,w,h (where x,y correspond to the top left corner)
         
         base_directory_path = rb_path + rb_name[:-4] + '_output/'
-        my_dirs = self.construct_directory_structure(base_directory_path, b_save_images_with_masks, b_output_debug_image)
+        my_dirs = self.construct_directory_structure(base_directory_path, object_name, b_save_images_with_masks, b_output_debug_image)
         T_cam_ego, T_ego_cam = self.construct_camera_transform() # note this is using hardcoded values calculated offline
  
         # definitions for loop
@@ -235,13 +235,13 @@ class segment_object_pixels:
             print("WARNING: No images in rosbag with topic {}".format(topic_str))
 
 
-    def construct_directory_structure(self, base_directory_path, b_save_images_with_masks=False, b_output_debug_image=False):
+    def construct_directory_structure(self, base_directory_path, object_name, b_save_images_with_masks=False, b_output_debug_image=False):
         my_dir_dict = {}
         my_dir_dict["base"] = base_directory_path
         my_dir_dict["images"] = base_directory_path + 'images/'
         my_dir_dict["seg_masks"] = base_directory_path + 'seg_masks/'
         my_dir_dict["camera_poses"] = base_directory_path + 'camera_poses/'
-        my_dir_dict["bowl_green_msl_poses"] = base_directory_path + 'bowl_green_msl_poses/'
+        my_dir_dict["bowl_green_msl_poses"] = base_directory_path + object_name + '_poses/'
         my_dir_dict["projection_matrices"] = base_directory_path + 'projection_matrices/'
         if b_save_images_with_masks:
             my_dir_dict["masked_images"] = base_directory_path + 'masked_images/'
